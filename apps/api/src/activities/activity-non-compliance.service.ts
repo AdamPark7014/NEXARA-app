@@ -5,7 +5,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
-import { DOMAIN_EVENTS, type SalidaDeJornada } from '../domain-events/domain-event.types.js';
+import { DOMAIN_EVENTS, type EntradaDeJornada, type SalidaDeJornada } from '../domain-events/domain-event.types.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { WORKDAY_TIMEZONE, workDateKey, workDayEnd, workDayStart } from '../common/time/workday.js';
 import { limiteDeEntrega } from './semaforo-actividad.js';
@@ -116,6 +116,10 @@ export class ActivityNonComplianceService implements OnModuleInit {
     this.domainEvents?.subscribe<SalidaDeJornada>(DOMAIN_EVENTS.ATTENDANCE_CHECKOUT, async (salida) => {
       await this.alChecarSalida(salida);
     });
+    this.domainEvents?.subscribe<EntradaDeJornada>(DOMAIN_EVENTS.ATTENDANCE_CHECKIN, async (entrada) => {
+      const r = await this.alChecarEntrada(entrada);
+      if (r.cerradas) this.logger.log(`Entrada de ${entrada.userId}: ${r.cerradas} actividad(es) no cumplida(s)`);
+    });
   }
 
   /**
@@ -215,10 +219,36 @@ export class ActivityNonComplianceService implements OnModuleInit {
     }
   }
 
-  async barridoNocturno(ahora: Date = new Date()): Promise<{ cerradas: number }> {
+  /**
+   * Al checar entrada (Adam, 21-11-2026): «al inicio de jornada se tienen que cerrar todas las actividades
+   * de la persona». Lo que venció antes de esta entrada y no entregó pasa a «No cumplida» en ese momento,
+   * sin esperar a su salida ni al barrido: nada queda colgado de un turno anterior, sea de día o de noche.
+   * Su propia jornada recién abierta no la protege; la de un compañero de equipo que sigue trabajando, sí.
+   */
+  async alChecarEntrada(entrada: EntradaDeJornada): Promise<{ cerradas: number }> {
+    return this.barridoNocturno(new Date(entrada.at), { userId: entrada.userId, companyId: entrada.companyId });
+  }
+
+  async barridoNocturno(
+    ahora: Date = new Date(),
+    solo?: { userId: number; companyId: number },
+  ): Promise<{ cerradas: number }> {
     const filas = (await this.prisma.activity.findMany({
       where: {
         deletedAt: null,
+        ...(solo
+          ? {
+              companyId: solo.companyId,
+              AND: [
+                {
+                  OR: [
+                    { responsableId: solo.userId },
+                    { assignees: { some: { userId: solo.userId, retiradoAt: null } } },
+                  ],
+                },
+              ],
+            }
+          : {}),
         estatus: {
           in: [
             ACTIVITY_STATUS.PENDIENTE,
@@ -244,6 +274,8 @@ export class ActivityNonComplianceService implements OnModuleInit {
       select: { userId: true },
     });
     const conJornadaAbierta = new Set(abiertas.map((d) => d.userId));
+    // Quien acaba de checar entrada ya abrió jornada: la suya no protege lo que dejó vencer.
+    if (solo) conJornadaAbierta.delete(solo.userId);
 
     let cerradas = 0;
     for (const fila of filas) {
@@ -257,6 +289,7 @@ export class ActivityNonComplianceService implements OnModuleInit {
       if (cierre.getTime() < NO_CUMPLIDA_VIGENTE_DESDE.getTime()) continue;
 
       const ejecutores = this.ejecutoresDe(fila);
+      if (solo && !ejecutores.includes(solo.userId)) continue;
       const entregas = this.entregas(fila, ejecutores);
       const sinEntregar = entregas.filter((e) => !e.entregadaAt);
       if (!sinEntregar.length) continue;

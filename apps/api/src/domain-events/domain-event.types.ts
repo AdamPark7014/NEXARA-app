@@ -7,6 +7,8 @@ export const DOMAIN_EVENTS = {
   ENTITY_UPDATED: 'entity.updated',
   /** Alguien checó su salida de jornada él mismo, incluyendo salidas por cierre automático a las 23:30 o registradas por un jefe. */
   ATTENDANCE_CHECKOUT: 'attendance.checkout',
+  /** Alguien abrió su jornada (entrada propia o registrada por un jefe). */
+  ATTENDANCE_CHECKIN: 'attendance.checkin',
 } as const;
 
 export type DomainEventName = (typeof DOMAIN_EVENTS)[keyof typeof DOMAIN_EVENTS];
@@ -29,11 +31,19 @@ export type SalidaDeJornada = {
   porJefe?: boolean;
 };
 
+export type EntradaDeJornada = {
+  userId: number;
+  companyId: number;
+  /** Hora de la entrada registrada. */
+  at: Date;
+};
+
 export type DomainEventPayloads = {
   [DOMAIN_EVENTS.AUTO_APPROVAL_EVALUATE]: AutoApprovalContext;
   [DOMAIN_EVENTS.ENTITY_CREATED]: EntityLifecyclePayload;
   [DOMAIN_EVENTS.ENTITY_UPDATED]: EntityLifecyclePayload;
   [DOMAIN_EVENTS.ATTENDANCE_CHECKOUT]: SalidaDeJornada;
+  [DOMAIN_EVENTS.ATTENDANCE_CHECKIN]: EntradaDeJornada;
 };
 
 export type DomainEventHandler<T = unknown> = (payload: T) => void | Promise<void>;

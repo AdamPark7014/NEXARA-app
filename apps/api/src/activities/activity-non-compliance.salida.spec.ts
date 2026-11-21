@@ -211,4 +211,46 @@ describe('cierre de jornada al checar salida (regla de Adam, 20-11)', () => {
     expect(r3.cerradas).toBe(0);
     expect(otra.registros).toHaveLength(0);
   });
+
+  it('al checar entrada: lo que venció antes se cierra aunque su jornada ya esté abierta; lo de hoy no', async () => {
+    const vencida = actividad({
+      id: 500,
+      fechaInicio: MX('2026-10-27T10:00:00'),
+      fechaMaxima: MX('2026-10-27T10:00:00'),
+      fechaEntregaEsperada: MX('2026-10-27T10:00:00'),
+      fechaAsignacion: MX('2026-10-27T08:00:00'),
+    });
+    const hoy = MX('2026-10-28T17:00:00');
+    const deHoy = actividad({ id: 501, fechaInicio: hoy, fechaMaxima: hoy, fechaEntregaEsperada: hoy });
+    const { service, prisma, registros } = armar([vencida, deHoy]);
+    prisma.attendanceDay.findMany.mockResolvedValue([{ userId: 15 }]); // acaba de abrir la suya
+    const r = await service.alChecarEntrada({ userId: 15, companyId: 1, at: MX('2026-10-28T10:02:00') });
+    expect(r.cerradas).toBe(1);
+    expect(registros.map((x) => x.activityId)).toEqual([500]);
+    // Solo busca lo de esa persona y de su empresa.
+    const where = prisma.activity.findMany.mock.calls[0][0].where;
+    expect(where.companyId).toBe(1);
+    expect(JSON.stringify(where.AND)).toContain('"responsableId":15');
+  });
+
+  it('al checar entrada: en equipo no se cierra si un compañero sigue con jornada abierta', async () => {
+    const equipo = actividad({
+      id: 503,
+      assignmentCharge: 'TEAM',
+      assignees: [
+        { userId: 15, rol: 'EJECUTOR', asignadoAt: MX('2026-10-27T08:00:00'), inicioRealAt: null, finRealAt: null },
+        { userId: 58, rol: 'EJECUTOR', asignadoAt: MX('2026-10-27T08:00:00'), inicioRealAt: null, finRealAt: null },
+      ],
+      fechaInicio: MX('2026-10-27T10:00:00'),
+      fechaMaxima: MX('2026-10-27T10:00:00'),
+      fechaEntregaEsperada: MX('2026-10-27T10:00:00'),
+      fechaAsignacion: MX('2026-10-27T08:00:00'),
+    });
+    const conCompa = armar([equipo]);
+    conCompa.prisma.attendanceDay.findMany.mockResolvedValue([{ userId: 15 }, { userId: 58 }]);
+    expect((await conCompa.service.alChecarEntrada({ userId: 15, companyId: 1, at: MX('2026-10-28T10:02:00') })).cerradas).toBe(0);
+    const solo = armar([equipo]);
+    solo.prisma.attendanceDay.findMany.mockResolvedValue([{ userId: 15 }]);
+    expect((await solo.service.alChecarEntrada({ userId: 15, companyId: 1, at: MX('2026-10-28T10:02:00') })).cerradas).toBe(1);
+  });
 });

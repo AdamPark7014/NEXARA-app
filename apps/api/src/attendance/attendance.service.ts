@@ -41,7 +41,7 @@ import { ejecutoresDeActividad, yaEntrego } from '../activities/recordatorios-jo
 import { limiteDeEntrega } from '../activities/semaforo-actividad.js';
 import { NO_CUMPLIDA_VIGENTE_DESDE } from '../activities/incumplimiento.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
-import { DOMAIN_EVENTS, type SalidaDeJornada } from '../domain-events/domain-event.types.js';
+import { DOMAIN_EVENTS, type EntradaDeJornada, type SalidaDeJornada } from '../domain-events/domain-event.types.js';
 import { MENSAJE_FIN_DE_SEMANA_SIN_GUARDIA, diaDeGuardia } from '../guardias/guardias-reglas.js';
 import { festivoSinLaborar } from '../festivos/festivos-datos.js';
 import { mensajeFestivoSinLaborar } from '../festivos/festivos-reglas.js';
@@ -792,6 +792,9 @@ export class AttendanceService {
 
     this.emitAttendanceUpdate(tenantId, targetId, type, at, checada.user);
 
+    if (type === 'entrada') {
+      this.domainEvents?.publish<EntradaDeJornada>(DOMAIN_EVENTS.ATTENDANCE_CHECKIN, { userId: targetId, companyId: tenantId, at });
+    }
     if (type === 'salida') {
       await cerrarSesionesDeUsuario(this.prisma, { userId: targetId, at, motivo: 'SALIDA', companyId: tenantId });
       this.domainEvents?.publish<SalidaDeJornada>(DOMAIN_EVENTS.ATTENDANCE_CHECKOUT, {
@@ -2210,6 +2213,13 @@ export class AttendanceService {
       );
 
       await this.avisarSiHayQueRevisar(userId, 'entrada', attendance.id, columnasValidacion);
+
+      // Al abrir jornada se cierra lo que dejó vencer de turnos anteriores (`alChecarEntrada`).
+      this.domainEvents?.publish<EntradaDeJornada>(DOMAIN_EVENTS.ATTENDANCE_CHECKIN, {
+        userId,
+        companyId: tenantId,
+        at: now,
+      });
 
       return {
         message: 'Entrada registrada exitosamente',
