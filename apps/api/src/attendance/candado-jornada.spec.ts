@@ -67,6 +67,12 @@ describe('sin entrada no se trabaja: qué peticiones piden jornada abierta', () 
     expect(pideJornadaAbierta({ metodo: 'POST', url: '/api/activities', usuario: { id: null, isBranchUser: true }, env: {} })).toBe(false);
   });
 
+  it('exención temporal por id (JORNADA_EXENTOS): solo esa persona', () => {
+    const env = { JORNADA_EXENTOS: '7, 12' };
+    expect(pideJornadaAbierta({ metodo: 'POST', url: '/api/activities', usuario: tecnico, env })).toBe(false);
+    expect(pideJornadaAbierta({ metodo: 'POST', url: '/api/activities', usuario: { ...tecnico, id: 8 }, env })).toBe(true);
+  });
+
   it('se apaga con JORNADA_OBLIGATORIA=0', () => {
     expect(pideJornadaAbierta({ metodo: 'POST', url: '/api/activities', usuario: tecnico, env: { JORNADA_OBLIGATORIA: '0' } })).toBe(false);
   });

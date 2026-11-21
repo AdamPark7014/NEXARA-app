@@ -26,9 +26,10 @@ export class AttendanceController {
    */
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @Get('web-checkin')
-  async webCheckin(@CurrentCompanyId() companyId: number | null) {
+  async webCheckin(@CurrentCompanyId() companyId: number | null, @Req() req: any) {
     if (companyId == null) return { abierta: false, hasta: null };
-    const v = await this.attendanceService.ventanaWeb(companyId);
+    // También vale la ventana que dirección le abrió solo a esta persona.
+    const v = await this.attendanceService.ventanaWeb(companyId, new Date(), req?.user?.id ?? null);
     return { abierta: v.abierta, hasta: v.hasta ? v.hasta.toISOString() : null };
   }
 
