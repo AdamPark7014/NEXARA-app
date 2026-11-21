@@ -496,6 +496,36 @@ body.dark {
 }
 
 /* ------------------------------------------------------------
+   Alias en oscuro
+   Un alias declarado en `:root` (`--ui-bg-2: var(--ui-surface-2)`) se resuelve
+   ahí, con el valor del tema claro, y así lo hereda `body.dark`: cambiar el
+   token de origen no lo mueve. Lo que pintaba con un alias se quedaba claro en
+   el tema oscuro (tarjetas blancas con letra clara, ilegibles). Aquí se vuelven
+   a declarar para que se resuelvan con los valores oscuros.
+   `lib/tokens-oscuro.spec.ts` falla si se agrega un alias sin su par aquí.
+   ------------------------------------------------------------ */
+body.dark {
+  --ui-surface-0: var(--ui-bg);
+  --ui-surface-1: var(--ui-surface);
+  --ui-surface-sunken: var(--ui-surface-2);
+  --ui-surface-raised: var(--ui-surface-3);
+  --ui-bg-2: var(--ui-surface-2);
+
+  --ui-fg-disabled: var(--ui-fg-4);
+  --ui-fg-muted: var(--ui-fg-3);
+  --ui-text-primary: var(--ui-fg);
+  --ui-text-secondary: var(--ui-fg-2);
+  --ui-text-tertiary: var(--ui-fg-3);
+
+  --ui-primary: var(--ui-brand);
+  --ui-primary-hover: var(--ui-brand-hover);
+  --ui-primary-soft: var(--ui-brand-soft);
+
+  --ui-focus-ring: var(--ui-ring);
+  --ui-focus-outline: 2px solid var(--ui-brand);
+}
+
+/* ------------------------------------------------------------
    Dentro del shell de los paneles: tipografía única (Inter 14 px).
    Los módulos que piden Space Grotesk / Manrope por variable heredan
    Inter sin tocar su código; su color y su forma no cambian aquí.

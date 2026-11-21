@@ -277,6 +277,9 @@ function authActionLabel(action: string): string {
 
 const RISK_LABEL: Record<string, string> = { high: "Alto", medium: "Medio", low: "Bajo" };
 
+/** La casilla sigue de 18 px, pero toda esta zona la marca: con el dedo, 18 px no se atinan. */
+const ZONA_DE_CASILLA: React.CSSProperties = { display: "grid", placeItems: "center", minWidth: 32, minHeight: 32, cursor: "pointer" };
+
 function MiniBars({
   points,
   color = "var(--primary)",
@@ -1005,23 +1008,27 @@ export default function UsersPage() {
     ...(cfg.canAssign ? [{
       key: "select" as const,
       label: (
-        <input
-          type="checkbox"
-          checked={selected.size > 0 && selected.size === visibleUsers.length}
-          onChange={toggleSelectAll}
-          aria-label="Seleccionar todos"
-          style={{ width: 18, height: 18 }}
-        />
+        <label style={ZONA_DE_CASILLA}>
+          <input
+            type="checkbox"
+            checked={selected.size > 0 && selected.size === visibleUsers.length}
+            onChange={toggleSelectAll}
+            aria-label="Seleccionar todos"
+            style={{ width: 18, height: 18 }}
+          />
+        </label>
       ) as unknown as string,
       width: 44,
       render: (u: ApiUser) => (
-        <input
-          type="checkbox"
-          checked={selected.has(u.id)}
-          onChange={() => toggleSelect(u.id)}
-          aria-label={`Seleccionar a ${u.nombre}`}
-          style={{ width: 18, height: 18 }}
-        />
+        <label style={ZONA_DE_CASILLA}>
+          <input
+            type="checkbox"
+            checked={selected.has(u.id)}
+            onChange={() => toggleSelect(u.id)}
+            aria-label={`Seleccionar a ${u.nombre}`}
+            style={{ width: 18, height: 18 }}
+          />
+        </label>
       ),
     }] : []),
     {
@@ -1034,8 +1041,8 @@ export default function UsersPage() {
               type="button"
               onClick={() => void openDrawer(u)}
               style={{
-                background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 650, fontSize: 13.5,
-                color: "var(--text-primary)", textAlign: "left",
+                background: "none", border: "none", padding: "3px 0", minHeight: 24, cursor: "pointer", fontWeight: 650,
+                fontSize: 13.5, color: "var(--text-primary)", textAlign: "left",
               }}
             >
               {u.nombre}

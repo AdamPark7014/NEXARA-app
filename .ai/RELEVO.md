@@ -1,5 +1,37 @@
 # RELEVO
 
+- **21-11 ~18:00 México (claude-code, nube; Cursor/Codex no alcanzables) — Sexta vuelta de pulido: tema oscuro legible y teléfono con el dedo. Sin migraciones; sin desplegar.**
+  - **Cómo se midió:** un navegador recorrió las 26 pantallas del menú a 390 px, en claro y en oscuro, midiendo lo que se
+    sale de la pantalla, los controles de menos de 24 px y el contraste de cada texto contra su fondo real. Nada se
+    desborda. En oscuro salieron tarjetas blancas con letra clara (contraste 1.1:1) en Costos, Vehículos y Asistencias.
+  - **Causa (web, `app/ui-tokens.scss`):** un alias declarado en `:root` (`--ui-bg-2: var(--ui-surface-2)`) se resuelve
+    en `:root` con el valor del tema claro y `body.dark` lo hereda ya resuelto: cambiar el token de origen no lo mueve.
+    Quince alias estaban así (`--ui-bg-2`, `--ui-surface-sunken`, `--ui-surface-raised`, `--ui-fg-muted`,
+    `--ui-fg-disabled`, `--ui-primary`, `--ui-focus-outline`…), usados por unas 60 reglas de 29 archivos: asistencias,
+    comidas, festivos, guardias, almacén, herramientas, costos, pizarra, chat, mapas, dirección. Ahora se vuelven a
+    declarar en `body.dark`. Comprobado compilando las hojas con sass y leyendo el valor en Chromium: `--ui-bg-2` en
+    oscuro pasó de `rgb(248,250,251)` a `rgb(14,21,34)`.
+  - **Candado:** `lib/tokens-oscuro.spec.ts` lee las cinco hojas globales y falla, nombrando el token, si un alias de
+    `:root` depende de algo que el tema oscuro cambia y no se repite en `body.dark` (o en `body`).
+  - **Anillo de foco (web, `app/globals.scss`):** `--ring-soft`, `--nx-panel-ring` y `--nx-panel-ring-accent` se
+    declaraban en `:root` con `var(--primary)` / `var(--accent)`, que viven en `body`: quedaban sin valor y el anillo
+    de foco de campos y botones de la capa antigua (`utilities.scss`) no se pintaba en ningún tema. Ahora se declaran
+    en `body`. `--nx-panel-hairline-strong` y `--nx-panel-surface-overlay-strong` se suman a sus hermanos en oscuro.
+  - **Con el dedo:** enlace de regreso de `PageHead` (18 px de alto), «Ver el detalle de…» en Desempeño (18 px) y el
+    nombre en las tarjetas de Asistencia (21 px) crecen solo en pantallas táctiles (`pointer: coarse`); en Usuarios la
+    casilla de 18 px ahora se marca tocando toda su celda y el nombre mide 25 px de alto.
+  - **Hallazgos sin tocar:** en tema claro `--nx-panel-hairline`, `--nx-panel-hairline-soft` y
+    `--nx-panel-surface-overlay` tampoco tienen valor (mismo motivo: `--border` y `--surface` viven en `body`); 44
+    reglas caen a su respaldo `var(--border)` y 8 estilos sin respaldo se quedan sin borde (asistencia de RH,
+    `ModuleStub`, pestañas de roles, portales). Arreglarlo aclara bordes en muchas pantallas: se deja para una vuelta
+    con vista previa. El índice de una persona dada de baja en Desempeño va al 60 % de opacidad (contraste 2.9:1): es
+    a propósito, queda anotado.
+  - **Vista previa local:** el servidor de la web de esta sesión llegó a su límite de tiempo y se detuvo a media vuelta;
+    las correcciones se comprobaron con las hojas compiladas en un navegador y con pruebas, no recorriendo pantallas.
+  - **Paridad:** Web hecho · API no aplica (no se tocó) · Android no aplica: tema y tamaños táctiles propios (Material) ·
+    iOS no aplica: igual (SwiftUI, colores del sistema de diseño de la app).
+  - **Verificado:** `npm run typecheck` 0; vitest web 2397/2398 (solo falla `ComoSeHace.spec.tsx`,
+    que ya fallaba antes y no es de esta vuelta); la API no cambió (jest 6580/6580 de la cuarta vuelta).
 - **21-11 ~17:50 México (claude-code, nube; Cursor/Codex no alcanzables) — Quinta vuelta de pulido: que nada se vea roto ni engañe cuando el servidor no contesta. Sin migraciones; sin desplegar.**
   - **Cómo se probó:** un navegador recorre las 26 pantallas del menú con la cuenta de demostración mientras se corta
     `/api/**` (sin red) y, en otra pasada, se contesta 500 a todo (como en medio de un despliegue). Antes: casi todas

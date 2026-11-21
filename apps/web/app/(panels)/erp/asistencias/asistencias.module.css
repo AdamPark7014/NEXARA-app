@@ -172,6 +172,13 @@
   color: var(--ui-brand-text);
 }
 
+/* Con el dedo: el nombre es el enlace a lo que hace la persona y medía 21 px de alto. */
+@media (pointer: coarse) {
+  .tarjetaNombre {
+    padding-block: 4px;
+  }
+}
+
 .tarjetaNombre:focus-visible {
   outline: var(--ui-focus-outline);
   outline-offset: 2px;

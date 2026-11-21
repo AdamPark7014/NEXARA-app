@@ -575,6 +575,11 @@
   .btn:not(.btnLink) {
     min-height: 40px;
   }
+
+  /* «‹ Asistencias» medía 18 px de alto: difícil de atinar con el dedo. */
+  .headBack {
+    min-height: 32px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -176,6 +176,27 @@
   --nx-tabular: "tnum" on, "lnum" on;
 }
 
+/* Anillos de foco. Se declaraban solo en `:root`, donde `--primary` y `--accent`
+   no existen (viven en `body`): quedaban sin valor y el foco de campos y botones
+   no pintaba su anillo en ningún tema. En `body` se resuelven con el color del
+   tema que toque. */
+body {
+  --ring-soft: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+  --nx-panel-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent);
+  --nx-panel-ring-accent: 0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+/* Los dos que faltaban junto a sus hermanos de más abajo (`--nx-panel-hairline`,
+   `--nx-panel-surface-overlay`): en oscuro se declaran en `body.dark`, donde sí
+   existen `--border`, `--surface` y `--background`. */
+body.dark {
+  --nx-panel-hairline-strong: color-mix(in srgb, var(--border) 100%, transparent);
+  --nx-panel-surface-overlay-strong:
+    linear-gradient(168deg,
+      color-mix(in srgb, var(--surface) 94%, var(--background)) 0%,
+      color-mix(in srgb, var(--surface-2) 90%, var(--background)) 100%);
+}
+
 body.dark {
   /* Sombras más profundas en oscuro para que las cards "floten" sobre el ink */
   --nx-panel-elev-1:

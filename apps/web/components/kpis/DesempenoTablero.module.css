@@ -436,6 +436,15 @@
   text-decoration: underline;
 }
 
+/* Con el dedo: el enlace medía 18 px de alto. */
+@media (pointer: coarse) {
+  .verDetalle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+  }
+}
+
 .nota {
   margin: 0;
   padding: 0 4px;
