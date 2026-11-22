@@ -1,5 +1,21 @@
 # RELEVO
 
+- **21-11 ~21:04 México (claude-code, nube) — Vuelta 14 de pulido: las pestañas de Recursos Humanos solo enseñan lo que cada puesto puede abrir. Sin migraciones; sin desplegar.**
+  - **El defecto:** `components/hr/HrModuleRail.tsx` pintaba las seis secciones a todos. Coordinación Administrativa
+    veía «Bitácora de incidencias» y «Prenómina», entraba y la página le negaba el paso; Arquitectura, Dirección y
+    Coordinación de Operaciones y Coordinación de Ventas, que solo abren el organigrama, veían cinco pestañas que no
+    eran suyas.
+  - **El arreglo:** cada pestaña pasa por `canUserAccessPath`, la misma función de la guarda de ruta y del menú. Si
+    queda una sola (o ninguna), la fila no se pinta. No cambia quién puede abrir qué: solo deja de ofrecer lo que ya
+    estaba negado. Quién abre cada sección hoy: RH, Dirección Administrativa, CEO y superadmin las seis;
+    Coordinación Administrativa cuatro (sin bitácora ni prenómina).
+  - **Para el hilo de módulos por perfil:** si Coordinación Administrativa debe abrir la bitácora o la prenómina, se
+    agrega la ruta en `lib/rbac/page-matrix.ts` (y su espejo en la API) y la pestaña aparece sola.
+  - **Paridad:** Web hecho · API no aplica · Android e iOS no aplica (no tienen esta fila; su menú ya sale por rol).
+  - **Verificado:** `npm run typecheck:web` 0; vitest web 300 archivos, 2,425 pruebas; `next build` termina bien (289
+    páginas). El API no cambió desde su corrida en verde de la vuelta 13. `HrModuleRail.spec.tsx` (5 pruebas, 3 se vieron fallar antes del cambio).
+    No se vio en navegador (el entorno local está apagado).
+
 - **21-11 ~20:59 México (claude-code, nube) — El CI ahora compila la web como en producción.**
   - Trabajo nuevo en `.github/workflows/ci.yml`: «Web · compilar (producción)», que corre
     `npm run build --workspace=apps/web` (el mismo `scripts/next-build-resilient.js` del despliegue) en cada push.

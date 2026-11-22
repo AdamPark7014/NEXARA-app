@@ -2,9 +2,15 @@
 
 import { usePathname } from "next/navigation";
 import ContextRail from "@/components/ui/ContextRail";
+import { useUser } from "@/components/UserContext";
+import { canUserAccessPath } from "@/lib/user-access";
 
 /**
  * Subnavegación densa del módulo RRHH — rodea asistencia híbrida sin tocarla.
+ *
+ * Solo aparecen las secciones que quien mira puede abrir: decide `canUserAccessPath`, la misma
+ * función de la guarda de ruta y del menú. Antes salían las seis a todos y dos de ellas llevaban
+ * a Coordinación Administrativa a una página que le negaba el paso.
  */
 const HR_LINKS = [
   { id: "plantilla", label: "Plantilla", href: "/erp/hr" },
@@ -22,11 +28,16 @@ function isHrPlantillaPath(pathname: string): boolean {
 
 export default function HrModuleRail() {
   const pathname = usePathname() ?? "";
+  const { user } = useUser();
+  const visibles = HR_LINKS.filter((l) => canUserAccessPath(user, l.href));
+
+  // Una fila con una sola pestaña no lleva a ningún lado.
+  if (visibles.length < 2) return null;
 
   return (
     <ContextRail
       ariaLabel="Secciones de Recursos Humanos"
-      items={HR_LINKS.map((l) => {
+      items={visibles.map((l) => {
         const active =
           l.id === "plantilla"
             ? isHrPlantillaPath(pathname)
