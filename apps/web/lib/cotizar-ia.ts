@@ -16,6 +16,7 @@ import {
   type PartidaEditor,
 } from "@/lib/cotizacion-documento";
 import { crearAviso, type AvisoCt, type SubirPrecio } from "@/lib/aviso-costo-ct";
+import { atencionPorOmision } from "@/lib/cliente-relleno";
 import { GRUPOS_PARTIDA, type CostoDeHoy, type CotizacionDetalle, type GrupoPartida, type OpcionPropuesta, type PartidaPropuesta, type Segmento } from "@/lib/cotizaciones-api";
 
 export type FilaPropuesta = PartidaPropuesta & {
@@ -214,6 +215,6 @@ export function documentoCopiadoDe(
     clientEmail: "",
     clientPhone: "",
     clientAddress: "",
-    atencion: "",
+    atencion: atencionPorOmision(nombre),
   };
 }

@@ -78,3 +78,11 @@ export function tamanoLegible(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+export function marcarDocumentoDigitalizado(exp: Expediente, id: string): Expediente {
+  if (!exp.documentos.some((d) => d.id === id)) return exp;
+  return {
+    ...exp,
+    documentos: exp.documentos.map((d) => (d.id === id ? { ...d, digitalizado: true } : d)),
+  };
+}

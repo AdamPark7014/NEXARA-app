@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { planoVacio, type Plano } from "./plano";
 import { agregarCamara } from "./editor";
-import { expedienteDe, queFalta, sePuedeDigitalizar, tamanoLegible } from "./expediente";
+import { expedienteDe, marcarDocumentoDigitalizado, queFalta, sePuedeDigitalizar, tamanoLegible } from "./expediente";
 
 describe("expediente", () => {
   it("un diseño sin expediente arranca vacío", () => {
@@ -36,4 +36,21 @@ describe("expediente", () => {
     expect(tamanoLegible(2048)).toBe("2 KB");
     expect(tamanoLegible(3 * 1024 * 1024)).toBe("3.0 MB");
   });
+
+  it("marcarDocumentoDigitalizado solo toca el id y no inventa docs", () => {
+    const base = {
+      sitio: "Campus",
+      documentos: [
+        { id: "a", nombre: "Plano.pdf", tipo: "pdf" as const, bytes: 10, url: "/u/x.pdf", subidoAt: "2026-11-16" },
+        { id: "b", nombre: "foto.jpg", tipo: "imagen" as const, bytes: 20, url: "/u/y.jpg", subidoAt: "2026-11-16" },
+      ],
+    };
+    expect(marcarDocumentoDigitalizado(base, "z")).toBe(base);
+    const marcado = marcarDocumentoDigitalizado(base, "a");
+    expect(marcado).not.toBe(base);
+    expect(marcado.documentos[0]?.digitalizado).toBe(true);
+    expect(marcado.documentos[1]?.digitalizado).toBeUndefined();
+    expect(marcado.sitio).toBe("Campus");
+  });
+
 });

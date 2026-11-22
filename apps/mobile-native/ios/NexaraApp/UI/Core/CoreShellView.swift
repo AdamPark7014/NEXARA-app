@@ -154,6 +154,7 @@ struct CoreShellView: View {
                 .environment(\.nxOpenNotifications, abrirNotificaciones)
                 .environment(\.nxShellChrome, chrome)
         }
+        .task { await JornadaCandado.sincronizarAlAbrir(client: ApiClient.shared) }
         .task { await refreshNavigationIfNeeded() }
         .task { await pollUnread() }
         .onAppear {

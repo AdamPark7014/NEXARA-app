@@ -113,3 +113,28 @@ extension Error {
         return false
     }
 }
+
+struct EstadoJornada: Decodable {
+    let debeChecar: Bool?
+    let jornadaAbierta: Bool?
+    let pideBarrera: Bool?
+    let webCheckinAbierta: Bool?
+    let webCheckinHasta: String?
+    let mensaje: String?
+    var debeAbrirBarrera: Bool { pideBarrera == true }
+}
+
+extension JornadaCandado {
+    /// GET attendance/estado-jornada: abre la barrera al entrar, no solo tras 409.
+    static func sincronizarAlAbrir(client: ApiClient) async {
+        do {
+            let data = try await client.get("attendance/estado-jornada")
+            let estado = try JSONDecoder().decode(EstadoJornada.self, from: data)
+            if estado.debeAbrirBarrera {
+                await MainActor.run { notifyBlocked() }
+            }
+        } catch {
+            // Si falla la consulta, el 409 al operar sigue abriendo la barrera.
+        }
+    }
+}

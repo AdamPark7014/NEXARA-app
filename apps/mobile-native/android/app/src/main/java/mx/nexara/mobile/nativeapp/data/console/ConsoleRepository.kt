@@ -28,6 +28,9 @@ class ConsoleRepository(context: Context) {
 
     suspend fun activitiesFetch(scope: String? = null) = api.getActivities(scope = scope)
 
+    /** Candado: ¿pide barrera de entrada al abrir la app? */
+    suspend fun estadoJornada() = api.getEstadoJornada()
+
     suspend fun activityFeed(limit: Int = 40): List<Map<String, Any?>> {
         val raw = api.getActivityFeedRaw(limit).string().trim()
         if (!raw.startsWith("{")) return emptyList()

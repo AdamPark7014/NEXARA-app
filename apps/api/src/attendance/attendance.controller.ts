@@ -11,6 +11,8 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { COLUMNAS_ASISTENCIA_HIBRIDA } from '../common/excel/reportes.js';
 import { workDateKey } from '../common/time/workday.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { armarEstadoJornada } from './estado-jornada.js';
 
 @Controller('attendance')
 export class AttendanceController {
@@ -19,6 +21,7 @@ export class AttendanceController {
     private readonly hybridService: AttendanceHybridService,
     private readonly excelExport: ExcelExportService,
     private readonly justifications: AttendanceJustificationsService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -32,6 +35,38 @@ export class AttendanceController {
     // También vale la ventana que dirección le abrió solo a esta persona.
     const v = await this.attendanceService.ventanaWeb(companyId, new Date(), req?.user?.id ?? null);
     return { abierta: v.abierta, hasta: v.hasta ? v.hasta.toISOString() : null };
+  }
+
+  /**
+   * Estado del candado para abrir la barrera al entrar (web/apps), no solo tras un 409.
+   * GET /api/attendance/estado-jornada
+   */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @Get('estado-jornada')
+  async estadoJornada(@CurrentCompanyId() companyId: number | null, @Req() req: any) {
+    const usuario = req?.user ?? null;
+    const userId = Number(usuario?.id ?? 0);
+    let jornadaAbierta = false;
+    if (userId > 0) {
+      try {
+        const dia = await this.prisma.attendanceDay.findFirst({
+          where: { userId, isOpen: true },
+          select: { id: true },
+        });
+        jornadaAbierta = Boolean(dia);
+      } catch {
+        jornadaAbierta = false;
+      }
+    }
+    const web =
+      companyId == null
+        ? { abierta: false, hasta: null as string | null }
+        : await this.attendanceService.ventanaWeb(companyId, new Date(), userId || null);
+    return armarEstadoJornada({
+      usuario,
+      jornadaAbierta,
+      webCheckin: { abierta: web.abierta, hasta: web.hasta },
+    });
   }
 
   /** Justificar la falta de un día (solo Christian): { userId, fecha: AAAA-MM-DD, motivo }. No crea checadas. */

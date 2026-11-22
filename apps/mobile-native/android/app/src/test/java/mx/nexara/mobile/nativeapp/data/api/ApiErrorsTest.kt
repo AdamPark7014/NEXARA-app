@@ -170,4 +170,11 @@ class ApiErrorsTest {
             JornadaCandadoEvents.setListener(null)
         }
     }
+
+    @Test
+    fun `estado-jornada pideBarrera abre la barrera`() {
+        assertEquals(true, EstadoJornadaDto(pideBarrera = true).debeAbrirBarrera())
+        assertEquals(false, EstadoJornadaDto(pideBarrera = false).debeAbrirBarrera())
+        assertEquals(false, EstadoJornadaDto().debeAbrirBarrera())
+    }
 }

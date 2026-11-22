@@ -173,6 +173,10 @@ fun Throwable.isJornadaNoAbierta(): Boolean {
     return body.contains(CODIGO_JORNADA_NO_ABIERTA)
 }
 
+/** ¿Abrir la barrera al entrar? Misma regla que `pideBarrera` del API. */
+fun EstadoJornadaDto.debeAbrirBarrera(): Boolean = pideBarrera == true
+
+
 /** Un solo sitio: la UI de checada escucha y muestra la barrera de entrada. */
 object JornadaCandadoEvents {
     @Volatile private var listener: (() -> Unit)? = null

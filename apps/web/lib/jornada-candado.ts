@@ -1,7 +1,19 @@
+import { buildApiUrl } from "@/lib/api-base";
+
 export const CODIGO_JORNADA_NO_ABIERTA = "JORNADA_NO_ABIERTA";
 export const MENSAJE_JORNADA_NO_ABIERTA = "Registra tu entrada para empezar a trabajar";
 
 export type ErrorJornada = { code: string; message: string; status?: number };
+
+/** Respuesta de GET attendance/estado-jornada (barrera al entrar, no solo tras 409). */
+export type EstadoJornadaCandado = {
+  debeChecar: boolean;
+  jornadaAbierta: boolean;
+  pideBarrera: boolean;
+  webCheckinAbierta: boolean;
+  webCheckinHasta: string | null;
+  mensaje: string | null;
+};
 
 /** Extrae code/message de un Error cuya message es JSON del API (erpFetch/asistente). */
 export function errorDeJornada(err: unknown): ErrorJornada | null {
@@ -49,6 +61,7 @@ export function manejarErrorJornada(err: unknown): boolean {
   abrirBarreraJornada();
   return true;
 }
+
 const MARCA_VIGIA = "__nxVigiaJornada";
 
 /**
@@ -82,4 +95,29 @@ export function vigilarRespuestasDeJornada(): () => void {
     if (window.fetch === vigilado) window.fetch = original;
     ventana[MARCA_VIGIA] = false;
   };
+}
+
+export async function fetchEstadoJornada(token: string): Promise<EstadoJornadaCandado> {
+  const res = await fetch(buildApiUrl("attendance/estado-jornada"), {
+    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error((await res.text().catch(() => "")) || `HTTP ${res.status}`);
+  }
+  return (await res.json()) as EstadoJornadaCandado;
+}
+
+/** Si el servidor pide barrera, la abre; si ya checó, la cierra. */
+export async function sincronizarBarreraJornada(token: string | null | undefined): Promise<EstadoJornadaCandado | null> {
+  if (!token) return null;
+  try {
+    const estado = await fetchEstadoJornada(token);
+    if (estado.pideBarrera) abrirBarreraJornada();
+    else cerrarBarreraJornada();
+    return estado;
+  } catch {
+    return null;
+  }
 }

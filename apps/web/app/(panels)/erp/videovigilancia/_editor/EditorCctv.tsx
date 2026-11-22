@@ -80,7 +80,7 @@ import PlanoTecnico, { HojaAjustada, IMPRIMIR_HOJA } from "./PlanoTecnico";
 import VistaCamara from "./VistaCamara";
 import DigitalizarConIA from "./DigitalizarConIA";
 import ExpedienteProyecto from "./ExpedienteProyecto";
-import { expedienteDe, queFalta, type DocumentoExpediente } from "@/lib/cctv/expediente";
+import { expedienteDe, marcarDocumentoDigitalizado, queFalta, type DocumentoExpediente } from "@/lib/cctv/expediente";
 import { CapasBloqueoPanel, HistorialVisible } from "./HistorialYCapas";
 import {
   CAPAS_INICIALES,
@@ -570,6 +570,9 @@ export default function EditorCctv({
     digitalizarTrasSubir.current = true;
     setVerExpediente(false);
     await alElegirCroquis(new File([blob], d.nombre, { type: tipo }));
+    // Marca en la raíz actual (no el render del modal): evita pisar el croquis recién subido.
+    const actual = raizRef.current;
+    aplicarRaiz({ ...actual, expediente: marcarDocumentoDigitalizado(expedienteDe(actual), d.id) });
   };
 
   const alElegirCroquis = async (f: File | undefined) => {
@@ -1250,7 +1253,7 @@ export default function EditorCctv({
             cliente={diseno.clienteNombre ?? null}
             expediente={expedienteDe(raiz)}
             pendientes={queFalta(raiz, niveles.filter((n) => n.plano !== raiz).map((n) => n.plano))}
-            onCambiar={(e) => aplicarRaiz({ ...raiz, expediente: e })}
+            onCambiar={(e) => aplicarRaiz({ ...raizRef.current, expediente: e })}
             onDigitalizar={digitalizarDocumento}
             onCerrar={() => setVerExpediente(false)}
           />

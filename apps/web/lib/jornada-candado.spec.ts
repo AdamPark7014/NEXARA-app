@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
-import { CODIGO_JORNADA_NO_ABIERTA, errorDeJornada, manejarErrorJornada, barreraJornadaActiva, cerrarBarreraJornada, abrirBarreraJornada, vigilarRespuestasDeJornada } from "./jornada-candado";
+import { CODIGO_JORNADA_NO_ABIERTA, errorDeJornada, manejarErrorJornada, barreraJornadaActiva, cerrarBarreraJornada, abrirBarreraJornada, vigilarRespuestasDeJornada, sincronizarBarreraJornada } from "./jornada-candado";
 
 beforeEach(() => cerrarBarreraJornada());
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe("errorDeJornada", () => {
   it("detecta 409 con codigo", () => {
@@ -24,6 +29,7 @@ describe("manejarErrorJornada", () => {
     expect(barreraJornadaActiva()).toBe(true);
   });
 });
+
 describe("vigilarRespuestasDeJornada", () => {
   let quitar: () => void = () => undefined;
   afterEach(() => {
@@ -64,5 +70,48 @@ describe("vigilarRespuestasDeJornada", () => {
     expect(window.fetch).toBe(vigilado);
     quitar();
     expect(window.fetch).toBe(simulada);
+  });
+});
+
+describe("sincronizarBarreraJornada", () => {
+  it("abre si pideBarrera y cierra si ya hay jornada", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          debeChecar: true,
+          jornadaAbierta: false,
+          pideBarrera: true,
+          webCheckinAbierta: false,
+          webCheckinHasta: null,
+          mensaje: "Registra tu entrada para empezar a trabajar",
+        }),
+      }),
+    );
+    await sincronizarBarreraJornada("tok");
+    expect(barreraJornadaActiva()).toBe(true);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          debeChecar: true,
+          jornadaAbierta: true,
+          pideBarrera: false,
+          webCheckinAbierta: false,
+          webCheckinHasta: null,
+          mensaje: null,
+        }),
+      }),
+    );
+    await sincronizarBarreraJornada("tok");
+    expect(barreraJornadaActiva()).toBe(false);
+  });
+
+  it("sin token no hace nada", async () => {
+    expect(await sincronizarBarreraJornada(null)).toBeNull();
+    expect(barreraJornadaActiva()).toBe(false);
   });
 });

@@ -492,6 +492,16 @@ data class AttendanceCurrentDto(
     val lastEntryAt: String? = null,
 )
 
+/** `GET attendance/estado-jornada` — barrera proactiva del candado (no solo tras 409). */
+data class EstadoJornadaDto(
+    val debeChecar: Boolean? = null,
+    val jornadaAbierta: Boolean? = null,
+    val pideBarrera: Boolean? = null,
+    val webCheckinAbierta: Boolean? = null,
+    val webCheckinHasta: String? = null,
+    val mensaje: String? = null,
+)
+
 /**
  * `POST attendance` — contrato A (asistencia no manipulable).
  *
@@ -681,6 +691,9 @@ interface ConsoleApi {
 
     @GET("attendance/current")
     suspend fun getAttendanceCurrent(): AttendanceCurrentDto
+
+    @GET("attendance/estado-jornada")
+    suspend fun getEstadoJornada(): EstadoJornadaDto
 
     @retrofit2.http.POST("attendance")
     suspend fun postAttendance(

@@ -73,7 +73,7 @@ export default function ExpedienteProyecto({
     setError(null);
     try {
       await onDigitalizar(d);
-      cambiarDoc(d.id, { digitalizado: true });
+      // digitalizado lo marca EditorCctv tras el croquis (evita carrera con raiz stale)
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo digitalizar ese documento.");
     } finally {

@@ -2,6 +2,8 @@ package mx.nexara.mobile.nativeapp.ui.console
 
 import androidx.compose.foundation.layout.Column
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSpectrumLine
+import mx.nexara.mobile.nativeapp.data.api.debeAbrirBarrera
+
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -353,12 +355,18 @@ fun ConsoleNavHost(
     var unreadCount by remember { mutableIntStateOf(0) }
     /** Mensajes de chat sin leer (suma de `unreadCount` de `chat/channels`), para la insignia. */
     var chatUnread by remember { mutableIntStateOf(0) }
-    /** 409 JORNADA_NO_ABIERTA: barrera para ir a checar entrada. */
+    /** 409 JORNADA_NO_ABIERTA o GET estado-jornada: barrera para ir a checar entrada. */
     var barreraJornada by remember { mutableStateOf(false) }
+    val consoleRepo = remember(context) { mx.nexara.mobile.nativeapp.data.console.ConsoleRepository(context) }
     DisposableEffect(Unit) {
         mx.nexara.mobile.nativeapp.data.api.JornadaCandadoEvents.setListener { barreraJornada = true }
         onDispose { mx.nexara.mobile.nativeapp.data.api.JornadaCandadoEvents.setListener(null) }
     }
+    LaunchedEffect(Unit) {
+        runCatching { consoleRepo.estadoJornada() }
+            .onSuccess { if (it.debeAbrirBarrera()) barreraJornada = true }
+    }
+
 
     val modules = remember(userAlDia) { CoreMenu.modulesFor(userAlDia) }
     /** «Más»: el resto de Core (cotizaciones, proyectos, KPIs, almacén, herramientas, vehículos). */
