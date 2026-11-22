@@ -32,7 +32,7 @@ import {
 // columnas `@db.Date` de Prisma; "hoy" se construye en hora local porque así
 // lo ve el servidor. Mezclarlos es justo el caso que corría un día los
 // cálculos.
-const HOY = new Date(2026, 8, 20, 15, 30, 0); // 20-sep-2026, hora local
+const HOY = new Date('2026-09-20T15:30:00-06:00'); // 20-sep-2026, hora de México (la de la empresa)
 const diaUtc = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d));
 
 type FilaPrueba = {
@@ -211,8 +211,9 @@ describe('días vencido', () => {
   });
 
   it('la hora del día no altera la cuenta', () => {
-    const madrugada = new Date(2026, 8, 20, 0, 1, 0);
-    const casiMedianoche = new Date(2026, 8, 20, 23, 59, 0);
+    // Horas de México: el servidor corre en UTC y «hoy» es el día de la empresa, no el de su reloj.
+    const madrugada = new Date('2026-09-20T00:01:00-06:00');
+    const casiMedianoche = new Date('2026-09-20T23:59:00-06:00');
     expect(diasVencido(diaUtc(2026, 9, 15), madrugada)).toBe(5);
     expect(diasVencido(diaUtc(2026, 9, 15), casiMedianoche)).toBe(5);
   });

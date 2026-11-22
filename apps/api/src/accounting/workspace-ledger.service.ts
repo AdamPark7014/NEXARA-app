@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { workDateParts } from '../common/time/workday.js';
 
 /**
  * NEXARA · Libro de movimientos del workspace de Contabilidad
@@ -292,16 +293,17 @@ export class AccountingWorkspaceLedgerService {
   // ───────────────────────── filtros ─────────────────────────
 
   private normalize(query: LedgerQuery): NormalizedFilters {
-    const now = new Date();
+    // Sin fechas, el mes en curso de la empresa (no el del reloj del servidor).
+    const mes = workDateParts(new Date());
     const rawFrom = clean(query.from);
     const rawTo = clean(query.to);
 
     const fromDate = rawFrom
       ? new Date(`${rawFrom}T00:00:00`)
-      : new Date(now.getFullYear(), now.getMonth(), 1);
+      : new Date(mes.year, mes.month - 1, 1);
     const toDate = rawTo
       ? new Date(`${rawTo}T23:59:59.999`)
-      : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      : new Date(mes.year, mes.month, 0, 23, 59, 59, 999);
 
     if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
       throw new BadRequestException('Rango de fechas inválido');

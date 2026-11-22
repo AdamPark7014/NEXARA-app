@@ -100,6 +100,20 @@ export function workDateKeyOf(
   return workDateKey(instante, tz);
 }
 
+/**
+ * Año, mes (1 a 12) y día del calendario de la empresa en ese instante.
+ *
+ * `now.getFullYear()`, `getMonth()` y `getDate()` leen el reloj del servidor (UTC): de las 18:00 de
+ * México en adelante ya es mañana, y la tarde del último día del mes ya es el mes siguiente.
+ */
+export function workDateParts(
+  instante: Date,
+  tz = WORKDAY_TIMEZONE,
+): { year: number; month: number; day: number } {
+  const p = partesEn(instante, tz);
+  return { year: p.year, month: p.month, day: p.day };
+}
+
 /** Suma días a un día `AAAA-MM-DD` por calendario, sin pasar por la hora de ningún reloj. */
 export function addDaysToKey(dia: string, dias: number): string {
   const [y, m, d] = dia.split('-').map(Number);

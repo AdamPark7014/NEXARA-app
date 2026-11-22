@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { workDateColumn } from '../common/time/workday.js';
 
 /**
  * Cuentas por cobrar / por pagar del workspace de la contadora.
@@ -81,8 +82,9 @@ type FilaCruda = {
 // Las columnas `@db.Date` llegan de Prisma como medianoche **UTC**. Leerlas
 // con `getDate()` en un servidor en UTC-6 devuelve el día anterior, y los
 // "días vencido" salen corridos uno. Por eso todo se compara como índice de
-// día calendario: el vencimiento se lee en UTC y "hoy" en la zona del
-// servidor, que es el día que la contadora ve en su reloj.
+// día calendario: el vencimiento se lee en UTC y "hoy" en la zona de la
+// empresa, que es el día que la contadora ve en su reloj (el servidor corre en
+// UTC: con su reloj, desde las 18:00 todo envejecía un día).
 
 /** Día calendario de un vencimiento, como días desde epoch. */
 export function indiceDeDia(valor: Date | string | null | undefined): number | null {
@@ -98,9 +100,9 @@ export function indiceDeDia(valor: Date | string | null | undefined): number | n
   return Date.UTC(valor.getUTCFullYear(), valor.getUTCMonth(), valor.getUTCDate()) / DIA_MS;
 }
 
-/** Hoy según el calendario del servidor. */
+/** Hoy según el calendario de la empresa. */
 export function indiceDeHoy(hoy: Date = new Date()): number {
-  return Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()) / DIA_MS;
+  return workDateColumn(hoy).getTime() / DIA_MS;
 }
 
 /** Medianoche UTC del índice — sirve para el `where` de Prisma. */

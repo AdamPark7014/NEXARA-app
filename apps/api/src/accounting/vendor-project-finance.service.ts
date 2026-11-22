@@ -255,7 +255,7 @@ export class VendorProjectFinanceService {
     const scope = companyWhere(tenantId);
     const now = new Date();
     const hoy = hoyDelServidor(now);
-    const yearStart = new Date(Date.UTC(now.getFullYear(), 0, 1));
+    const yearStart = new Date(Date.UTC(hoy.getUTCFullYear(), 0, 1));
 
     const supplierWhere: Record<string, unknown> = { ...scope };
     if (filters?.soloActivos) supplierWhere.isActive = true;

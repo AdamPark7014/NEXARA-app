@@ -10,6 +10,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { COLUMNAS_ASISTENCIA_HIBRIDA } from '../common/excel/reportes.js';
+import { workDateKey } from '../common/time/workday.js';
 
 @Controller('attendance')
 export class AttendanceController {
@@ -338,7 +339,7 @@ export class AttendanceController {
         req.user?.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE) ||
         req.user?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN),
     );
-    const day = date || new Date().toLocaleDateString('sv-SE');
+    const day = date || workDateKey(new Date());
     return this.hybridService.getHybridDay(req.user, day, companyId, {
       siteId: siteId ? parseInt(siteId, 10) : null,
       selfOnly: !canManage,
@@ -368,7 +369,7 @@ export class AttendanceController {
         req.user?.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE) ||
         req.user?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN),
     );
-    const day = date || new Date().toLocaleDateString('sv-SE');
+    const day = date || workDateKey(new Date());
     const data = await this.hybridService.getHybridDay(req.user, day, companyId, {
       siteId: siteId ? parseInt(siteId, 10) : null,
       selfOnly: !canManage,

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AccountingService } from './accounting.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { workDateKey } from '../common/time/workday.js';
 import {
   ETIQUETA_CATEGORIA_VIATICO,
   ETIQUETA_ESTATUS_VIATICO,
@@ -1485,10 +1486,10 @@ export class AccountingWorkspaceReportsService {
 
   /** Rango por defecto: del día 1 del mes en curso a hoy. */
   private rangoPeriodo(from?: string, to?: string): { from: string; to: string } {
-    const hoy = new Date();
-    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    const desde = this.parseDia(from) ?? inicioMes;
-    const hasta = this.parseDia(to) ?? hoy;
+    // «Hoy» y «este mes» son los de la empresa, no los del reloj del servidor.
+    const hoyClave = workDateKey(new Date());
+    const desde = this.parseDia(from) ?? this.parseDia(`${hoyClave.slice(0, 7)}-01`)!;
+    const hasta = this.parseDia(to) ?? this.parseDia(hoyClave)!;
     if (desde.getTime() > hasta.getTime()) {
       throw new BadRequestException('El inicio del periodo no puede ser posterior al final');
     }
@@ -1515,7 +1516,7 @@ export class AccountingWorkspaceReportsService {
    * días», y el balance general arrastraba las pólizas del día siguiente.
    */
   private fechaCorte(asOf?: string): Date {
-    const d = this.parseDia(asOf) ?? new Date();
+    const d = this.parseDia(asOf) ?? this.parseDia(workDateKey(new Date()))!;
     return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999));
   }
 

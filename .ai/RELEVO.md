@@ -1,5 +1,37 @@
 # RELEVO
 
+- **21-11 ~21:52 México (claude-code, nube) — Vuelta 17 de pulido: «hoy» y «este mes» son los de México en contabilidad, asistencia y mis actividades. Solo API; sin migraciones; sin desplegar.**
+  - **El defecto:** el servidor corre en UTC y varios módulos leían su reloj (`now.getMonth()`, `now.getDate()`,
+    `toLocaleDateString('sv-SE')`). De las 18:00 de México en adelante ya era «mañana», y la tarde del último día
+    del mes ya era el mes siguiente. A esa hora:
+    - **Cuentas por cobrar y por pagar:** toda la cartera envejecía un día; lo que vence hoy salía «vencido».
+    - **Mesa contable y tableros:** el periodo por omisión era el mes siguiente (en ceros), «vence hoy» salía en
+      «vencido», y el resumen de la cuenta bancaria no traía los movimientos del mes.
+    - **Reportes y libro de movimientos:** sin fechas, el rango por omisión era el mes siguiente; el corte «a hoy»
+      era el de mañana.
+    - **Catálogo y pólizas del SAT:** el mes y el año por omisión del XML.
+    - **Asistencia:** el día por omisión (pantalla y Excel) era mañana, vacío.
+    - **Mis actividades:** «terminadas hoy» empezaba a contar a las 18:00: por la tarde se vaciaba y por la mañana
+      traía lo de la noche anterior.
+  - **El arreglo:** `workDateParts(instante)` nuevo en `common/time/workday.ts` (año, mes y día de la empresa) y
+    los que ya existían (`workDateColumn`, `workDateKey`, `workDayStart`). Tocados: `accounting/accounting.service.ts`
+    (tablero financiero, de facturas, cuenta bancaria, mesa contable, catálogo), `workspace-ar-ap.service.ts`
+    (`indiceDeHoy`), `workspace-reports.service.ts`, `workspace-ledger.service.ts`, `vendor-project-finance.service.ts`,
+    `buzon-sat/buzon-sat.controller.ts`, `attendance/attendance.controller.ts`, `me/my-activities.service.ts`.
+  - **Pruebas:** `common/time/hoy-y-este-mes-de-la-empresa.spec.ts` (13, con dos guardas). En
+    `workspace-ar-ap.spec.ts` las horas de «la hora del día no altera la cuenta» quedaron fijas en hora de México
+    (antes dependían de la zona de la máquina que corría la prueba); no se omitió ninguna.
+  - **Queda abierto (no se tocó):** en reportes y libro, los límites del rango para columnas con hora
+    (`fechaGasto`, `paidAt`, `incurredAt`) siguen en la hora del servidor: un gasto pagado a las 19:00 del último día
+    del mes cae en el mes siguiente. Hay que pasar `limites()` e `isoLocalDay` a `parseWorkDate`/`workDateKey` con
+    sus pruebas; es un cambio de reportes contables y conviene verlo con datos reales.
+  - **Paridad:** API hecho · Web, Android e iOS no aplica (piden estos datos sin fecha y pintan lo que llega).
+  - **Verificado:** `npm run typecheck:api` 0; jest del API 540 suites, 6,756 pruebas; además contabilidad, asistencia,
+    `common/time` y `me` con `TZ=UTC` (96 suites, 1,153 pruebas), que es como corre producción; `nest build` bien. Las
+    13 pruebas nuevas se vieron fallar antes del cambio. La web no cambió.
+  - **CI de las vueltas 15 y 16:** corrida en verde sobre `f859297`, los seis trabajos, incluidos Android (con la
+    prueba nueva `NxFormatTest`) y la compilación de iOS.
+
 - **21-11 ~21:44 México (claude-code, nube) — Vuelta 16 de pulido: el servidor ya no da por vencido lo que vence hoy o mañana. Solo API; sin migraciones; sin desplegar.**
   - **El defecto:** vencimiento, entrega estimada y visita programada son días de calendario (`@db.Date`, medianoche
     UTC = 18:00 de la víspera en México) y se comparaban con `new Date()`. Resultado:

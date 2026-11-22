@@ -16,7 +16,7 @@ import { DomainEventBusService } from '../domain-events/domain-event-bus.service
 import { BASE_CHART_OF_ACCOUNTS } from './base-chart-of-accounts.js';
 import { polizaFacturaEmitida, polizaPagoFactura, type RenglonPoliza } from './mesa-contable/polizas-mesa.js';
 import { celdaCsv } from '../common/security/celda-csv.js';
-import { addDaysToKey, workDateColumn, workDateKey, workDateKeyOf } from '../common/time/workday.js';
+import { addDaysToKey, workDateColumn, workDateKey, workDateKeyOf, workDateParts } from '../common/time/workday.js';
 
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -401,8 +401,8 @@ export class AccountingService {
 
     const naturOf = (type: string): 'D' | 'A' => (type === 'ASSET' || type === 'EXPENSE' ? 'D' : 'A');
 
-    const now = new Date();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const periodo = workDateParts(new Date());
+    const mm = String(periodo.month).padStart(2, '0');
     const rows = accounts
       .map((a) => {
         const parent = a.parentId ? byId.get(a.parentId) : null;
@@ -412,7 +412,7 @@ export class AccountingService {
 
     return [
       '<?xml version="1.0" encoding="UTF-8"?>',
-      `<catalogocuentas:Catalogo xmlns:catalogocuentas="http://www.sat.gob.mx/esquemas/ContabilidadE/1_3/CatalogoCuentas" Version="1.3" RFC="${escapeXml(company?.rfc ?? '')}" Mes="${mm}" Anio="${now.getFullYear()}">`,
+      `<catalogocuentas:Catalogo xmlns:catalogocuentas="http://www.sat.gob.mx/esquemas/ContabilidadE/1_3/CatalogoCuentas" Version="1.3" RFC="${escapeXml(company?.rfc ?? '')}" Mes="${mm}" Anio="${periodo.year}">`,
       rows,
       '</catalogocuentas:Catalogo>',
     ].join('\n');
@@ -3322,10 +3322,13 @@ export class AccountingService {
   async getFinancialDashboard(companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
-    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+    // «Este mes» es el de la empresa, como valor de columna `@db.Date` (medianoche UTC). Con el reloj
+    // del servidor, la tarde del último día del mes ya contaba el mes siguiente y el tablero salía en ceros.
+    const { year, month } = workDateParts(now);
+    const startOfMonth = new Date(Date.UTC(year, month - 1, 1));
+    const startOfYear = new Date(Date.UTC(year, 0, 1));
+    const startOfPrevMonth = new Date(Date.UTC(year, month - 2, 1));
+    const endOfPrevMonth = new Date(Date.UTC(year, month - 1, 0));
 
     const [
       arAggregate,
@@ -3667,8 +3670,10 @@ export class AccountingService {
   async getInvoiceDashboard(companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    // El mes de la empresa, como valor de columna `@db.Date`.
+    const { year, month } = workDateParts(now);
+    const startOfMonth = new Date(Date.UTC(year, month - 1, 1));
+    const endOfMonth = new Date(Date.UTC(year, month, 0));
 
     const [totalAR, totalAP, overdueCount, monthInvoices, recentPayments] = await Promise.all([
       this.prisma.invoice.aggregate({
@@ -3722,8 +3727,9 @@ export class AccountingService {
     });
     assertCompanyAccess(account, tenantId, 'Cuenta bancaria');
 
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    // El mes de la empresa, como valor de columna `@db.Date`.
+    const { year, month } = workDateParts(new Date());
+    const startOfMonth = new Date(Date.UTC(year, month - 1, 1));
 
     const [monthSummary, unreconciled, lastTransactions] = await Promise.all([
       this.prisma.bankTransaction.groupBy({
@@ -3834,9 +3840,11 @@ export class AccountingService {
       return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
     };
 
-    /** Hoy = el día del calendario del servidor, expresado a medianoche UTC. */
-    const startToday = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-    const fromDay = from ? diaUtc(from) : new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+    /** Hoy = el día del calendario de la empresa, expresado a medianoche UTC. */
+    const startToday = workDateColumn(now);
+    const fromDay = from
+      ? diaUtc(from)
+      : new Date(Date.UTC(startToday.getUTCFullYear(), startToday.getUTCMonth(), 1));
     const toDay = to ? diaUtc(to) : startToday;
     if (!fromDay || !toDay) throw new BadRequestException('Rango de fechas inválido');
     if (fromDay.getTime() > toDay.getTime()) {

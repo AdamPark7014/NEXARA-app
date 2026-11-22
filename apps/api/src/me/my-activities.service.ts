@@ -15,6 +15,7 @@ import { evidenceProgressPct } from '../activities/evidence/evidence-flow.helper
 import type { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
+import { workDayStart } from '../common/time/workday.js';
 import {
   cambiosAlIniciar,
   horasPlanValidas,
@@ -1325,7 +1326,8 @@ export class MyActivitiesService {
     }
 
     const ahora = new Date();
-    const dayStart = new Date(`${ahora.toLocaleDateString('sv-SE')}T00:00:00`);
+    // El día de la empresa: con el reloj del servidor (UTC), «hoy» empezaba a las 18:00 de México.
+    const dayStart = workDayStart(ahora);
     // Sesiones de trabajo: lo que quedó corriendo de ayer (o lleva 12 h) se cierra al leerlo.
     await cerrarSesionesVencidas(this.prisma, { userIds: [viewer.id], companyId }, ahora);
     const sesiones = await leerSesiones(this.prisma, {
