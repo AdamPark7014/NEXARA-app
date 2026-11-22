@@ -69,6 +69,53 @@ export function validarSeriesContraCantidad(series: string[], piezas: number): v
   }
 }
 
+/** Movimientos que sacan la pieza del almacén (salida, baja, consumo de producción). */
+export const TIPOS_QUE_SACAN_LA_PIEZA: ReadonlySet<string> = new Set(['DISPATCH', 'SCRAP', 'PRODUCTION_OUT']);
+
+export type MovimientoConSeries = {
+  type?: string | null;
+  series?: unknown;
+  movementNumber?: string | null;
+  createdAt?: Date | string | null;
+};
+
+/**
+ * De las series que se quieren sacar, las que ya salieron y no han regresado: su movimiento más
+ * reciente es una salida. Una serie es una pieza; no puede estar en dos obras. `historial` son
+ * los movimientos del mismo producto que nombran alguna de esas series, en cualquier orden.
+ */
+export function seriesQueSiguenFuera(
+  series: string[],
+  historial: MovimientoConSeries[],
+): Array<{ serie: string; movementNumber: string }> {
+  const pedidas = normalizarSeries(series);
+  const delMasReciente = [...historial].sort(
+    (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
+  );
+  const fuera: Array<{ serie: string; movementNumber: string }> = [];
+  for (const serie of pedidas) {
+    const ultimo = delMasReciente.find((m) => normalizarSeries(m.series).includes(serie));
+    if (ultimo && TIPOS_QUE_SACAN_LA_PIEZA.has(String(ultimo.type ?? '').toUpperCase())) {
+      fuera.push({ serie, movementNumber: String(ultimo.movementNumber ?? '').trim() });
+    }
+  }
+  return fuera;
+}
+
+const enLista = (partes: string[]) =>
+  partes.length <= 1 ? (partes[0] ?? '') : `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}`;
+
+/** El aviso a quien registra la salida: cuál serie, en qué movimiento salió y qué hacer. */
+export function avisoSeriesFuera(fuera: Array<{ serie: string; movementNumber: string }>): string {
+  const folios = Array.from(new Set(fuera.map((f) => f.movementNumber).filter(Boolean)));
+  if (fuera.length === 1) {
+    const donde = folios.length ? ` en el movimiento ${folios[0]}` : '';
+    return `La serie ${fuera[0].serie} ya salió${donde} y no ha regresado. Revisa la etiqueta o registra primero su devolución.`;
+  }
+  const donde = folios.length ? ` (${folios.length === 1 ? 'movimiento' : 'movimientos'} ${enLista(folios)})` : '';
+  return `Las series ${enLista(fuera.map((f) => f.serie))} ya salieron${donde} y no han regresado. Revisa las etiquetas o registra primero su devolución.`;
+}
+
 /** Junta la evidencia que ya tenía el movimiento con la que llega, sin repetir y con tope. */
 export function sumarEvidencia(
   actual: { fotos?: unknown; series?: unknown },

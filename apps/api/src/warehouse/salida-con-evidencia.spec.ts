@@ -16,6 +16,8 @@ function fixture() {
     product: { findFirst: jest.fn().mockResolvedValue({ id: 7 }) },
     user: { findFirst: jest.fn().mockResolvedValue({ id: 4 }) },
     stockMovement: {
+      // Historial de las series que se quieren sacar: ninguna ha salido antes.
+      findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue({ id: 1, quantity: 2, fotos: null, series: null }),
       update: jest.fn().mockImplementation(async ({ data }) => ({ id: 1, movementNumber: 'SM-1', ...data })),
     },

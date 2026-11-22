@@ -16,8 +16,11 @@ import { pdfPeriodo } from '../common/pdf/nexara-pdf-theme.js';
 import { workDateKey, workDateRange } from '../common/time/workday.js';
 import { EmpaqueInvalidoError, convertirCaptura, type Empaque } from './empaque.js';
 import {
+  TIPOS_QUE_SACAN_LA_PIEZA,
+  avisoSeriesFuera,
   normalizarFotosMovimiento,
   normalizarSeries,
+  seriesQueSiguenFuera,
   sumarEvidencia,
   validarSeriesContraCantidad,
 } from './evidencia-salida.js';
@@ -494,6 +497,11 @@ export class WarehouseService {
     });
     if (!product) throw new NotFoundException('Producto no encontrado');
 
+    // Una serie es una pieza: la que ya salió y no ha regresado no puede salir otra vez.
+    if (TIPOS_QUE_SACAN_LA_PIEZA.has(normalizedType)) {
+      await this.assertSeriesEnAlmacen(dto.productId, tenantId, series);
+    }
+
     // La OT a la que se carga el material tiene que ser de esta empresa: si no se
     // comprueba, un movimiento de la empresa A queda ligado a una actividad de la B.
     let activityId: number | null = null;
@@ -883,6 +891,32 @@ export class WarehouseService {
   }
 
   /**
+   * Rechaza las series que ya salieron del almacén y no han regresado (su movimiento más reciente
+   * es una salida, una baja o un consumo). Se busca en el mismo producto y la misma empresa;
+   * `exceptoId` es la propia salida cuando se le agregan series después.
+   */
+  private async assertSeriesEnAlmacen(
+    productId: number,
+    tenantId: number,
+    series: string[],
+    exceptoId?: number,
+  ): Promise<void> {
+    if (!series.length) return;
+    const historial = await this.prisma.stockMovement.findMany({
+      where: {
+        ...(exceptoId != null ? { id: { not: exceptoId } } : {}),
+        productId,
+        ...companyWhere(tenantId),
+        OR: series.map((serie) => ({ series: { array_contains: [serie] } })),
+      },
+      select: { id: true, type: true, series: true, movementNumber: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    const fuera = seriesQueSiguenFuera(series, historial);
+    if (fuera.length) throw new BadRequestException(avisoSeriesFuera(fuera));
+  }
+
+  /**
    * Agrega fotos y números de serie a un movimiento ya registrado (la foto de lo que sale y la
    * de cada etiqueta de serie). Suma a lo que había; no borra evidencia ni cambia existencias.
    */
@@ -894,7 +928,7 @@ export class WarehouseService {
     const tenantId = requireCompanyId(companyId);
     const movimiento = await this.prisma.stockMovement.findFirst({
       where: { id, ...companyWhere(tenantId) },
-      select: { id: true, quantity: true, fotos: true, series: true },
+      select: { id: true, type: true, productId: true, quantity: true, fotos: true, series: true },
     });
     if (!movimiento) throw new NotFoundException('Movimiento no encontrado');
 
@@ -902,6 +936,16 @@ export class WarehouseService {
     validarSeriesContraCantidad(suma.series, Number(movimiento.quantity));
     if (!suma.fotos.length && !suma.series.length) {
       throw new BadRequestException('Agrega al menos una foto o un número de serie');
+    }
+    // Las series que se agregan a una salida tampoco pueden haber salido ya en otro movimiento.
+    if (TIPOS_QUE_SACAN_LA_PIEZA.has(String(movimiento.type))) {
+      const yaTenia = new Set(normalizarSeries(movimiento.series));
+      await this.assertSeriesEnAlmacen(
+        movimiento.productId,
+        tenantId,
+        suma.series.filter((serie) => !yaTenia.has(serie)),
+        movimiento.id,
+      );
     }
 
     return this.prisma.stockMovement.update({

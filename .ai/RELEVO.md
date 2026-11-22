@@ -1,5 +1,29 @@
 # RELEVO
 
+- **21-11 ~20:58 México (claude-code, nube; Cursor/Codex no alcanzables) — Vuelta 13 de pulido: en almacén, un número de serie que ya salió no puede volver a salir. Sin migraciones; sin desplegar.**
+  - **El hueco:** una serie es una pieza, pero la misma serie se podía registrar en dos salidas (etiqueta leída dos
+    veces, serie tecleada mal o un reintento). En la base local de demostración estaba el caso: `DS-2CD-0001` en
+    `SM-000003` y otra vez en `SM-000004`. El historial decía que la misma cámara estaba en dos obras.
+  - **La regla (`warehouse/evidencia-salida.ts`, pura):** `seriesQueSiguenFuera` mira el movimiento más reciente que
+    nombra cada serie, dentro del mismo producto y la misma empresa. Si es una salida, una baja o un consumo de
+    producción, la serie sigue fuera. Una devolución o una entrada posterior la regresa; un traspaso entre
+    almacenes no la saca.
+  - **Dónde se aplica (`warehouse.service.ts`, `assertSeriesEnAlmacen`):** al registrar una salida, baja o consumo con
+    series, antes de mover existencias; y al agregarle series después a una salida ya registrada (sin compararla
+    contra sí misma). Responde 400 con un aviso que dice qué hacer: «La serie DS-1 ya salió en el movimiento SM-3 y
+    no ha regresado. Revisa la etiqueta o registra primero su devolución.» Con varias, las nombra todas.
+  - **Lo que NO hace:** no corrige lo ya capturado (si en producción hay series repetidas en dos salidas, ahí siguen;
+    falta un reporte para encontrarlas); no impide dar entrada dos veces a la misma serie; y como no hay llave única
+    en la base (pediría migración), dos salidas simultáneas de la misma serie todavía podrían pasar las dos.
+  - **Paridad:** API hecho · Web no aplica (el escáner y Movimientos ya muestran el aviso del servidor con
+    `formatApiError`) · Android e iOS no aplica (`mensajeAlmacen` y `EscaneoReglas.mensaje` muestran ese mismo aviso;
+    revisado en el código, no en un teléfono).
+  - **Verificado:** `npm run typecheck:api` 0; jest API 537 suites, 6,727 pruebas; `nest build` termina bien. La web no
+    cambió desde `d222b94` (vitest 299 archivos y 2,419 pruebas, y `next build` completo). `serie-ya-salio.spec.ts` (12 pruebas, 9 se vieron fallar antes del
+    cambio). La consulta real de Prisma (`series: { array_contains: [serie] }`) se corrió en modo lectura contra la
+    base local: encuentra la serie exacta dentro del arreglo, no confunde una parecida y respeta la exclusión del
+    propio movimiento. No se probó en navegador (el entorno local está apagado) ni en producción.
+
 - **21-11 ~20:46 México (claude-code, nube; Cursor/Codex no alcanzables) — Vuelta 12 de pulido: «hoy» después de las 6 de la tarde, horas que se recorrían al editar, y una página que no compilaba para producción (error mío de la vuelta 2). Sin migraciones; sin desplegar.**
   - **OJO, primero esto: `main` no compilaba la web desde `d99aa9a` (21-11, 16:38 México).** En
     `app/(subdomains)/tickets/[branch]/page.tsx` un guion mío puso un `import` arriba de `"use client"` (el archivo
