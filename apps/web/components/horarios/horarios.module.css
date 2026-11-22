@@ -1,0 +1,17 @@
+.ficha {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rango {
+  font-weight: 600;
+}
+.meta {
+  opacity: 0.75;
+  font-size: 0.875rem;
+}
+.acciones {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
