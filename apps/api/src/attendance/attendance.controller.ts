@@ -13,6 +13,7 @@ import { COLUMNAS_ASISTENCIA_HIBRIDA } from '../common/excel/reportes.js';
 import { workDateKey } from '../common/time/workday.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { armarEstadoJornada } from './estado-jornada.js';
+import { listarTrabajandoSinJornada } from './trabajando-sin-jornada.js';
 
 @Controller('attendance')
 export class AttendanceController {
@@ -67,6 +68,36 @@ export class AttendanceController {
       jornadaAbierta,
       webCheckin: { abierta: web.abierta, hasta: web.hasta },
     });
+  }
+
+  /**
+   * Solo lectura: quién tiene sesión de actividad abierta sin jornada abierta.
+   * GET /api/attendance/trabajando-sin-entrada — Adam decide; no muta datos.
+   */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  @Get('trabajando-sin-entrada')
+  async trabajandoSinEntrada(@CurrentCompanyId() companyId: number | null) {
+    if (companyId == null) return { personas: [] as { userId: number; nombre: string }[] };
+    const [sesiones, jornadas] = await Promise.all([
+      this.prisma.activityWorkSession.findMany({
+        where: { companyId, endedAt: null },
+        select: { userId: true },
+        take: 500,
+      }),
+      this.prisma.attendanceDay.findMany({
+        where: { companyId, isOpen: true },
+        select: { userId: true },
+      }),
+    ]);
+    const ids = listarTrabajandoSinJornada(sesiones, jornadas, new Map()).map((p) => p.userId);
+    if (!ids.length) return { personas: [] as { userId: number; nombre: string }[] };
+    const gente = await this.prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, nombre: true },
+    });
+    const nombres = new Map(gente.map((u) => [u.id, u.nombre]));
+    return { personas: listarTrabajandoSinJornada(sesiones, jornadas, nombres) };
   }
 
   /** Justificar la falta de un día (solo Christian): { userId, fecha: AAAA-MM-DD, motivo }. No crea checadas. */

@@ -86,3 +86,9 @@ export function marcarDocumentoDigitalizado(exp: Expediente, id: string): Expedi
     documentos: exp.documentos.map((d) => (d.id === id ? { ...d, digitalizado: true } : d)),
   };
 }
+
+/** Texto del botón de cabecera: «Expediente» o «Expediente · N» si faltan pendientes. */
+export function etiquetaBotonExpediente(pendientes: Pendiente[]): string {
+  const n = pendientes.filter((p) => !p.hecho).length;
+  return n > 0 ? `Expediente · ${n}` : "Expediente";
+}

@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { planoVacio, type Plano } from "./plano";
 import { agregarCamara } from "./editor";
-import { expedienteDe, marcarDocumentoDigitalizado, queFalta, sePuedeDigitalizar, tamanoLegible } from "./expediente";
+import {
+  etiquetaBotonExpediente,
+  expedienteDe,
+  marcarDocumentoDigitalizado,
+  queFalta,
+  sePuedeDigitalizar,
+  tamanoLegible,
+} from "./expediente";
 
 describe("expediente", () => {
   it("un diseño sin expediente arranca vacío", () => {
@@ -53,4 +60,15 @@ describe("expediente", () => {
     expect(marcado.sitio).toBe("Campus");
   });
 
+  it("botón Expediente · N cuenta pendientes incompletos", () => {
+    expect(etiquetaBotonExpediente([])).toBe("Expediente");
+    expect(etiquetaBotonExpediente([{ texto: "a", hecho: true }])).toBe("Expediente");
+    expect(
+      etiquetaBotonExpediente([
+        { texto: "a", hecho: true },
+        { texto: "b", hecho: false },
+        { texto: "c", hecho: false },
+      ]),
+    ).toBe("Expediente · 2");
+  });
 });

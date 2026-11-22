@@ -80,7 +80,7 @@ import PlanoTecnico, { HojaAjustada, IMPRIMIR_HOJA } from "./PlanoTecnico";
 import VistaCamara from "./VistaCamara";
 import DigitalizarConIA from "./DigitalizarConIA";
 import ExpedienteProyecto from "./ExpedienteProyecto";
-import { expedienteDe, marcarDocumentoDigitalizado, queFalta, type DocumentoExpediente } from "@/lib/cctv/expediente";
+import { etiquetaBotonExpediente, expedienteDe, marcarDocumentoDigitalizado, queFalta, type DocumentoExpediente } from "@/lib/cctv/expediente";
 import { CapasBloqueoPanel, HistorialVisible } from "./HistorialYCapas";
 import {
   CAPAS_INICIALES,
@@ -715,7 +715,7 @@ export default function EditorCctv({
             <RedoRoundedIcon fontSize="small" />
           </Button>
           <Button iconStart={<FolderOpenOutlinedIcon fontSize="small" />} onClick={() => setVerExpediente(true)} title="Datos del proyecto, documentos y qué falta para entregar">
-            Expediente
+            {etiquetaBotonExpediente(queFalta(raiz, niveles.filter((n) => n.plano !== raiz).map((n) => n.plano)))}
           </Button>
           {puedeCotizar ? (
             <Button
