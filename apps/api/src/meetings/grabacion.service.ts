@@ -14,6 +14,7 @@ import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { JobQueueService } from '../jobs/job-queue.service.js';
 import { EmailService } from '../common/email/email.service.js';
+import { aTextoPlano, correoNexara, escaparHtml, parrafo, saludo } from '../common/email/correo-nexara.js';
 import { TranscriptorService } from '../ai/voz/transcriptor.service.js';
 import { EXTENSIONES_AUDIO, extensionAudio, promptTranscriptor } from '../ai/voz/transcriptor.js';
 import { ClaudeService, type UsoClaude } from '../ai/claude/claude.service.js';
@@ -782,11 +783,20 @@ export class GrabacionService implements OnModuleInit {
     });
     const correos = [...new Set((r?.asistentes ?? []).map((a) => a.user?.email?.trim()).filter((c): c is string => Boolean(c)))];
     if (!correos.length) throw new BadRequestException('Ningún convocado tiene correo registrado: agrega asistentes a la reunión.');
-    const titulo = escapar(r!.titulo);
+    // La fecha de la reunión es un día, no un instante: se lee en UTC para que no se recorra.
+    const fecha = (opciones: Intl.DateTimeFormatOptions) =>
+      new Intl.DateTimeFormat('es-MX', { ...opciones, timeZone: 'UTC' }).format(r!.fecha);
+    const cuerpo = [
+      saludo(),
+      parrafo(
+        `Adjuntamos la minuta de la reunión <strong>${escaparHtml(r!.titulo)}</strong> del ${fecha({ day: 'numeric', month: 'long', year: 'numeric' })}, con el resumen, los temas tratados y los acuerdos.`,
+      ),
+    ].join('\n');
     const ok = await this.email.send({
       to: correos,
-      subject: `[NEXARA] Minuta: ${r!.titulo} (${dia(r!.fecha)})`,
-      html: `<p>Hola:</p><p>Adjuntamos la minuta de la reunión <strong>${titulo}</strong> del ${dia(r!.fecha)}, con el resumen, los temas tratados y los acuerdos.</p><p>NEXARA</p>`,
+      subject: `[NEXARA] Minuta: ${r!.titulo} (${fecha({ day: 'numeric', month: 'short', year: 'numeric' })})`,
+      html: correoNexara({ etiqueta: 'Minuta de reunión', cuerpo, pie: 'Enviado desde Reuniones, en NEXARA.' }),
+      text: aTextoPlano(cuerpo),
       attachments: [{ filename: archivo.nombre, content: archivo.pdf, contentType: 'application/pdf' }],
     });
     if (!ok) throw new ServiceUnavailableException('No se pudo enviar el correo: intenta de nuevo más tarde.');
@@ -798,8 +808,4 @@ function mimeDe(ext: string): string {
   if (ext === 'm4a') return 'audio/mp4';
   if (ext === 'mp3') return 'audio/mpeg';
   return `audio/${ext}`;
-}
-
-function escapar(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

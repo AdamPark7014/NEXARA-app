@@ -17,6 +17,8 @@ import {
   resolvePublicCompanyId,
 } from '../common/tenant/tenant-scope.js';
 import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
+import { remitenteConNombre } from '../common/email/correo-nexara.js';
+import { correoDeNoticia, ligaDeLaNoticia } from './correo-noticia.js';
 
 interface MulterFile {
   fieldname: string;
@@ -348,11 +350,14 @@ export class NewsService {
     if (!subscribers.length) return;
 
     const transporter = this.buildTransporter();
-    const from = process.env['SMTP_FROM'] || 'no-reply@nexara.com';
+    const from = process.env['SMTP_FROM'] || 'no-reply@nexara.com.mx';
     const baseUrl = (process.env['PUBLIC_WEB_URL'] || process.env['WEB_URL'] || 'https://nexara.com.mx')
       .replace(/\/+$/, '');
-    const logoUrl = (process.env['EMAIL_LOGO_URL'] || `${baseUrl}/logo-nexara.png`).trim();
-    const newsUrl = baseUrl;
+    // «Ver noticia» abre la noticia, no la portada, cuando el blog del sitio la publica.
+    const esDelSitio = await this.publicCompanyId()
+      .then((id) => id === post.companyId)
+      .catch(() => false);
+    const newsUrl = ligaDeLaNoticia(baseUrl, post.slug, esDelSitio);
     const preview = this.buildNewsPreview(post.summary, post.content);
 
     const chunkSize = 25;
@@ -360,21 +365,19 @@ export class NewsService {
       const chunk = subscribers.slice(i, i + chunkSize);
       await Promise.allSettled(
         chunk.map((subscriber) => {
-          const subject = `Nueva noticia: ${post.title}`;
-          const { html, text } = this.buildNewsletterEmail({
-            subscriberName: subscriber.name || undefined,
-            postTitle: post.title,
-            postSummary: preview,
-            postUrl: newsUrl,
-            logoUrl,
+          const correo = correoDeNoticia({
+            suscriptor: subscriber.name,
+            tituloDeLaNoticia: post.title,
+            resumen: preview,
+            liga: newsUrl,
           });
 
           return transporter.sendMail({
-            from,
+            from: remitenteConNombre(from),
             to: subscriber.email,
-            subject,
-            html,
-            text,
+            subject: correo.subject,
+            html: correo.html,
+            text: correo.text,
           });
         }),
       );
@@ -384,78 +387,6 @@ export class NewsService {
   private buildNewsPreview(summary: string | null, content: string) {
     const clean = (summary?.trim() || content.trim()).replace(/\s+/g, ' ');
     if (clean.length <= 200) return clean;
-    return `${clean.slice(0, 197)}...`;
-  }
-
-  private buildNewsletterEmail(payload: {
-    subscriberName?: string;
-    postTitle: string;
-    postSummary: string;
-    postUrl: string;
-    logoUrl: string;
-  }) {
-    const greeting = payload.subscriberName ? `Hola ${payload.subscriberName},` : 'Hola,';
-    const safeTitle = this.escapeHtml(payload.postTitle);
-    const safeSummary = this.escapeHtml(payload.postSummary);
-    const safeUrl = this.escapeHtml(payload.postUrl);
-    const safeLogoUrl = this.escapeHtml(payload.logoUrl);
-
-    const html = `
-      <div style="background-color:#f5f7fb;padding:24px 12px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;font-family:Arial,sans-serif;">
-          <tr>
-            <td style="padding:20px 24px;background:linear-gradient(135deg,#0b1b2e,#0c243a);color:#ffffff;">
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-                <tr>
-                  <td style="vertical-align:middle;">
-                    <img src="${safeLogoUrl}" alt="Nexara" width="120" height="40" style="display:block;border:0;" />
-                  </td>
-                  <td style="text-align:right;vertical-align:middle;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#c6d7ef;">
-                    Nexara News
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 24px 8px;color:#1f2a44;">
-              <p style="margin:0 0 12px;font-size:16px;">${greeting}</p>
-              <p style="margin:0 0 12px;color:#45556f;line-height:1.6;">Tenemos una nueva noticia publicada:</p>
-              <h2 style="margin:0 0 8px;font-size:20px;color:#12233b;">${safeTitle}</h2>
-              <p style="margin:0 0 16px;color:#45556f;line-height:1.6;">${safeSummary}</p>
-              <a href="${safeUrl}" style="display:inline-block;background:#1f4aa8;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:999px;font-size:14px;">Ver noticia</a>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:10px 24px 24px;color:#45556f;">
-              <p style="margin:0 0 6px;">Gracias por suscribirte a Nexara News.</p>
-              <p style="margin:0;">Equipo Nexara</p>
-            </td>
-          </tr>
-        </table>
-        <p style="text-align:center;color:#8a97ad;font-size:12px;margin:12px 0 0;">Estas recibiendo este correo porque estas suscrito a Nexara News.</p>
-      </div>
-    `;
-
-    const text = `${greeting}
-
-Nueva noticia publicada: ${payload.postTitle}
-${payload.postSummary}
-
-Ver noticia: ${payload.postUrl}
-
-Gracias por suscribirte a Nexara News.
-Equipo Nexara`;
-
-    return { html, text };
-  }
-
-  private escapeHtml(value: string) {
-    return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+    return `${clean.slice(0, 199)}…`;
   }
 }

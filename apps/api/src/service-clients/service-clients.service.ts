@@ -9,6 +9,8 @@ import { randomBytes } from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 import { generateClientReportPdf } from './client-report-pdf.js';
+import { remitenteConNombre } from '../common/email/correo-nexara.js';
+import { correoDeAccesoAlPortal, correoDeEncuestaDeServicio } from './correos-portal.js';
 import {
   assertCompanyAccess,
   companyWhere,
@@ -182,54 +184,20 @@ export class ServiceClientsService {
     const transporter = this.buildTransporter();
     const from = process.env['SMTP_VENTAS_USER'] || process.env['SMTP_FROM'] || 'ventas@nexara.com.mx';
     const baseUrl = (process.env['PUBLIC_WEB_URL'] || 'https://nexara.com.mx').replace(/\/+$/, '');
-    const logoUrl = (process.env['EMAIL_LOGO_URL'] || `${baseUrl}/logo-nexara.png`).trim();
     const portalUrl = `${baseUrl}/tickets`;
-
-    const html = `
-      <div style="background-color:#f5f7fb;padding:24px 12px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;font-family:Arial,sans-serif;">
-          <tr>
-            <td style="padding:20px 24px;background:linear-gradient(135deg,#0b1b2e,#0c243a);color:#ffffff;">
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-                <tr>
-                  <td style="vertical-align:middle;">
-                    <img src="${logoUrl}" alt="Nexara" width="120" height="40" style="display:block;border:0;" />
-                  </td>
-                  <td style="text-align:right;vertical-align:middle;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#c6d7ef;">
-                    Accesos al portal de tickets
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 24px 8px;color:#1f2a44;">
-              <p style="margin:0 0 12px;font-size:16px;">Hola ${payload.clientName},</p>
-              <p style="margin:0 0 18px;color:#45556f;line-height:1.6;">Se genero tu acceso para el portal de tickets Nexara.</p>
-              <div style="background:#f1f5fb;border:1px solid #d7e1f2;border-radius:14px;padding:16px;color:#24324a;line-height:1.7;">
-                <p style="margin:0 0 8px;"><strong>Usuario:</strong> ${payload.portalEmail}</p>
-                <p style="margin:0 0 8px;"><strong>Password:</strong> ${payload.portalPassword}</p>
-                <p style="margin:0;"><strong>Acceso:</strong> <a href="${portalUrl}">${portalUrl}</a></p>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:10px 24px 24px;color:#45556f;">
-              <p style="margin:0 0 6px;">Si necesitas ayuda, responde a este correo.</p>
-              <p style="margin:0;">Saludos,</p>
-              <p style="margin:4px 0 0;font-weight:700;color:#12233b;">Equipo Nexara</p>
-            </td>
-          </tr>
-        </table>
-        <p style="text-align:center;color:#8a97ad;font-size:12px;margin:12px 0 0;">Este mensaje fue enviado desde el panel de Nexara.</p>
-      </div>
-    `;
+    const correo = correoDeAccesoAlPortal({
+      cliente: payload.clientName,
+      usuario: payload.portalEmail,
+      contrasena: payload.portalPassword,
+      ligaDelPortal: portalUrl,
+    });
 
     await transporter.sendMail({
-      from,
+      from: remitenteConNombre(from),
       to: payload.toEmail,
-      subject: 'Accesos al portal de tickets Nexara',
-      html,
+      subject: correo.subject,
+      html: correo.html,
+      text: correo.text,
     });
   }
 
@@ -239,55 +207,21 @@ export class ServiceClientsService {
     activityLabel: string;
   }) {
     const transporter = this.buildTransporter();
-    const from = process.env['SMTP_FROM'] || 'no-reply@nexara.com';
+    const from = process.env['SMTP_FROM'] || 'no-reply@nexara.com.mx';
     const baseUrl = (process.env['PUBLIC_WEB_URL'] || 'https://nexara.com.mx').replace(/\/+$/, '');
-    const logoUrl = (process.env['EMAIL_LOGO_URL'] || `${baseUrl}/logo-nexara.png`).trim();
     const portalUrl = `${baseUrl}/tickets`;
-
-    const html = `
-      <div style="background-color:#f5f7fb;padding:24px 12px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;font-family:Arial,sans-serif;">
-          <tr>
-            <td style="padding:20px 24px;background:linear-gradient(135deg,#0b1b2e,#0c243a);color:#ffffff;">
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-                <tr>
-                  <td style="vertical-align:middle;">
-                    <img src="${logoUrl}" alt="Nexara" width="120" height="40" style="display:block;border:0;" />
-                  </td>
-                  <td style="text-align:right;vertical-align:middle;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#c6d7ef;">
-                    Encuesta de servicio
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 24px 8px;color:#1f2a44;">
-              <p style="margin:0 0 12px;font-size:16px;">Hola ${payload.clientName},</p>
-              <p style="margin:0 0 18px;color:#45556f;line-height:1.6;">El servicio ${payload.activityLabel} se marco como finalizado. Queremos confirmar que fue atendido correctamente y recibir tu opinion.</p>
-              <div style="background:#f1f5fb;border:1px solid #d7e1f2;border-radius:14px;padding:16px;color:#24324a;line-height:1.7;">
-                <p style="margin:0 0 8px;"><strong>Acceso:</strong> <a href="${portalUrl}">${portalUrl}</a></p>
-                <p style="margin:0;">Por favor ingresa y completa la encuesta. Nos ayuda a mejorar.</p>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:10px 24px 24px;color:#45556f;">
-              <p style="margin:0 0 6px;">Gracias por tu confianza.</p>
-              <p style="margin:0;">Saludos,</p>
-              <p style="margin:4px 0 0;font-weight:700;color:#12233b;">Equipo Nexara</p>
-            </td>
-          </tr>
-        </table>
-        <p style="text-align:center;color:#8a97ad;font-size:12px;margin:12px 0 0;">Este mensaje fue enviado desde el panel de Nexara.</p>
-      </div>
-    `;
+    const correo = correoDeEncuestaDeServicio({
+      cliente: payload.clientName,
+      servicio: payload.activityLabel,
+      ligaDelPortal: portalUrl,
+    });
 
     await transporter.sendMail({
-      from,
+      from: remitenteConNombre(from),
       to: payload.toEmail,
-      subject: 'Tu opinion sobre el servicio Nexara',
-      html,
+      subject: correo.subject,
+      html: correo.html,
+      text: correo.text,
     });
   }
 

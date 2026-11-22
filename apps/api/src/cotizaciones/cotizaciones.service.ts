@@ -102,6 +102,8 @@ import {
   partidasDePaquete,
 } from './paquetes.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
+import { remitenteConNombre } from '../common/email/correo-nexara.js';
+import { correoDeCotizacion } from './correo-cotizacion.js';
 import { ROLES_QUE_COTIZAN, ROLE_LABELS, type RoleKey } from '../common/rbac/roles.v2.js';
 import {
   MENSAJE_PROBLEMA,
@@ -127,22 +129,6 @@ const normalizeStatus = (status?: string) => {
   }
   return undefined;
 };
-
-/**
- * Texto de cliente dentro del HTML del correo.
- *
- * El mensaje que escribe quien envía la cotización se interpolaba tal cual en el cuerpo del correo:
- * cualquier `<` o comilla rompía el HTML, y una etiqueta pegada desde otro lado viajaba al buzón del
- * cliente firmada por NEXARA.
- */
-function escaparHtml(texto: string): string {
-  return texto
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 /** Cuántas cotizaciones sirve `listaCore` cuando nadie pide un `limit`. */
 const TOPE_LISTA_CORE = 200;
@@ -2389,26 +2375,22 @@ export class CotizacionesService {
     const baseUrl = process.env['PUBLIC_WEB_URL'] || 'http://localhost:3000';
     const signUrl = `${baseUrl.replace(/\/+$/, '')}/cotizaciones/firmar/${token}`;
 
-    // Todo lo que viene de una persona se escapa: el mensaje libre y el nombre del cliente.
-    const saludo = escaparHtml(String(quote.clientName || 'cliente'));
-    const folio = escaparHtml(String(quote.quoteNumber));
-    const cuerpo = message?.trim()
-      ? `<p>${escaparHtml(message.trim()).replace(/\r?\n/g, '<br />')}</p>`
-      : '';
-    const htmlMessage = `
-      <p>Hola ${saludo},</p>
-      <p>Adjuntamos la propuesta técnica ${folio}.</p>
-      ${cuerpo}
-      <p>Para revisarla y firmarla: <a href="${signUrl}">${signUrl}</a></p>
-    `;
+    // El contenido (asunto, HTML y texto) se arma aparte, con todo lo que escribe una persona escapado.
+    const correo = correoDeCotizacion({
+      cliente: quote.clientName,
+      folio: String(quote.quoteNumber),
+      mensaje: message,
+      ligaParaFirmar: signUrl,
+    });
 
     try {
       await transporter.sendMail({
-        from,
+        from: remitenteConNombre(from),
         to: email,
         ...(cc.length ? { cc } : {}),
-        subject: `Cotizacion ${quote.quoteNumber}`,
-        html: htmlMessage,
+        subject: correo.subject,
+        html: correo.html,
+        text: correo.text,
         attachments: [
           {
             filename: `cotizacion-${quote.quoteNumber}.pdf`,

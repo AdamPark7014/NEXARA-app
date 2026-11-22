@@ -1,5 +1,41 @@
 # RELEVO
 
+- **21-11 ~19:14 México (claude-code, nube; Cursor/Codex no alcanzables) — Octava vuelta de pulido: los correos que manda la plataforma. Sin migraciones; sin desplegar.**
+  - **Qué había:** ocho correos armados en cinco servicios. Seis traían su propia copia del mismo HTML y dos no traían
+    ninguno: la cotización le llegaba al cliente como cuatro renglones sin formato, con asunto «Cotizacion» y la
+    dirección larga a la vista. Las copias compartían tres fallas: el logo (`logo-nexara.png`, 343×374) se pintaba a
+    120×40, estirado al triple; la cabecera solo declaraba un degradado, que Outlook no pinta (letras blancas sobre
+    blanco); y con las imágenes bloqueadas no quedaba ni el nombre.
+  - **Marco único (API, `common/email/correo-nexara.ts`):** `correoNexara` y sus piezas (`saludo`, `parrafo`,
+    `recuadro`, `dato`, `botonDeCorreo`, `ligaDeRespaldo`, `despedida`). Logo a 37×40 con «NEXARA» en texto al lado
+    (se lee aunque las imágenes estén bloqueadas); con `EMAIL_LOGO_URL` solo se fija el alto, porque de un logo ajeno
+    no se conoce la proporción. Color de respaldo en la cabecera, ancho fijo para Outlook, `lang="es"`, texto de
+    avance para el buzón y botón con el color en la celda. `escaparHtml` y `conSaltos` para todo lo que escribe una
+    persona; `aTextoPlano` saca la versión en texto; `remitenteConNombre` pone «NEXARA» como nombre del remitente en
+    los correos a clientes (el buzón enseñaba «ventas») y respeta el que ya trae nombre.
+  - **Cada correo, en su archivo y con versión en texto:** cotización (`cotizaciones/correo-cotizacion.ts`: asunto
+    «Cotización FOLIO», botón «Revisar y firmar la cotización», el mensaje de quien envía en un recuadro; sin nombre
+    de cliente saluda «Hola,» y ya no «Hola cliente,»), acceso al portal y encuesta
+    (`service-clients/correos-portal.ts`: «Contraseña» en vez de «Password», «Se genero», «se marco», «tu opinion»),
+    contacto nuevo y respuesta (`contact-messages/correos-contacto.ts`: «Categoría», «Correo», «Teléfono»; «A
+    continuacion», «mas dudas»), noticia (`news/correo-noticia.ts`: «Estas recibiendo… estas suscrito»), minuta
+    (fecha «20 de noviembre de 2026» en vez de «2026-11-20») y los cinco avisos internos de `email.service.ts`
+    (títulos sin mayúsculas de más; «día/días» también en el asunto).
+  - **Fallas que no eran de texto:** el nombre de quien se suscribe o escribe desde el sitio (formulario público) y el
+    del cliente entraban al HTML sin escapar en noticias, respuesta a contacto, acceso al portal y encuesta. «Ver
+    noticia» llevaba a la portada: ahora abre la noticia (`/blog/slug`) cuando es de la empresa del sitio, que es la
+    única que el blog publica; para las demás sigue yendo a la portada. El remitente de respaldo de encuesta y
+    noticias era `no-reply@nexara.com`, un dominio ajeno: ahora `nexara.com.mx` (solo aplica si falta `SMTP_FROM`).
+  - **No cambió:** a quién se manda, cuándo, las copias, los adjuntos, las ligas del portal y de firma, ni la
+    configuración SMTP. Mandar la contraseña del portal por correo sigue igual (ya era así).
+  - **Cómo se revisó:** cada correo dibujado en Chromium a 680 y 375 px con datos de demostración; ninguno se
+    desborda. Antes y ahora de los dos que recibe el cliente: `rediseno/antes-despues-2026-11-21/correos.png` en los
+    archivos del proyecto. No se probó en Outlook ni Gmail reales: conviene mandarse una cotización de prueba tras el
+    despliegue.
+  - **Paridad:** API hecho · Web, Android e iOS no aplica: los correos los arma y manda el servidor.
+  - **Verificado:** `npm run typecheck` 0; jest API 6,601 de 6,601 en 523 archivos (`common/email/correos.spec.ts`, 16 pruebas
+    nuevas); web sin cambios desde la vuelta anterior.
+
 - **21-11 ~18:15 México (claude-code, nube; Cursor/Codex no alcanzables) — Séptima vuelta de pulido: que el servidor nunca conteste en inglés. Solo textos; sin migraciones; sin desplegar.**
   - **Validación de formularios (API, `common/validacion-es.ts`):** unas 1,300 reglas de `class-validator` no traen
     mensaje propio y contestaban con el texto de la librería: «amount must be a positive number», «property stock
