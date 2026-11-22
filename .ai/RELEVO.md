@@ -1,5 +1,53 @@
 # RELEVO
 
+- **21-11 ~22:44 México (claude-code, nube) — Vuelta 21 de pulido: los tres PDF de dibujo propio (orden de compra, cotización de Ventas, reporte de evidencias). Solo API; sin migraciones; sin desplegar.**
+  - **Qué eran:** los tres documentos que no usan la plantilla común de reportes. Se revisaron impresos (PDF a PNG con
+    datos de demostración) y salieron defectos de fondo, no solo la tipografía.
+  - **Cotización de Ventas** (`POST ventas/cotizaciones/generar-pdf` y el PDF de la orden al cerrar un proyecto):
+    se dibujaba con posiciones fijas y **sin saltos de hoja**. Con más de unas veinte partidas el contenido pasaba del
+    pie y PDFKit abría una hoja por cada texto que ya no cabía: **treinta partidas salían en 85 hojas** con un renglón
+    cada una. Una descripción de dos renglones se encimaba con su garantía (y el nombre de la partida es texto largo,
+    con viñetas); la dirección de la empresa, con su sitio web; el pie salía azul sobre azul marino porque se pedía
+    `rgba(...)`, que PDFKit no entiende; un pie de plantilla largo abría otra hoja. El dibujo se sacó a
+    `ventas/cotizacion-ventas-pdf.ts` (`construirPdfDeCotizacion`; el servicio solo reúne los datos): cada bloque se
+    mide antes de pintarse, la tabla repite su encabezado, totales y firmas no se parten, el alcance y unas notas
+    largas pasan de hoja por renglones, y el pie lleva «Página 1 de 3». Además: «IVA 16 %» solo si todas las partidas
+    comparten tasa; se imprime la entrega por partida (el dato ya venía y no salía); letra oscura si el color de la
+    plantilla es claro; un color de plantilla que no sea `#abc`/`#aabbcc` usa el azul por omisión; la orden de venta
+    dice «Orden de venta» en el pie.
+  - **Orden de compra** (`procurement/purchase-order-pdf.ts`): la tabla sumaba 524 pt en 507 útiles y «Importe» se
+    salía de la banda; las notas de dos o más renglones **perdían el último** (se medían sin el interlineado con que
+    se pintan); una razón social larga perdía su último renglón en la tarjeta (se medía en regular de 8 y se pintaba
+    en negrita de 9) y en el membrete se metía bajo el recuadro del folio; la franja de condiciones medía 36 pt fijos
+    y un texto de dos renglones se salía; las firmas pedían 96 pt para ocupar 70 y se iban solas a otra hoja; una raya
+    sí y una no entre partidas (la franja gris tapaba la de arriba). Ahora: columnas que caben (`TABLE_COLS`,
+    `ANCHO_UTIL_OC`), SKU completo aunque tome dos renglones, tarjetas del mismo alto, «Enviar a» con quién recibe y
+    la dirección corrida (antes un pedazo por coma), «Tiempo de entrega: N día(s)» en vez de «Lead time»,
+    «Incoterms» solo si la orden lo trae, «Unidad» en vez de «UdM».
+  - **Cantidades en un renglón (los dos documentos):** PDFKit parte en dos lo que no cabe en su ancho, y con el recorte
+    de la celda el segundo pedazo no se imprimía: una cantidad de ocho o nueve cifras salía sin sus últimos dígitos.
+    Ahora la letra baja hasta que la cantidad quepa entera (`textoEnUnRenglon`, `enUnRenglon`). Ojo para quien toque
+    PDFs: en PDFKit 0.15 `lineBreak: false` **no** evita el salto si se pasa `width`.
+  - **Reporte de evidencias** (`GET activity-evidence/history/report`, lo usa iOS): tenía su propio encabezado; el
+    título se pintaba sobre el subtítulo, el periodo salía «2026-11-01 a 2026-11-21», el nombre largo de una actividad
+    se recortaba a 44 letras y aun así se salía del renglón, sin número de hoja, y **cada ticket sin archivos abría una
+    hoja casi en blanco**. El dibujo se sacó a `activities/evidence/reporte-historial-evidencias-pdf.ts` con el
+    encabezado, las tarjetas, la tabla y el pie de los demás reportes: periodo como fecha, nombre completo, hoja de
+    detalle solo para tickets con archivos, seis fotos por hoja (cabían cuatro), prioridad legible («Media», no
+    «MEDIA») y «Archivo no disponible» en vez de «Sin evidencia» cuando la foto no está en disco. El logo sale de
+    `loadNexaraLogo()` (antes solo de `../web/public`, que en el contenedor puede no existir).
+  - **Tipografía:** los tres en Montserrat e Inter (`fuente(doc, …)`). Quedan con Helvetica, a propósito: el crédito
+    «© OpenStreetMap» de 6.5 pt del mapa (`common/maps/osm-teselas.ts`, dibuja sobre un lienzo falso en pruebas) y la
+    etiqueta de herramienta (`tool-requests/tool-label.ts`).
+  - **Pruebas:** `common/pdf/pdfs-de-diseno-propio.spec.ts` (27). `common/pdf/texto-de-pdf.ts` ahora también da la
+    posición de cada renglón (`renglonesPorHoja`) y detecta textos encimados (`renglonesEncimados`): sirve para
+    cualquier otro PDF.
+  - **Pendiente que vi:** la etiqueta PDF de herramienta imprime el código como texto, sin código de barras ni QR (la
+    de ZPL sí lo lleva; `qrcode` ya es dependencia). Las fotos se incrustan al tamaño original en este reporte y en el
+    de ticket: con `sharp` (ya instalado) pesarían una fracción.
+  - **Paridad:** API hecho · Web, Android e iOS no aplica (descargan el PDF que arma el servidor).
+  - **Verificado:** `npm run typecheck:api` 0; jest del API 544 suites, 6,828 pruebas; las de PDF también con `TZ=UTC`; `nest build` bien; los PDF revisados impresos (PNG) con datos de demostración, incluidos casos exigentes (26 partidas, cantidades de millones, razones sociales y notas largas, color de plantilla amarillo).
+
 - **21-11 ~22:13 México (claude-code, nube) — Vuelta 20 de pulido: almacén no deja recibir dos veces la misma serie. Solo API; sin migraciones; sin desplegar.**
   - **El defecto:** la vuelta 13 cerró la salida doble (una serie que ya salió no vuelve a salir), pero la entrada
     seguía abierta: la misma etiqueta leída en dos recepciones (entrega parcial, caja escaneada dos veces) quedaba

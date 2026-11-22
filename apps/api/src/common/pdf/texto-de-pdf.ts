@@ -1,5 +1,8 @@
 import zlib from 'zlib';
 
+/** Un renglón impreso: dónde arranca (en puntos, con el origen abajo a la izquierda), su tamaño de letra y su texto. */
+export type RenglonDePdf = { x: number; y: number; tam: number; texto: string };
+
 /**
  * Texto de cada hoja de un PDF hecho con PDFKit, en orden de hojas. Es para las pruebas: permite
  * comprobar que un campo sale impreso sin depender de una biblioteca de PDF.
@@ -10,6 +13,34 @@ import zlib from 'zlib';
  * renglón de la salida.
  */
 export function textoPorHoja(pdf: Buffer): string[] {
+  return renglonesPorHoja(pdf).map((renglones) => renglones.map((r) => r.texto).join('\n'));
+}
+
+/**
+ * Pares de renglones que quedaron uno encima del otro: misma hoja, mismo arranque a la izquierda y
+ * menos de un renglón de separación. Es como se ve un título de dos renglones sobre su subtítulo, o
+ * una descripción larga sobre la línea de garantía que va debajo. Devuelve una frase por choque.
+ */
+export function renglonesEncimados(pdf: Buffer): string[] {
+  const choques: string[] = [];
+  renglonesPorHoja(pdf).forEach((hoja, i) => {
+    const conTexto = hoja.filter((r) => r.texto.trim());
+    for (let a = 0; a < conTexto.length; a += 1) {
+      for (let b = a + 1; b < conTexto.length; b += 1) {
+        const r = conTexto[a]!;
+        const s = conTexto[b]!;
+        if (Math.abs(r.x - s.x) > 1) continue;
+        if (Math.abs(r.y - s.y) < Math.min(r.tam, s.tam) * 0.75) {
+          choques.push(`hoja ${i + 1}: «${r.texto.trim()}» y «${s.texto.trim()}»`);
+        }
+      }
+    }
+  });
+  return choques;
+}
+
+/** Los renglones de cada hoja con su posición, en el orden en que se pintaron. */
+export function renglonesPorHoja(pdf: Buffer): RenglonDePdf[][] {
   const fuente = pdf.toString('latin1');
   const objetos = leerObjetos(fuente);
 
@@ -37,20 +68,30 @@ export function textoPorHoja(pdf: Buffer): string[] {
   return hijos.map((num) => {
     const contenido = /\/Contents (\d+) 0 R/.exec(objetos.get(num)?.dict ?? '');
     const flujo = contenido ? objetos.get(Number(contenido[1]))?.flujo : null;
-    if (!flujo) return '';
+    if (!flujo) return [];
     const operadores = inflar(flujo).toString('latin1');
     let mapa: Map<number, string> | null = null;
-    const renglones: string[] = [];
-    for (const m of operadores.matchAll(/\/(\w+)\s+[\d.]+\s+Tf|\[([^\]]*)\]\s*TJ/g)) {
-      if (m[1]) {
-        const num = recursos.get(m[1]);
-        mapa = num === undefined ? null : mapaDeObjeto(num);
+    let x = 0;
+    let y = 0;
+    let tam = 0;
+    const renglones: RenglonDePdf[] = [];
+    // PDFKit abre cada renglón con su posición (`1 0 0 1 x y Tm`), su fuente (`/F1 9 Tf`) y el texto (`[...] TJ`).
+    for (const m of operadores.matchAll(/1 0 0 1 (-?[\d.]+) (-?[\d.]+) Tm|\/(\w+)\s+([\d.]+)\s+Tf|\[([^\]]*)\]\s*TJ/g)) {
+      if (m[1] !== undefined) {
+        x = Number(m[1]);
+        y = Number(m[2]);
         continue;
       }
-      const partes = [...m[2]!.matchAll(/<([0-9a-fA-F]*)>/g)].map(([, hex]) => decodificar(hex!, mapa));
-      renglones.push(partes.join(''));
+      if (m[3]) {
+        const num = recursos.get(m[3]);
+        mapa = num === undefined ? null : mapaDeObjeto(num);
+        tam = Number(m[4]);
+        continue;
+      }
+      const partes = [...m[5]!.matchAll(/<([0-9a-fA-F]*)>/g)].map(([, hex]) => decodificar(hex!, mapa));
+      renglones.push({ x, y, tam, texto: partes.join('') });
     }
-    return renglones.join('\n');
+    return renglones;
   });
 }
 

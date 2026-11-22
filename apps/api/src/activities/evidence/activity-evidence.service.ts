@@ -41,8 +41,9 @@ import {
   fotosAlCerrarPaso,
   type EvidenceStep,
 } from './evidence-flow.helpers.js';
-import PDFDocument from 'pdfkit';
 import { leerRevisores } from '../../me/revision-evidencias.js';
+import { ETIQUETA_PRIORIDAD, etiquetaDe } from '../../common/excel/etiquetas.js';
+import { generarReporteHistorialEvidencias, type FilaDeHistorial } from './reporte-historial-evidencias-pdf.js';
 import fs from 'fs';
 import path from 'path';
 import { parseWorkDate, parseWorkDateEnd, workDayStart } from '../../common/time/workday.js';
@@ -1459,23 +1460,6 @@ export class ActivityEvidenceService {
       },
     });
 
-    const formatDateTime = (value?: Date | null) => {
-      if (!value) return '-';
-      return value.toLocaleString('es-MX', {
-        timeZone: 'America/Mexico_City',
-        year: '2-digit',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    };
-
-    const truncate = (text: string, max = 40) => {
-      if (!text) return '-';
-      return text.length > max ? `${text.slice(0, max - 1)}...` : text;
-    };
-
     const normalizeUploadUrl = (value?: string | null) => {
       if (!value) return '';
       const raw = value.trim();
@@ -1551,298 +1535,44 @@ export class ActivityEvidenceService {
     const rejectedCount = evidences.filter((item) => item.reviewStatus === 'REJECTED').length;
     const pendingCount = evidences.length - approvedCount - rejectedCount;
 
-    return new Promise<Buffer>((resolve, reject) => {
-      const doc = new PDFDocument({ size: 'A4', margin: 32 });
-      const chunks: Buffer[] = [];
-
-      doc.on('data', (chunk) => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', (error) => reject(error));
-
-      const colors = {
-        navy: '#0B1F3A',
-        blue: '#1F6BBA',
-        lightBlue: '#E3F2FD',
-        softGray: '#F5F7FB',
-        text: '#1F2A37',
-        muted: '#5B6B7A',
-        line: '#D9E2EC',
-      };
-
-      const loadLogo = (relativePath: string) => {
-        try {
-          if (fs.existsSync(relativePath)) {
-            return fs.readFileSync(relativePath);
-          }
-        } catch {
-          return null;
-        }
-        return null;
-      };
-
-      const left = doc.page.margins.left;
-      const top = 140;
-      const pageRight = doc.page.width - doc.page.margins.right;
-      const pageWidth = doc.page.width;
-      const rowHeight = 22;
-      const col = {
-        fecha: left,
-        ticket: left + 104,
-        actividad: left + 184,
-        estatus: left + 372,
-        archivos: left + 462,
-      };
-
-      const nexaraLogo = loadLogo(path.resolve(process.cwd(), '../web/public/logo-nexara.png'))
-        || loadLogo(path.resolve(process.cwd(), '../../apps/web/public/logo-nexara.png'));
-
-      const drawCorporateHeader = () => {
-        doc.save();
-        doc.rect(0, 0, pageWidth, 120).fill(colors.lightBlue);
-        doc.rect(0, 0, pageWidth, 6).fill(colors.blue);
-        doc.restore();
-
-        const logoBox = { x: left, y: 22, w: 120, h: 64 };
-        if (nexaraLogo) {
-          doc.image(nexaraLogo, logoBox.x, logoBox.y, { fit: [logoBox.w, logoBox.h] });
-        }
-
-        const titleX = left + logoBox.w + 12;
-        const rightWidth = 220;
-        const infoX = pageRight - rightWidth;
-        const titleWidth = Math.max(180, infoX - titleX - 12);
-
-        doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(20).text('Reporte de Evidencias', titleX, 30, {
-          width: titleWidth,
+    const filas: FilaDeHistorial[] = evidences.map((evidence) => {
+      const medios = [
+        ...(evidence.entryPhotoUrl ? [{ etiqueta: 'Entrada', tipo: 'imagen' as const, url: normalizeUploadUrl(evidence.entryPhotoUrl) }] : []),
+        ...(evidence.evidencePhotos || []).map((url, idx) => ({
+          etiqueta: `Evidencia ${idx + 1}`,
+          tipo: 'imagen' as const,
+          url: normalizeUploadUrl(url),
+        })),
+        ...(evidence.serviceSheetPdfUrl
+          ? [{ etiqueta: 'Hoja de servicio', tipo: 'pdf' as const, url: normalizeUploadUrl(evidence.serviceSheetPdfUrl) }]
+          : []),
+        ...(evidence.exitPhotoUrl ? [{ etiqueta: 'Salida', tipo: 'imagen' as const, url: normalizeUploadUrl(evidence.exitPhotoUrl) }] : []),
+      ]
+        .filter((medio) => Boolean(medio.url))
+        .map(({ etiqueta, tipo, url }) => {
+          const esPdf = tipo === 'pdf' || url.toLowerCase().endsWith('.pdf');
+          return { etiqueta, tipo: esPdf ? ('pdf' as const) : ('imagen' as const), ruta: esPdf ? null : resolveUploadPath(url) };
         });
-        doc.fontSize(10).font('Helvetica').fillColor(colors.muted).text('Resumen ejecutivo de actividad', titleX, 56, {
-          width: titleWidth,
-        });
-
-        doc.fillColor(colors.text).font('Helvetica').fontSize(9);
-        doc.text(`Generado: ${formatDateTime(new Date())}`, infoX, 24, { width: rightWidth, align: 'right' });
-        doc.text(`Rango: ${from || 'inicio'} a ${to || 'hoy'}`, infoX, 36, { width: rightWidth, align: 'right' });
-        doc.text(`Tickets: ${evidences.length}`, infoX, 48, { width: rightWidth, align: 'right' });
-        doc.text(`Aprobadas: ${approvedCount} · Rechazadas: ${rejectedCount} · Pendientes: ${pendingCount}`, infoX, 60, {
-          width: rightWidth,
-          align: 'right',
-        });
+      return {
+        fecha: evidence.completedAt || evidence.updatedAt || evidence.createdAt || null,
+        ticket: evidence.activity?.anNumber || `#${evidence.activityId}`,
+        actividad: evidence.activity?.titulo || evidence.activity?.branchName || 'Sin título',
+        responsable: evidence.activity?.responsable?.nombre || '-',
+        sucursal: [evidence.activity?.branchName, evidence.activity?.branchCity, evidence.activity?.branchState].filter(Boolean).join(', ') || '-',
+        estatus: this.mapReviewStatus(evidence.reviewStatus),
+        prioridad: etiquetaDe(ETIQUETA_PRIORIDAD, evidence.activity?.prioridad),
+        medios,
       };
+    });
 
-      const drawSectionTitle = (label: string) => {
-        doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(12).text(label, left, doc.y);
-        doc.moveDown(0.2);
-      };
-
-      const drawTableHeader = (y: number) => {
-        doc.save();
-        doc.rect(left, y, pageRight - left, rowHeight).fill(colors.navy);
-        doc.restore();
-
-        doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(9);
-        doc.text('Fecha', col.fecha + 6, y + 7, { width: 92 });
-        doc.text('Ticket', col.ticket + 6, y + 7, { width: 72 });
-        doc.text('Actividad', col.actividad + 6, y + 7, { width: 180 });
-        doc.text('Estatus', col.estatus + 6, y + 7, { width: 82 });
-        doc.text('Archivos', col.archivos + 6, y + 7, { width: 64, align: 'center' });
-      };
-
-      const drawRow = (y: number, values: { fecha: string; ticket: string; actividad: string; estatus: string; archivos: string }, index: number) => {
-        if (index % 2 === 1) {
-          doc.save();
-          doc.rect(left, y, pageRight - left, rowHeight).fill(colors.softGray);
-          doc.restore();
-        }
-
-        doc.save();
-        doc.rect(left, y, pageRight - left, rowHeight).stroke(colors.line);
-        [col.ticket, col.actividad, col.estatus, col.archivos].forEach((x) => {
-          doc.moveTo(x, y).lineTo(x, y + rowHeight).stroke(colors.line);
-        });
-        doc.restore();
-
-        doc.fillColor(colors.text).font('Helvetica').fontSize(8.8);
-        doc.text(values.fecha, col.fecha + 5, y + 6, { width: 94 });
-        doc.text(values.ticket, col.ticket + 5, y + 6, { width: 72 });
-        doc.text(values.actividad, col.actividad + 5, y + 6, { width: 182 });
-        doc.text(values.estatus, col.estatus + 5, y + 6, { width: 84 });
-        doc.text(values.archivos, col.archivos + 5, y + 6, { width: 64, align: 'center' });
-      };
-
-      drawCorporateHeader();
-      doc.y = top;
-
-      drawSectionTitle('Resumen');
-      const summaryY = doc.y;
-      const summaryWidth = pageRight - left;
-      const summaryPadding = 12;
-      doc.save();
-      doc.roundedRect(left, summaryY, summaryWidth, 70, 8).fill(colors.softGray);
-      doc.restore();
-
-      const summaryRows: Array<[string, string]> = [
-        ['Tickets totales', String(evidences.length)],
-        ['Aprobadas / Rechazadas', `${approvedCount} / ${rejectedCount}`],
-        ['Pendientes', String(pendingCount)],
-      ];
-
-      let summaryCursorY = summaryY + summaryPadding;
-      summaryRows.forEach(([label, value]) => {
-        doc.fillColor(colors.muted).font('Helvetica').fontSize(9).text(label, left + summaryPadding, summaryCursorY, {
-          width: summaryWidth - summaryPadding * 2,
-        });
-        doc.fillColor(colors.text).font('Helvetica-Bold').fontSize(11).text(value, left + summaryPadding, summaryCursorY, {
-          width: summaryWidth - summaryPadding * 2,
-          align: 'right',
-        });
-        summaryCursorY += 18;
-      });
-
-      doc.y = summaryY + 82;
-      drawSectionTitle('Listado de tickets');
-
-      let y = doc.y;
-      drawTableHeader(y);
-      y += rowHeight;
-
-      evidences.forEach((evidence, evidenceIndex) => {
-        if (y + rowHeight > doc.page.height - doc.page.margins.bottom) {
-          doc.addPage();
-          drawCorporateHeader();
-          doc.y = top;
-          drawSectionTitle('Listado de tickets');
-          y = doc.y;
-          drawTableHeader(y);
-          y += rowHeight;
-        }
-
-        const fileCount =
-          (evidence.entryPhotoUrl ? 1 : 0) +
-          (evidence.exitPhotoUrl ? 1 : 0) +
-          (evidence.serviceSheetPdfUrl ? 1 : 0) +
-          (evidence.evidencePhotos?.length || 0);
-
-        drawRow(y, {
-          fecha: formatDateTime(evidence.completedAt || evidence.updatedAt || evidence.createdAt),
-          ticket: evidence.activity?.anNumber || `#${evidence.activityId}`,
-          actividad: truncate(evidence.activity?.titulo || evidence.activity?.branchName || 'Sin título', 44),
-          estatus: this.mapReviewStatus(evidence.reviewStatus),
-          archivos: String(fileCount),
-        }, evidenceIndex);
-
-        y += rowHeight;
-      });
-
-      if (evidences.length > 0) {
-        evidences.forEach((evidence, evidenceIndex) => {
-          doc.addPage();
-          drawCorporateHeader();
-          doc.y = top;
-          const pageLeft = doc.page.margins.left;
-          const pageRightX = doc.page.width - doc.page.margins.right;
-
-          const mediaItems: Array<{ label: string; type: 'image' | 'pdf'; url: string }> = [
-            ...(evidence.entryPhotoUrl ? [{ label: 'Entrada', type: 'image' as const, url: normalizeUploadUrl(evidence.entryPhotoUrl) }] : []),
-            ...((evidence.evidencePhotos || []).map((url, idx) => ({
-              label: `Evidencia ${idx + 1}`,
-              type: 'image' as const,
-              url: normalizeUploadUrl(url),
-            }))),
-            ...(evidence.serviceSheetPdfUrl ? [{ label: 'Hoja de servicio', type: 'pdf' as const, url: normalizeUploadUrl(evidence.serviceSheetPdfUrl) }] : []),
-            ...(evidence.exitPhotoUrl ? [{ label: 'Salida', type: 'image' as const, url: normalizeUploadUrl(evidence.exitPhotoUrl) }] : []),
-          ].filter((item) => Boolean(item.url));
-
-          drawSectionTitle('Detalle de evidencias');
-
-          doc.fillColor(colors.text).font('Helvetica-Bold').fontSize(15)
-            .text(`Ticket ${evidence.activity?.anNumber || `#${evidence.activityId}`}`, pageLeft, doc.y);
-
-          doc.fillColor(colors.muted).font('Helvetica').fontSize(9)
-            .text(`Detalle ${evidenceIndex + 1} de ${evidences.length}  •  Fecha: ${formatDateTime(evidence.completedAt || evidence.updatedAt || evidence.createdAt)}`)
-            .text(`Actividad: ${evidence.activity?.titulo || '-'}  •  Responsable: ${evidence.activity?.responsable?.nombre || '-'}`)
-            .text(`Sucursal: ${[evidence.activity?.branchName, evidence.activity?.branchCity, evidence.activity?.branchState].filter(Boolean).join(', ') || '-'}`)
-            .text(`Estatus: ${this.mapReviewStatus(evidence.reviewStatus)}  •  Prioridad: ${evidence.activity?.prioridad || '-'}`);
-
-          doc.moveDown(0.8);
-          doc.fillColor(colors.text).font('Helvetica-Bold').fontSize(11).text('Evidencias visuales', pageLeft);
-
-          let mediaY = doc.y + 8;
-          const cardGap = 12;
-          const cardWidth = Math.floor((pageRightX - pageLeft - cardGap) / 2);
-          const cardHeight = 148;
-          let colIndex = 0;
-
-          mediaItems.forEach((media) => {
-            if (mediaY + cardHeight + 26 > doc.page.height - doc.page.margins.bottom) {
-              doc.addPage();
-              drawCorporateHeader();
-              doc.y = top;
-              drawSectionTitle('Detalle de evidencias');
-              doc.fillColor(colors.text).font('Helvetica-Bold').fontSize(15)
-                .text(`Ticket ${evidence.activity?.anNumber || `#${evidence.activityId}`}`, pageLeft, doc.y);
-              doc.fillColor(colors.muted).font('Helvetica').fontSize(9)
-                .text(`Detalle ${evidenceIndex + 1} de ${evidences.length}  •  Fecha: ${formatDateTime(evidence.completedAt || evidence.updatedAt || evidence.createdAt)}`)
-                .text(`Actividad: ${evidence.activity?.titulo || '-'}  •  Responsable: ${evidence.activity?.responsable?.nombre || '-'}`)
-                .text(`Sucursal: ${[evidence.activity?.branchName, evidence.activity?.branchCity, evidence.activity?.branchState].filter(Boolean).join(', ') || '-'}`)
-                .text(`Estatus: ${this.mapReviewStatus(evidence.reviewStatus)}  •  Prioridad: ${evidence.activity?.prioridad || '-'}`);
-              doc.moveDown(0.8);
-              doc.fillColor(colors.text).font('Helvetica-Bold').fontSize(11).text('Evidencias visuales', pageLeft);
-              mediaY = doc.y + 8;
-              colIndex = 0;
-            }
-
-            const x = colIndex === 0 ? pageLeft : pageLeft + cardWidth + cardGap;
-            const mediaPath = resolveUploadPath(media.url);
-            const isPdf = media.type === 'pdf' || media.url.toLowerCase().endsWith('.pdf');
-
-            doc.save();
-            doc.rect(x, mediaY, cardWidth, cardHeight).fill('#f1f5f9');
-            doc.restore();
-
-            if (mediaPath && !isPdf) {
-              try {
-                doc.image(mediaPath, x + 4, mediaY + 4, {
-                  fit: [cardWidth - 8, cardHeight - 8],
-                  align: 'center',
-                  valign: 'center',
-                });
-              } catch {
-                doc.fillColor(colors.muted).fontSize(9).text('No se pudo cargar', x, mediaY + cardHeight / 2 - 6, {
-                  width: cardWidth,
-                  align: 'center',
-                });
-              }
-            } else {
-              doc.fillColor(colors.muted).fontSize(9).text(isPdf ? 'PDF adjunto' : 'Sin evidencia', x, mediaY + cardHeight / 2 - 6, {
-                width: cardWidth,
-                align: 'center',
-              });
-            }
-
-            doc.fillColor(colors.text).font('Helvetica-Bold').fontSize(8.5)
-              .text(media.label, x, mediaY + cardHeight + 6, { width: cardWidth });
-
-            if (colIndex === 0) {
-              colIndex = 1;
-            } else {
-              colIndex = 0;
-              mediaY += cardHeight + 26;
-            }
-          });
-
-          if (mediaItems.length === 0) {
-            doc.fillColor(colors.muted).font('Helvetica').fontSize(10)
-              .text('Este ticket no contiene archivos de evidencia en el rango seleccionado.', pageLeft, doc.y + 12);
-          }
-        });
-      }
-
-      if (evidences.length === 0) {
-        doc.moveDown(2);
-        doc.fillColor(colors.muted).font('Helvetica').fontSize(11).text('No se encontraron tickets en el rango seleccionado.');
-      }
-
-      doc.end();
+    return generarReporteHistorialEvidencias({
+      desde: from,
+      hasta: to,
+      generadoEn: new Date(),
+      aprobadas: approvedCount,
+      rechazadas: rejectedCount,
+      pendientes: pendingCount,
+      filas,
     });
   }
 
