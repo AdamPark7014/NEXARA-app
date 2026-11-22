@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Cargos from './cargos-perdida/page';
 import Medidas from './medidas/page';
@@ -10,8 +10,11 @@ describe.each([['cargos',Cargos],['medidas',Medidas]] as const)('%s: estados y p
   beforeEach(()=>{sesion.token='token';sesion.user.roleKey='rh';request.mockReset();});
   it('explica el vacío después de una carga correcta',async()=>{
     request.mockResolvedValue({ok:true,json:async()=>[]}); render(<Page/>);
-    await waitFor(()=>expect(screen.queryByRole('status')).not.toBeInTheDocument());
-    expect(screen.getByText(/No hay .*registrad/)).toBeInTheDocument();
+    // Se espera el vacío mismo. Antes se esperaba a que «no hubiera status» y luego se leía el texto
+    // sin esperar: mientras carga no hay ningún `status` (y el vacío sí lo es), así que pasaba solo
+    // cuando la carga terminaba a tiempo y fallaba a ratos en el CI (7f90d88).
+    expect(await screen.findByText(/No hay .*registrad/)).toBeInTheDocument();
+    expect(screen.queryByText('Cargando…')).not.toBeInTheDocument();
   });
   it('muestra el error y permite reintentar',async()=>{
     request.mockRejectedValue(new Error('Sin conexión'));render(<Page/>);

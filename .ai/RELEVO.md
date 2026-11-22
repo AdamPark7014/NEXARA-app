@@ -1,5 +1,12 @@
 # RELEVO
 
+- **21-11 ~21:07 México (claude-code, nube) — La prueba de la web que fallaba a ratos en el CI.**
+  - Era `app/(panels)/erp/hr/pulido-cola06.spec.tsx`, «explica el vacío después de una carga correcta» (falló en
+    `7f90d88`, pasó en los demás). Esperaba a que «no hubiera `status`» y luego leía el texto del vacío sin esperar;
+    mientras carga no hay ningún `status` (y el vacío mismo sí lo es), así que solo pasaba cuando la carga terminaba
+    a tiempo. Ahora espera el texto del vacío y comprueba que ya no diga «Cargando…». Misma intención, sin carrera.
+    No se omitió ni se apagó ninguna prueba. Corrida 4 veces seguidas en verde; `typecheck:web` 0.
+
 - **21-11 ~21:04 México (claude-code, nube) — Vuelta 14 de pulido: las pestañas de Recursos Humanos solo enseñan lo que cada puesto puede abrir. Sin migraciones; sin desplegar.**
   - **El defecto:** `components/hr/HrModuleRail.tsx` pintaba las seis secciones a todos. Coordinación Administrativa
     veía «Bitácora de incidencias» y «Prenómina», entraba y la página le negaba el paso; Arquitectura, Dirección y
