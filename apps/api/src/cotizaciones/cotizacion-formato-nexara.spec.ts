@@ -129,6 +129,26 @@ describe('formato Nexara', () => {
     expect(f.entrega).toBe('10 días hábiles');
   });
 
+  it('sin Atención escrita, el PDF usa Administración de <cliente>', () => {
+    const f = formatoDesdeCotizacion({
+      ...grupoDice,
+      atencion: null,
+      clientCompany: 'Grupo Dice Puebla',
+      clientName: 'Grupo Dice Puebla',
+    });
+    expect(f.atencion).toBe('Administración de Grupo Dice Puebla');
+  });
+
+  it('si hay contacto distinto de la empresa, la Atención sigue siendo el contacto', () => {
+    const f = formatoDesdeCotizacion({
+      ...grupoDice,
+      atencion: '',
+      clientCompany: 'Grupo Dice Puebla',
+      clientName: 'Eva Benavides',
+    });
+    expect(f.atencion).toBe('Eva Benavides');
+  });
+
   it('el PDF lleva el membrete, la firma y no imprime el costo', async () => {
     const pdf = await generarCotizacionNexaraPdf(grupoDice);
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');

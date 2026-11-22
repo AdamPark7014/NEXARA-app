@@ -447,7 +447,10 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
     vigencia: textoVigencia(dias, vence, opciones.condiciones.vigencia),
     moneda,
     cliente: empresa || nombre || '—',
-    atencion: atencionExplicita || (empresa && nombre && empresa !== nombre ? nombre : ''),
+    atencion:
+      atencionExplicita ||
+      (empresa && nombre && empresa !== nombre ? nombre : '') ||
+      (empresa || nombre ? `Administración de ${empresa || nombre}` : ''),
     telefono: String(quote.clientPhone ?? '').trim(),
     correo: String(quote.clientEmail ?? '').trim(),
     ubicacion: String(quote.clientAddress ?? '').trim(),
