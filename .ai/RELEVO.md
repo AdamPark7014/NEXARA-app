@@ -1,5 +1,21 @@
 # RELEVO
 
+- **21-11 ~22:13 México (claude-code, nube) — Vuelta 20 de pulido: almacén no deja recibir dos veces la misma serie. Solo API; sin migraciones; sin desplegar.**
+  - **El defecto:** la vuelta 13 cerró la salida doble (una serie que ya salió no vuelve a salir), pero la entrada
+    seguía abierta: la misma etiqueta leída en dos recepciones (entrega parcial, caja escaneada dos veces) quedaba
+    como dos piezas con la misma serie.
+  - **El arreglo:** en `warehouse/evidencia-salida.ts`, `seriesQueYaEstanDentro` y `avisoSeriesDentro`; en
+    `warehouse.service.ts`, `assertSeriesNoRecibidas` al registrar una recepción o una entrada de producción, y al
+    agregarle series después. Una serie «ya está dentro» si su movimiento más reciente (mismo producto, misma empresa)
+    es recepción, devolución, entrada de producción o transferencia. Aviso: «La serie X ya está registrada en almacén
+    (movimiento SM-…). Revisa la etiqueta: una pieza no se recibe dos veces.»
+  - **A propósito no se bloquea:** la **devolución** (la pieza pudo salir sin que se anotara su serie, y bloquearla
+    detendría un regreso legítimo) ni lo que viene después de un **ajuste** (no dice si está dentro o fuera).
+  - **Pruebas:** `warehouse/serie-ya-recibida.spec.ts` (11). Sigue sin llave única en la base (pide migración) y sin
+    reporte de series ya duplicadas de antes.
+  - **Paridad:** API hecho · Web, Android e iOS no aplica (muestran el aviso que responde el servidor).
+  - **Verificado:** `npm run typecheck:api` 0; jest del API 543 suites, 6,801 pruebas; `nest build` bien.
+
 - **21-11 ~22:13 México (claude-code, nube) — Vuelta 19 de pulido: las cotizaciones vistas desde Ventas respetan «quién ve qué». Solo API; sin migraciones; sin desplegar.**
   - **El defecto:** `GET /ventas/cotizaciones` (lista) y `GET /ventas/cotizaciones/:id` (detalle), más
     `POST /ventas/cotizaciones/:cotizacionId/link/:opportunityId`, no pasaban por la regla del 20-11 (cada quien ve las

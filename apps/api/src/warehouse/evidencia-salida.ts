@@ -116,6 +116,45 @@ export function avisoSeriesFuera(fuera: Array<{ serie: string; movementNumber: s
   return `Las series ${enLista(fuera.map((f) => f.serie))} ya salieron${donde} y no han regresado. Revisa las etiquetas o registra primero su devolución.`;
 }
 
+/** Movimientos que reciben una pieza nueva (recepción de proveedor, entrada de producción). */
+export const TIPOS_QUE_RECIBEN_LA_PIEZA: ReadonlySet<string> = new Set(['RECEIPT', 'PRODUCTION_IN']);
+/** Movimientos tras los que la pieza sigue en algún almacén de la empresa. Un ajuste no lo dice. */
+const TIPOS_QUE_LA_DEJAN_DENTRO: ReadonlySet<string> = new Set(['RECEIPT', 'RETURN', 'PRODUCTION_IN', 'TRANSFER']);
+
+/**
+ * De las series que se quieren recibir, las que ya están en almacén: su movimiento más reciente es
+ * una entrada o una transferencia. La misma etiqueta leída en dos recepciones no son dos piezas.
+ * `historial` son los movimientos del mismo producto que nombran alguna de esas series.
+ */
+export function seriesQueYaEstanDentro(
+  series: string[],
+  historial: MovimientoConSeries[],
+): Array<{ serie: string; movementNumber: string }> {
+  const pedidas = normalizarSeries(series);
+  const delMasReciente = [...historial].sort(
+    (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
+  );
+  const dentro: Array<{ serie: string; movementNumber: string }> = [];
+  for (const serie of pedidas) {
+    const ultimo = delMasReciente.find((m) => normalizarSeries(m.series).includes(serie));
+    if (ultimo && TIPOS_QUE_LA_DEJAN_DENTRO.has(String(ultimo.type ?? '').toUpperCase())) {
+      dentro.push({ serie, movementNumber: String(ultimo.movementNumber ?? '').trim() });
+    }
+  }
+  return dentro;
+}
+
+/** El aviso a quien registra la recepción: cuál serie, en qué movimiento está y qué hacer. */
+export function avisoSeriesDentro(dentro: Array<{ serie: string; movementNumber: string }>): string {
+  const folios = Array.from(new Set(dentro.map((d) => d.movementNumber).filter(Boolean)));
+  if (dentro.length === 1) {
+    const donde = folios.length ? ` (movimiento ${folios[0]})` : '';
+    return `La serie ${dentro[0].serie} ya está registrada en almacén${donde}. Revisa la etiqueta: una pieza no se recibe dos veces.`;
+  }
+  const donde = folios.length ? ` (${folios.length === 1 ? 'movimiento' : 'movimientos'} ${enLista(folios)})` : '';
+  return `Las series ${enLista(dentro.map((d) => d.serie))} ya están registradas en almacén${donde}. Revisa las etiquetas: una pieza no se recibe dos veces.`;
+}
+
 /** Junta la evidencia que ya tenía el movimiento con la que llega, sin repetir y con tope. */
 export function sumarEvidencia(
   actual: { fotos?: unknown; series?: unknown },

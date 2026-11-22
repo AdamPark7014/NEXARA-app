@@ -16,11 +16,14 @@ import { pdfPeriodo } from '../common/pdf/nexara-pdf-theme.js';
 import { ultimosDiasLaborales, workDateKey, workDateRange } from '../common/time/workday.js';
 import { EmpaqueInvalidoError, convertirCaptura, type Empaque } from './empaque.js';
 import {
+  TIPOS_QUE_RECIBEN_LA_PIEZA,
   TIPOS_QUE_SACAN_LA_PIEZA,
+  avisoSeriesDentro,
   avisoSeriesFuera,
   normalizarFotosMovimiento,
   normalizarSeries,
   seriesQueSiguenFuera,
+  seriesQueYaEstanDentro,
   sumarEvidencia,
   validarSeriesContraCantidad,
 } from './evidencia-salida.js';
@@ -501,6 +504,10 @@ export class WarehouseService {
     if (TIPOS_QUE_SACAN_LA_PIEZA.has(normalizedType)) {
       await this.assertSeriesEnAlmacen(dto.productId, tenantId, series);
     }
+    // …y la que ya está en almacén no se recibe otra vez (la misma etiqueta leída en dos recepciones).
+    if (TIPOS_QUE_RECIBEN_LA_PIEZA.has(normalizedType)) {
+      await this.assertSeriesNoRecibidas(dto.productId, tenantId, series);
+    }
 
     // La OT a la que se carga el material tiene que ser de esta empresa: si no se
     // comprueba, un movimiento de la empresa A queda ligado a una actividad de la B.
@@ -902,7 +909,28 @@ export class WarehouseService {
     exceptoId?: number,
   ): Promise<void> {
     if (!series.length) return;
-    const historial = await this.prisma.stockMovement.findMany({
+    const fuera = seriesQueSiguenFuera(series, await this.historialDeSeries(productId, tenantId, series, exceptoId));
+    if (fuera.length) throw new BadRequestException(avisoSeriesFuera(fuera));
+  }
+
+  /**
+   * Rechaza las series que ya están en almacén (su movimiento más reciente es una entrada o una
+   * transferencia): una pieza no se recibe dos veces. Mismo producto y misma empresa.
+   */
+  private async assertSeriesNoRecibidas(
+    productId: number,
+    tenantId: number,
+    series: string[],
+    exceptoId?: number,
+  ): Promise<void> {
+    if (!series.length) return;
+    const dentro = seriesQueYaEstanDentro(series, await this.historialDeSeries(productId, tenantId, series, exceptoId));
+    if (dentro.length) throw new BadRequestException(avisoSeriesDentro(dentro));
+  }
+
+  /** Movimientos del producto que nombran alguna de esas series, del más reciente al más viejo. */
+  private historialDeSeries(productId: number, tenantId: number, series: string[], exceptoId?: number) {
+    return this.prisma.stockMovement.findMany({
       where: {
         ...(exceptoId != null ? { id: { not: exceptoId } } : {}),
         productId,
@@ -912,8 +940,6 @@ export class WarehouseService {
       select: { id: true, type: true, series: true, movementNumber: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
-    const fuera = seriesQueSiguenFuera(series, historial);
-    if (fuera.length) throw new BadRequestException(avisoSeriesFuera(fuera));
   }
 
   /**
@@ -938,14 +964,14 @@ export class WarehouseService {
       throw new BadRequestException('Agrega al menos una foto o un número de serie');
     }
     // Las series que se agregan a una salida tampoco pueden haber salido ya en otro movimiento.
+    const yaTenia = new Set(normalizarSeries(movimiento.series));
+    const seriesNuevas = suma.series.filter((serie) => !yaTenia.has(serie));
     if (TIPOS_QUE_SACAN_LA_PIEZA.has(String(movimiento.type))) {
-      const yaTenia = new Set(normalizarSeries(movimiento.series));
-      await this.assertSeriesEnAlmacen(
-        movimiento.productId,
-        tenantId,
-        suma.series.filter((serie) => !yaTenia.has(serie)),
-        movimiento.id,
-      );
+      await this.assertSeriesEnAlmacen(movimiento.productId, tenantId, seriesNuevas, movimiento.id);
+    }
+    // Ni las que se agregan a una recepción pueden estar ya en almacén por otro movimiento.
+    if (TIPOS_QUE_RECIBEN_LA_PIEZA.has(String(movimiento.type))) {
+      await this.assertSeriesNoRecibidas(movimiento.productId, tenantId, seriesNuevas, movimiento.id);
     }
 
     return this.prisma.stockMovement.update({
