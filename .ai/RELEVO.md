@@ -1,5 +1,54 @@
 # RELEVO
 
+- **21-11 ~20:29 México (claude-code, nube; Cursor/Codex no alcanzables) — Vuelta 11 de pulido: descargas y pantallas que salían vacías o negadas por no recibir la empresa, y «este mes» con el reloj del servidor. Sin migraciones; sin desplegar.**
+  - **La causa, una sola:** los servicios buscan con `companyWhere(empresa)` o `requireCompanyId(empresa)`. Sin empresa
+    el primero filtra por `companyId: -1` (cero filas) y el segundo responde 403 «Empresa requerida». Es el candado
+    correcto, y el middleware de Prisma no lo afloja (si el `where` ya trae `companyId`, lo deja). El defecto estaba
+    en quien llama: varias rutas ya tenían la empresa a la mano y no la pasaban. No hay fuga de datos en ninguna; al
+    revés, no devolvían nada.
+  - **Cómo se encontraron:** un barrido con el compilador de TypeScript (lectura solamente) sobre todo `apps/api/src`:
+    cada llamada que omite un parámetro opcional `companyId` (o lo manda `null`/`undefined`), y una segunda pasada
+    para la empresa que viaja dentro de un objeto (`filters.companyId`, `opts.companyId`). 45 llamadas marcadas; se
+    leyó cada una. 15 fallaban de verdad; el resto es a propósito (sitio público, tareas programadas, banderas de
+    plataforma). Los dos guiones quedaron en el borrador de la sesión, no en el repo.
+  - **Lo que no funcionaba y ya funciona:**
+    - *Excel de actividades* (`GET activities/export/xlsx`, página Exportaciones): bajaba sin renglones para todos.
+    - *Reporte del ticket en PDF*: portal de clientes, portal de sucursal y el del propio técnico
+      (`activity-evidence/:id/report`) respondían 404. Web, Android e iOS lo piden; se arregla en el servidor para
+      los tres. Ahora viaja la empresa de la propia actividad, que la ruta ya había validado como de quien pregunta.
+    - *Portal de clientes*: PDF y XML de la factura, y PDF de la cotización, respondían 404. Igual: la empresa del
+      registro ya validado.
+    - *Resumen del proyecto comercial* (`GET ventas/proyectos/:id/resumen`): 403 siempre; es lo que usa
+      `/erp/proyectos/comercial/:id` para llevar al proyecto, así que esa liga mostraba «Empresa requerida».
+    - *Crear el proyecto de una oportunidad* y *desplegarlo en campo* cuando el cliente aún no existe en operación:
+      403. Lo mismo, en silencio, al ganar la oportunidad (el alta automática se tragaba el error).
+    - *Adjuntar a una oportunidad una cotización hecha en la plataforma*: 404.
+    - *Inicio del CRM móvil* (`GET mobile/crm/home`): 403 siempre. Hoy ninguna app lo consume; queda listo.
+  - **Fechas en Exportaciones (`exports.service.ts`):** el rango se armaba con `new Date('AAAA-MM-DD')` y `setHours` del
+    servidor: lo capturado después de las 18:00 de México salía en el archivo del día siguiente. Las columnas con
+    hora (`createdAt`, `fechaAsignacion`, `fechaCreacion`) usan `workDateRange`; las que guardan solo el día
+    (`issueDate` de factura y cotización, `startDate` de proyecto) se comparan por día calendario en UTC explícito,
+    sin depender de la zona del proceso.
+  - **«Este mes» con el reloj del servidor:** `new Date(y, m, 1)` y `now.getMonth()` leen UTC. La tarde del último día
+    del mes el tablero de dirección ya contaba el mes siguiente (en ceros), y lo cerrado esa tarde se sumaba a ese
+    mes; en metas de ventas eso movía también la comisión. `workMonth`, `workMonthOf` y `calendarMonthColumnRange`
+    (`common/time/workday.ts`) dan el mes de la empresa. Aplicado en `executive.service.ts` (ventas del mes, del
+    anterior y del año; actividades y tickets terminados; mejores vendedores), `sales-targets.service.ts`
+    (desempeño y comisión, y la búsqueda de la meta por año y mes) y `mobile-crm.controller.ts`. Lo facturado en el
+    mes sigue por día calendario (la fecha de factura no lleva hora), igual que el cierre real de proyectos.
+  - **Pendiente visto y no hecho:** quedan meses armados con el reloj del servidor en contabilidad
+    (`workspace-reports`, `workspace-ledger`), que comparan sobre todo columnas de solo día y piden revisarse una por
+    una con la contadora; al ganar una oportunidad el alta automática corre con un actor que solo trae `id`, y las
+    reglas de acceso al cliente (`assertPuedeVerCliente`) pueden negarla en silencio a quien no es dueño: no se
+    tocó porque cambia quién puede qué.
+  - **Paridad:** API hecho · Web no aplica (no cambió: consume las mismas rutas, que ahora responden) · Android e iOS
+    no aplica (piden el reporte del ticket por las mismas rutas; sin cambio en la app).
+  - **Verificado:** `npm run typecheck` 0; jest API 534 suites, 6,696 pruebas en verde (corrida completa); la web no cambió desde su corrida en verde de la
+    vuelta 10 (297 archivos, 2,405 pruebas). Cada corrección tiene una prueba que se vio fallar antes del cambio:
+    `ventas-empresa-interna.spec.ts` (6), `portales-descargas-empresa.spec.ts` (7), `mobile-crm-home.spec.ts` (4),
+    `activities-export-empresa.spec.ts` (4), `exports-fechas.spec.ts` (13), `executive-mes.spec.ts` (4) y 4 más en
+    `workday.spec.ts`. No se probó contra la base real ni en producción: son pruebas con la base simulada.
+
 - **21-11 ~20:16 México (claude-code, nube; Cursor/Codex no alcanzables) — Décima vuelta de pulido: los Excel que se descargan y las fechas de los reportes. Sin migraciones; sin desplegar.**
   - **Cómo se revisó:** cada Excel se generó con datos de demostración, se convirtió a PDF con LibreOffice (así se ve
     cómo se imprime) y se leyó hoja por hoja. Los de operación (actividades, evidencias, vehículos, viáticos,

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { workMonth, workMonthOf } from '../common/time/workday.js';
 
 @Injectable()
 export class SalesTargetsService {
@@ -83,11 +84,12 @@ export class SalesTargetsService {
   /** Calcula desempeño actual de cada vendedor vs su meta del mes. */
   async getPerformance(year?: number, month?: number, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
-    const now = new Date();
-    const y = year ?? now.getFullYear();
-    const m = month ?? now.getMonth() + 1;
-    const startOfMonth = new Date(y, m - 1, 1);
-    const endOfMonth = new Date(y, m, 0, 23, 59, 59);
+    // Mes de la empresa, no del reloj del servidor (UTC): lo cerrado la tarde del último día
+    // se sumaba al mes siguiente, y con ello la comisión.
+    const hoy = workMonth(new Date());
+    const y = year ?? hoy.year;
+    const m = month ?? hoy.month;
+    const { start: startOfMonth, end: endOfMonth } = workMonthOf(y, m);
 
     const salesOrgKeys = ['sales_rep', 'sales_manager', 'vendedor', 'coord_ventas', 'director_commercial'];
     const [targets, salesUsers] = await Promise.all([

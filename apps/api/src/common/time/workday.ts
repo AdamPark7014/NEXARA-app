@@ -149,6 +149,42 @@ export function workMonthStart(instante: Date, tz = WORKDAY_TIMEZONE): Date {
   return workDayStart(new Date(Date.UTC(p.year, p.month - 1, 1, 12, 0, 0)), tz);
 }
 
+/** Un mes de la empresa: sus dos extremos como instantes y su año y número (1 a 12). */
+export type MesLaboral = { year: number; month: number; start: Date; end: Date };
+
+/**
+ * El mes `month` (1 a 12) del año `year`, de su primer instante al último en la zona de la
+ * empresa. Acepta meses fuera de rango y los acomoda: el 0 es diciembre del año anterior.
+ */
+export function workMonthOf(year: number, month: number, tz = WORKDAY_TIMEZONE): MesLaboral {
+  const start = workDayStart(new Date(Date.UTC(year, month - 1, 1, 12, 0, 0)), tz);
+  const siguiente = workDayStart(new Date(Date.UTC(year, month, 1, 12, 0, 0)), tz);
+  const p = partesEn(new Date(start.getTime() + 12 * 3_600_000), tz);
+  return { year: p.year, month: p.month, start, end: new Date(siguiente.getTime() - 1) };
+}
+
+/**
+ * El mes de la empresa que contiene a `instante`.
+ *
+ * `new Date(y, m, 1)` y `now.getMonth()` leen el reloj del servidor (UTC): la tarde del último
+ * día del mes ya contaban el mes siguiente, y lo cerrado esa tarde se sumaba al mes equivocado.
+ */
+export function workMonth(instante: Date, tz = WORKDAY_TIMEZONE): MesLaboral {
+  const p = partesEn(instante, tz);
+  return workMonthOf(p.year, p.month, tz);
+}
+
+/**
+ * Filtro `{ gte, lte }` de un mes para una columna que guarda solo el día (`@db.Date`, o una fecha
+ * capturada sin hora): esas viven a medianoche UTC, así que el mes es el calendario tal cual.
+ */
+export function calendarMonthColumnRange(year: number, month: number): { gte: Date; lte: Date } {
+  return {
+    gte: new Date(Date.UTC(year, month - 1, 1)),
+    lte: new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)),
+  };
+}
+
 /** Igual, para el año en curso. */
 export function workYearStart(instante: Date, tz = WORKDAY_TIMEZONE): Date {
   const p = partesEn(instante, tz);

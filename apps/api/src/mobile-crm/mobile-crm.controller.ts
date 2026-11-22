@@ -7,6 +7,7 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
 import { RbacGuard } from '../common/rbac.guard.js';
+import { workMonth } from '../common/time/workday.js';
 import type { SalesLeadStatus } from '@prisma/client';
 
 /**
@@ -38,12 +39,14 @@ export class MobileCrmController {
   ) {
     const tenantId = requireCompanyId(companyId);
     const tw = companyWhere(tenantId);
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    // Mes de la empresa, no del reloj del servidor (UTC).
+    const mes = workMonth(new Date());
+    const startOfMonth = mes.start;
+    const endOfMonth = mes.end;
 
     const [agenda, hotLeads, openOpps, monthClosed, target] = await Promise.all([
-      this.crmActivities.getMyAgenda(user.id),
+      // Con la empresa: `getMyAgenda` la exige y sin ella esta ruta respondía 403 siempre.
+      this.crmActivities.getMyAgenda(user.id, tenantId),
       this.prisma.salesLead.findMany({
       // `CONTACTED` NO existe en SalesLeadStatus —los valores son NEW,
         // QUALIFIED, NURTURING, LOST y CONVERTED— así que esta consulta
@@ -72,8 +75,8 @@ export class MobileCrmController {
           ...tw,
           ownerId: user.id,
           period: 'MONTHLY',
-          year: now.getFullYear(),
-          month: now.getMonth() + 1,
+          year: mes.year,
+          month: mes.month,
         },
       }),
     ]);

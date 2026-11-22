@@ -1,5 +1,6 @@
 import {
   WORKDAY_TIMEZONE,
+  calendarMonthColumnRange,
   parseWorkDate,
   parseWorkDateEnd,
   workDateColumn,
@@ -8,6 +9,8 @@ import {
   workDayBounds,
   workDayEnd,
   workDayStart,
+  workMonth,
+  workMonthOf,
 } from './workday.js';
 
 /**
@@ -157,6 +160,49 @@ describe('rango de días para un reporte', () => {
     expect(workDateRange('2026-11-21T08:00:00Z', '2026-11-21T20:00:00Z', MX)).toEqual({
       gte: new Date('2026-11-21T08:00:00.000Z'),
       lte: new Date('2026-11-21T20:00:00.000Z'),
+    });
+  });
+});
+
+describe('mes de la empresa', () => {
+  it('el 30 de noviembre a las 19:30 sigue siendo noviembre aunque el servidor ya esté en diciembre', () => {
+    // 30-nov 19:30 en México = 1-dic 01:30 UTC.
+    const mes = workMonth(new Date('2026-12-01T01:30:00.000Z'), MX);
+    expect(mes).toEqual({
+      year: 2026,
+      month: 11,
+      start: new Date('2026-11-01T06:00:00.000Z'),
+      end: new Date('2026-12-01T05:59:59.999Z'),
+    });
+  });
+
+  it('un mes pedido por número cubre de su día 1 al último, sin hueco con el siguiente', () => {
+    const nov = workMonthOf(2026, 11, MX);
+    const dic = workMonthOf(2026, 12, MX);
+    expect(nov.start.toISOString()).toBe('2026-11-01T06:00:00.000Z');
+    expect(dic.start.getTime() - nov.end.getTime()).toBe(1);
+    // Diciembre termina en enero del año siguiente.
+    expect(dic.end.toISOString()).toBe('2027-01-01T05:59:59.999Z');
+    expect(dic).toMatchObject({ year: 2026, month: 12 });
+  });
+
+  it('el mes anterior a enero es diciembre del año pasado', () => {
+    const enero = workMonth(new Date('2027-01-15T18:00:00.000Z'), MX);
+    expect(workMonthOf(enero.year, enero.month - 1, MX)).toMatchObject({
+      year: 2026,
+      month: 12,
+      start: new Date('2026-12-01T06:00:00.000Z'),
+    });
+  });
+
+  it('para columnas de solo día da el mes calendario, del 1 al último a medianoche UTC', () => {
+    expect(calendarMonthColumnRange(2026, 11)).toEqual({
+      gte: new Date('2026-11-01T00:00:00.000Z'),
+      lte: new Date('2026-11-30T23:59:59.999Z'),
+    });
+    expect(calendarMonthColumnRange(2026, 2)).toEqual({
+      gte: new Date('2026-02-01T00:00:00.000Z'),
+      lte: new Date('2026-02-28T23:59:59.999Z'),
     });
   });
 });

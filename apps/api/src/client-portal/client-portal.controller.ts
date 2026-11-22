@@ -903,14 +903,15 @@ export class ClientPortalController {
   ) {
     const activity = await this.prisma['activity'].findFirst({
       where: { id, clientId: user.clientId },
-      select: { id: true },
+      select: { id: true, companyId: true },
     });
     if (!activity) {
       res.status(404).send('Ticket no encontrado');
       return;
     }
 
-    const result = await this.activitiesService.generateTicketReport(activity.id);
+    // Con la empresa de la actividad: sin ella el generador no la encuentra y el reporte no bajaba.
+    const result = await this.activitiesService.generateTicketReport(activity.id, activity.companyId);
     if (!result) {
       res.status(404).send('Ticket no encontrado');
       return;
@@ -1053,18 +1054,20 @@ export class ClientPortalController {
     });
   }
 
+  /** La factura del cliente que pregunta, con su empresa: los generadores la exigen para encontrarla. */
   private async findOwnInvoiceOrFail(user: any, id: number) {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id, type: 'ACCOUNTS_RECEIVABLE', client: { serviceClientId: user.clientId } },
-      select: { id: true },
+      select: { id: true, companyId: true },
     });
     if (!invoice) throw new BadRequestException('Factura no encontrada');
+    return invoice;
   }
 
   @Get('invoices/:id/pdf')
   async invoicePdf(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    await this.findOwnInvoiceOrFail(user, id);
-    const pdf = await this.accountingService.getInvoicePdf(id);
+    const invoice = await this.findOwnInvoiceOrFail(user, id);
+    const pdf = await this.accountingService.getInvoicePdf(id, invoice.companyId);
     if ('body' in pdf) {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="${pdf.filename}"`);
@@ -1076,8 +1079,8 @@ export class ClientPortalController {
 
   @Get('invoices/:id/xml')
   async invoiceXml(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    await this.findOwnInvoiceOrFail(user, id);
-    const xml = await this.accountingService.getInvoiceXml(id);
+    const invoice = await this.findOwnInvoiceOrFail(user, id);
+    const xml = await this.accountingService.getInvoiceXml(id, invoice.companyId);
     res.setHeader('Content-Type', xml.contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${xml.filename}"`);
     res.send(xml.body);
@@ -1108,10 +1111,10 @@ export class ClientPortalController {
   async quotePdf(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number, @Res() res: Response) {
     const quote = await this.prisma.cotizacion.findFirst({
       where: { id, salesClient: { serviceClientId: user.clientId }, deletedAt: null },
-      select: { id: true, quoteNumber: true },
+      select: { id: true, quoteNumber: true, companyId: true },
     });
     if (!quote) throw new BadRequestException('Cotización no encontrada');
-    const pdf = await this.cotizacionesService.getPdfBuffer(id);
+    const pdf = await this.cotizacionesService.getPdfBuffer(id, quote.companyId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=${quote.quoteNumber}.pdf`);
     res.send(pdf);

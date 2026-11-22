@@ -2,6 +2,7 @@ import { whereCotizacionesVisibles, type Actor } from '../common/visibilidad/vis
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { workDateRange } from '../common/time/workday.js';
 
 export type ExportEntity =
   | 'clients'
@@ -31,26 +32,41 @@ const DATE_FIELD: Partial<Record<ExportEntity, string>> = {
   cotizaciones: 'issueDate',
 };
 
-function buildDateWhere(entity: ExportEntity, filters?: { from?: string; to?: string }) {
+/**
+ * Columnas que guardan un día y no un instante (medianoche UTC): la fecha de la factura y de la
+ * cotización, el inicio del proyecto. Se comparan por día calendario; las demás llevan hora y se
+ * filtran por el día de la empresa.
+ */
+const CAMPOS_DE_SOLO_DIA = new Set(['issueDate', 'startDate']);
+
+const ES_SOLO_DIA = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Rango para una columna de solo día. No depende de la zona del servidor. */
+function rangoDeDiasCalendario(desde?: string, hasta?: string): { gte?: Date; lte?: Date } | undefined {
+  const rango: { gte?: Date; lte?: Date } = {};
+  const inicio = desde?.trim() ? new Date(desde.trim()) : null;
+  const hastaLimpio = hasta?.trim();
+  const fin = hastaLimpio
+    ? new Date(ES_SOLO_DIA.test(hastaLimpio) ? `${hastaLimpio}T23:59:59.999Z` : hastaLimpio)
+    : null;
+  if (inicio && !Number.isNaN(inicio.getTime())) rango.gte = inicio;
+  if (fin && !Number.isNaN(fin.getTime())) rango.lte = fin;
+  return rango.gte || rango.lte ? rango : undefined;
+}
+
+/**
+ * Filtro «del día X al día Y» de una exportación.
+ *
+ * El servidor corre en UTC: armar el rango con su reloj cerraba el día a las 18:00 de México y lo
+ * capturado esa tarde salía en el archivo del día siguiente.
+ */
+export function buildDateWhere(entity: ExportEntity, filters?: { from?: string; to?: string }) {
   const field = DATE_FIELD[entity];
   if (!field || (!filters?.from && !filters?.to)) return {};
-  const range: { gte?: Date; lte?: Date } = {};
-  if (filters.from) {
-    const from = new Date(filters.from);
-    if (!Number.isNaN(from.getTime())) range.gte = from;
-  }
-  if (filters.to) {
-    const to = new Date(filters.to);
-    if (!Number.isNaN(to.getTime())) {
-      // Inclusive end-of-day for date-only inputs
-      if (/^\d{4}-\d{2}-\d{2}$/.test(filters.to)) {
-        to.setHours(23, 59, 59, 999);
-      }
-      range.lte = to;
-    }
-  }
-  if (!range.gte && !range.lte) return {};
-  return { [field]: range };
+  const range = CAMPOS_DE_SOLO_DIA.has(field)
+    ? rangoDeDiasCalendario(filters.from, filters.to)
+    : workDateRange(filters.from, filters.to);
+  return range ? { [field]: range } : {};
 }
 
 @Injectable()

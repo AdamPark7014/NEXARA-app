@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { ACTIVITY_STATUS, FINISHED_ACTIVITY_WHERE, statusVariants } from '../activities/activity-status.js';
-import { workDateColumn } from '../common/time/workday.js';
+import { calendarMonthColumnRange, workDateColumn, workMonth, workMonthOf, workYearStart } from '../common/time/workday.js';
 import { kpiFallback } from '../common/kpi-fallback.js';
 import type { SalesLeadStatus } from '@prisma/client';
 
@@ -48,11 +48,19 @@ export class ExecutiveService {
     const tw = companyWhere(tenantId);
 
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
-    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    // El mes es el de la empresa, no el del reloj del servidor (UTC): con ese reloj, la tarde del
+    // último día el tablero ya contaba el mes siguiente y lo cerrado esa tarde se iba a ese mes.
+    const mes = workMonth(now);
+    const mesAnterior = workMonthOf(mes.year, mes.month - 1);
+    const startOfMonth = mes.start;
+    const endOfMonth = mes.end;
+    const startOfYear = workYearStart(now);
+    const startOfPrevMonth = mesAnterior.start;
+    const endOfPrevMonth = mesAnterior.end;
+    // La fecha de la factura guarda solo el día (medianoche UTC): su mes es el calendario tal cual.
+    const facturadoEnElMes = calendarMonthColumnRange(mes.year, mes.month);
+    // El cierre real de un proyecto puede venir como día sin hora: el año se cuenta desde el 1 de enero calendario.
+    const inicioDeAnioCalendario = new Date(Date.UTC(mes.year, 0, 1));
 
     // Ejecuto todo en paralelo
     const [
@@ -139,7 +147,7 @@ export class ExecutiveService {
         where: { ...tw, ...FINISHED_ACTIVITY_WHERE, fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
       }).catch(kpiFallback('executive.service.ts:99', 0)),
       this.prisma.invoice.aggregate({
-        where: { ...tw, issueDate: { gte: startOfMonth, lte: endOfMonth }, status: { not: 'CANCELLED' }, type: 'ACCOUNTS_RECEIVABLE' },
+        where: { ...tw, issueDate: facturadoEnElMes, status: { not: 'CANCELLED' }, type: 'ACCOUNTS_RECEIVABLE' },
         _sum: { totalAmount: true },
         _count: { _all: true },
       }).catch(() => ({ _sum: { totalAmount: 0 }, _count: { _all: 0 } } as any)),
@@ -207,7 +215,7 @@ export class ExecutiveService {
       }).catch(kpiFallback('executive.service.ts:153', [])),
       this.prisma.operationalProject.groupBy({
         by: ['projectType'],
-        where: { ...tw, status: 'COMPLETED' as any, actualEndDate: { gte: startOfYear } },
+        where: { ...tw, status: 'COMPLETED' as any, actualEndDate: { gte: inicioDeAnioCalendario } },
         _count: { _all: true },
       }).catch(kpiFallback('executive.service.ts:158', [])),
     ]);

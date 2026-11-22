@@ -1391,13 +1391,14 @@ export class VentasService {
     user?: any,
     companyId?: number | null,
   ) {
-    await this.getOpportunity(opportunityId, user, companyId);
+    const opp = await this.getOpportunity(opportunityId, user, companyId);
     const existingCount = await this.prisma.salesOpportunityQuote.count({
       where: { opportunityId },
     });
     let pdfUrl = dto.pdfUrl || null;
     if (dto.cotizacionId && !pdfUrl) {
-      const stored = await this.cotizacionesService.generatePdfFile(dto.cotizacionId);
+      // Con la empresa de la oportunidad: sin ella la cotización «no existe» y adjuntarla respondía 404.
+      const stored = await this.cotizacionesService.generatePdfFile(dto.cotizacionId, opp.companyId ?? companyId);
       pdfUrl = stored.pdfUrl;
     }
     return this.prisma.salesOpportunityQuote.create({
@@ -1437,7 +1438,7 @@ export class VentasService {
       throw new BadRequestException('El proyecto requiere un cliente real del padrón.');
     }
     if (!clienteProyecto.serviceClientId) {
-      clienteProyecto = (await this.provisionServiceClient(clienteProyecto.id, user)).salesClient as typeof clienteProyecto;
+      clienteProyecto = (await this.provisionServiceClient(clienteProyecto.id, user, tenantId)).salesClient as typeof clienteProyecto;
     }
     const clienteOperativo = clienteProyecto?.serviceClientId ? await this.prisma.serviceClient.findFirst({
       where: { id: clienteProyecto.serviceClientId, companyId: tenantId, isActive: true }, select: { id: true, name: true },
@@ -1516,7 +1517,7 @@ export class VentasService {
     const actorUser = actorId ? { id: actorId } : undefined;
 
     if (opportunity.clientId) {
-      void this.provisionServiceClient(opportunity.clientId, actorUser).catch(() => undefined);
+      void this.provisionServiceClient(opportunity.clientId, actorUser, opportunity.companyId).catch(() => undefined);
     }
 
     let project = opportunity.projects[0] ?? null;
@@ -1696,7 +1697,7 @@ export class VentasService {
     }
     if (esNombreDeRelleno(salesClient.name)) throw new BadRequestException('El proyecto requiere un cliente real del padrón.');
     if (!salesClient.serviceClientId) {
-      const provisioned = await this.provisionServiceClient(salesClient.id, user);
+      const provisioned = await this.provisionServiceClient(salesClient.id, user, project.companyId);
       salesClient = provisioned.salesClient as typeof salesClient;
     }
     if (!salesClient.serviceClientId) {
@@ -2475,7 +2476,8 @@ export class VentasService {
       };
     }
 
-    const costs = await this.calculateProjectCosts(projectId, user);
+    // Con la empresa: sin ella `calculateProjectCosts` respondía 403 y el resumen nunca abría.
+    const costs = await this.calculateProjectCosts(projectId, user, companyId ?? user?.companyId);
 
     return {
       project: {

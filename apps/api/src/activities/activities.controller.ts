@@ -56,12 +56,16 @@ export class ActivitiesController {
    *
    * `res` estaba declarado sin `@Res()`, así que Nest nunca lo inyectaba y el endpoint
    * reventaba con «Cannot read properties of undefined» antes de enviar nada.
+   *
+   * La empresa viaja a las tres consultas: sin ella el filtro cae en «sin empresa no hay filas»
+   * y el archivo bajaba siempre sin renglones.
    */
   @Get('export/:format')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_EXPORT] })
   async export(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Param('format') format: string,
     @Res() res: Response,
   ) {
@@ -71,15 +75,15 @@ export class ActivitiesController {
     let result: any;
     let alcance: string;
     if (user.isSuperAdmin) {
-      result = await this.activitiesService.findAll();
+      result = await this.activitiesService.findAll(undefined, companyId);
       alcance = 'Todas las actividades de la empresa';
     } else if (this.hasTeamActivitiesScope(user)) {
       const scopeUsers = await this.usersService.findUsersForConsoleActivityScope();
       const allowedUserIds = scopeUsers.map((u: { id: number }) => u.id);
-      result = await this.activitiesService.findByAllowedUsers(allowedUserIds);
+      result = await this.activitiesService.findByAllowedUsers(allowedUserIds, companyId);
       alcance = 'Actividades del equipo a cargo';
     } else {
-      result = await this.activitiesService.findByResponsible(user.id);
+      result = await this.activitiesService.findByResponsible(user.id, companyId);
       alcance = 'Actividades de las que soy responsable';
     }
     const data: any[] = Array.isArray(result) ? result : (result?.data ?? []);

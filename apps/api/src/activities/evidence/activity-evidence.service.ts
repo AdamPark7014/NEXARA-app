@@ -1382,6 +1382,7 @@ export class ActivityEvidenceService {
         activity: {
           select: {
             responsableId: true,
+            companyId: true,
           },
         },
       },
@@ -1395,7 +1396,8 @@ export class ActivityEvidenceService {
       throw new ForbiddenException('No tienes permisos para descargar este reporte');
     }
 
-    const result = await this.activitiesService.generateTicketReport(activityId);
+    // Con la empresa de la actividad: sin ella el generador no la encuentra y el reporte no bajaba.
+    const result = await this.activitiesService.generateTicketReport(activityId, evidence.activity.companyId);
     if (!result) {
       throw new NotFoundException('No se pudo generar el reporte del ticket');
     }

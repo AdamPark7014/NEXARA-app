@@ -419,13 +419,14 @@ export class BranchPortalController {
         clientId: user.clientId,
         OR: branchScope,
       },
-      select: { id: true },
+      select: { id: true, companyId: true },
     });
     if (!activity) {
       return res.status(404).send('Ticket no encontrado');
     }
 
-    const result = await this.activitiesService.generateTicketReport(activity.id);
+    // Con la empresa de la actividad: sin ella el generador no la encuentra y el reporte no bajaba.
+    const result = await this.activitiesService.generateTicketReport(activity.id, activity.companyId);
     if (!result) {
       return res.status(404).send('Ticket no encontrado');
     }
