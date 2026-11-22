@@ -87,6 +87,8 @@ export default function ArticuloDialog({
   const [errores, setErrores] = useState<Partial<Record<CampoArticulo, string>>>({});
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  /** Al editar, la consulta de su empaque falló: los campos vacíos no quieren decir que no tenga. */
+  const [empaqueNoCargo, setEmpaqueNoCargo] = useState(false);
 
   // Cada vez que se abre arranca de cero (o de lo que tiene el producto). Solo al abrir o
   // al cambiar de producto: un repintado de la pantalla de atrás no borra lo tecleado.
@@ -98,6 +100,7 @@ export default function ArticuloDialog({
     setForm(base);
     setErrores({});
     setErrorServidor(null);
+    setEmpaqueNoCargo(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al abrir
   }, [apertura]);
 
@@ -117,7 +120,10 @@ export default function ArticuloDialog({
         setInicial(llenar);
         setForm(llenar);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        // Guardar sin empaque no toca el que ya tiene: basta con decir que aquí no se ve.
+        if (vigente) setEmpaqueNoCargo(true);
+      });
     return () => {
       vigente = false;
     };
@@ -296,6 +302,11 @@ export default function ArticuloDialog({
 
             {form.tipo === "EQUIPO" ? (
               <p className={s.nota}>Se cuenta por pieza y no lleva empaque.</p>
+            ) : null}
+            {empaqueNoCargo && meta?.empaque ? (
+              <p className={s.nota} role="status">
+                No se pudo cargar su empaque actual. Si dejas estos campos vacíos, se conserva el que ya tiene.
+              </p>
             ) : null}
           </>
         )}

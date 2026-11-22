@@ -1,5 +1,49 @@
 # RELEVO
 
+- **21-11 ~23:03 México (claude-code, nube) — Vuelta 22 de pulido: una lista que no cargó ya no se enseña como lista vacía (almacén, compras, editor de cotización) y el catálogo llega entero al formulario de movimientos. Web y API; sin migraciones; sin desplegar.**
+  - **El defecto:** las listas que alimentan un formulario se pedían con `.catch(() => undefined)`. Si la carga
+    fallaba, el formulario decía lo mismo que cuando de verdad no hay nada: «Primero crea un almacén», «No hay
+    productos en el catálogo», «No hay órdenes abiertas por recibir», «Aún no hay proveedores. Da de alta el primero».
+    Quien lee eso da de alta un duplicado o cree que perdió sus datos. En el editor de cotización el panel de
+    plantillas se quedaba en «Cargando plantillas…» para siempre y «Paquetes» quedaba apagado sin decir por qué.
+  - **La pieza común:** `lib/lista-de-apoyo.ts` (`useListaDeApoyo(clave, pedir, "los almacenes")`): dice en qué
+    quedó la carga (`espera · cargando · lista · fallo · reintentando`), por qué falló (`causa`, ya en español) y la
+    vuelve a pedir (`recargar`). `rotuloDeApoyo` da la primera opción del selector según el caso y
+    `components/ui/AvisoDeApoyo.tsx` pinta un solo aviso con «Reintentar» aunque fallen varias listas («No se
+    pudieron cargar los productos ni los almacenes»). Si un refresco falla con la lista ya a la vista, la lista se
+    queda y no se avisa. El nombre va en plural y con artículo, para que la frase cuadre.
+  - **Dónde quedó puesta:** formulario de movimiento de almacén (`VistaAlmacen`: productos y almacenes; la cifra
+    «Almacenes» ya no afirma 0 mientras llegan o si no llegaron); recepción de mercancía en Compras (órdenes y
+    almacenes); «Pedir cotización» en Compras (si la pestaña no cargó, aviso con «Reintentar» en vez de «Aún no hay
+    proveedores»); editor de cotización (plantillas y paquetes: aviso arriba solo si la cotización se puede editar; el
+    panel de plantillas distingue cargando, no cargó y «este segmento no tiene»); edición de artículo (si su empaque
+    no carga: «No se pudo cargar su empaque actual. Si dejas estos campos vacíos, se conserva el que ya tiene», que
+    es lo que hace el servidor).
+  - **Catálogo de más de 200 productos:** `listCatalogProducts` de `lib/stock-api.ts` pedía solo la primera página
+    (`take=200`): con un catálogo más grande, el resto **no se podía elegir** en un movimiento. Ahora recorre las
+    páginas hasta el total (tope 5,000), sin repetir productos, y si una página falla, falla la carga entera. En la
+    API (`catalog.service.ts`, `listProducts`): el orden desempata por `id` (sin eso dos productos con la misma
+    categoría y nombre pueden cambiar de lugar entre páginas), una página nunca pasa de 500 y `?take=abc` ya no
+    tira un 500 (`NaN` llegaba a Prisma).
+  - **A propósito se quedó callado:** «Tu desempeño» del inicio (decisión del 11-11: un error ahí no llega a la
+    pantalla), la lista de proveedores del formulario de orden de compra (es solo sugerencia del campo de texto) y
+    las consultas secundarias que ya toleran un 403 con su comentario (`OpsActivityForm`, `kb`, `documents`…).
+  - **Pruebas:** `lib/lista-de-apoyo.spec.ts` (17), `components/ui/AvisoDeApoyo.spec.tsx` (6),
+    `warehouse/VistaAlmacen.listas.spec.tsx` (4), `procurement/page.listas.spec.tsx` (5),
+    `cotizaciones/_editor/EditorCotizacion.listas.spec.tsx` (3), 3 nuevas en `ArticuloDialog.spec.tsx`, 7 en
+    `lib/stock-api.spec.ts` y 6 en `catalog.service.spec.ts`. Las de pantalla montan la página real con un
+    `fetch` de mentira por ruta: sirven de molde para probar otras pantallas grandes.
+  - **Pendiente que vi:** (1) el portal de clientes (`app/(subdomains)/tickets/page.tsx`) tiene el mismo defecto y
+    peor: si la red falla, «Sincronizando...» no termina nunca, y un 500 se ve como «no tienes tickets»; va en la
+    vuelta 23. (2) `lib/stock-api.ts` no manda `X-Company-Id` (`withTenantHeaders`): con dos empresas vería la
+    primera. (3) El selector de producto del movimiento es un `<select>` con todo el catálogo: con miles de
+    artículos pide un buscador. (4) Pruebas viejas de la web con nombres y correos reales del personal en sus datos
+    (`cotizaciones/[id]/page.spec.tsx` y otras): hay que pasarlas a datos de demostración.
+  - **Paridad:** Web hecho · API hecho (catálogo por páginas) · Android e iOS no aplica: registran movimientos
+    leyendo el código (no cargan lista de productos ni de almacenes) y no tienen los formularios de compras ni el
+    editor de cotización con plantillas. Falta revisar en las apps sus propias listas con el mismo criterio.
+  - **Verificado:** `npm run typecheck:web` 0 y `npm run typecheck:api` 0; vitest de la web 308 archivos, 2,478 pruebas; jest del API 544 suites, 6,834 pruebas; `next build` de producción y `nest build` bien. Las pruebas de pantalla se vieron fallar primero contra la versión anterior de cada página.
+
 - **21-11 ~22:44 México (claude-code, nube) — Vuelta 21 de pulido: los tres PDF de dibujo propio (orden de compra, cotización de Ventas, reporte de evidencias). Solo API; sin migraciones; sin desplegar.**
   - **Qué eran:** los tres documentos que no usan la plantilla común de reportes. Se revisaron impresos (PDF a PNG con
     datos de demostración) y salieron defectos de fondo, no solo la tipografía.

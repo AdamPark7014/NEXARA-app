@@ -61,6 +61,21 @@ function empaqueRevisado(
   }
 }
 
+const PRODUCTOS_POR_PAGINA = 50;
+/** Ninguna pantalla pide más de 200 por página; el tope evita que una URL se traiga la tabla entera. */
+const MAXIMO_POR_PAGINA = 500;
+
+/**
+ * `?take=abc` llega como `NaN` y Prisma lo rechaza con un 500. Lo que no es un entero dentro del
+ * rango vale lo de siempre (`porDefecto`) o se recorta al tope.
+ */
+function enteroDePagina(valor: number | undefined, porDefecto: number, minimo: number, maximo: number): number {
+  if (typeof valor !== 'number' || !Number.isFinite(valor)) return porDefecto;
+  const entero = Math.trunc(valor);
+  if (entero < minimo) return porDefecto;
+  return Math.min(entero, maximo);
+}
+
 export type CatalogProductQuery = {
   q?: string;
   category?: string;
@@ -103,9 +118,11 @@ export class CatalogService {
       this.prisma.product.findMany({
         where,
         include: { brand: { select: { id: true, name: true } } },
-        orderBy: [{ category: 'asc' }, { name: 'asc' }],
-        skip: query.skip,
-        take: query.take ?? 50,
+        // El id desempata: sin él, dos productos con la misma categoría y nombre pueden cambiar
+        // de lugar entre una página y la siguiente (uno sale dos veces y otro no sale).
+        orderBy: [{ category: 'asc' }, { name: 'asc' }, { id: 'asc' }],
+        skip: enteroDePagina(query.skip, 0, 0, Number.MAX_SAFE_INTEGER),
+        take: enteroDePagina(query.take, PRODUCTOS_POR_PAGINA, 1, MAXIMO_POR_PAGINA),
       }),
       this.prisma.product.count({ where }),
     ]);

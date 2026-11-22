@@ -12,6 +12,7 @@ import PanelTabs from "@/components/ui/PanelTabs";
 import EmptyState from "@/components/ui/EmptyState";
 import Modal from "@/components/ui/Modal";
 import InlineAlert from "@/components/ui/InlineAlert";
+import AvisoDeApoyo from "@/components/ui/AvisoDeApoyo";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { SkeletonRows } from "@/components/base";
 import { useUser } from "@/components/UserContext";
@@ -58,6 +59,7 @@ import {
 } from "./compras-datos";
 import s from "./compras.module.css";
 import { errorSeguidoDe } from "@/lib/erp-api";
+import { rotuloDeApoyo, useListaDeApoyo } from "@/lib/lista-de-apoyo";
 import { diaEnMexico } from "@/lib/dia-pactado";
 import { aFechaLocal } from "@/lib/fecha-calendario";
 
@@ -150,7 +152,6 @@ export default function ProcurementPage() {
   const [receiptNotes, setReceiptNotes] = useState("");
   const [receiptWarehouseId, setReceiptWarehouseId] = useState("");
   const [receiptLandedCost, setReceiptLandedCost] = useState({ ...emptyLanded });
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [savingReceipt, setSavingReceipt] = useState(false);
   const [receiptLines, setReceiptLines] = useState<ReceiptLine[]>([]);
   const [loadingReceiptPo, setLoadingReceiptPo] = useState(false);
@@ -267,33 +268,31 @@ export default function ProcurementPage() {
     }
   }, [token]);
 
-  // Almacenes y órdenes abiertas solo hacen falta con el formulario de recepción abierto.
+  // Almacenes y órdenes abiertas solo hacen falta con el formulario de recepción abierto. Si no
+  // cargan, el formulario lo dice: antes quedaba en «No hay órdenes abiertas por recibir».
+  const claveRecepcion = token && showReceiptForm ? token : null;
+  const almacenesDeRecepcion = useListaDeApoyo<Warehouse>(
+    claveRecepcion,
+    async () =>
+      unwrapList<Warehouse & { isActive?: boolean }>(await apiFetch("warehouse", token)).filter((w) => w.isActive !== false),
+    "los almacenes",
+  );
+  const warehouses = almacenesDeRecepcion.lista;
   useEffect(() => {
-    if (!token || !showReceiptForm) return;
-    let vivo = true;
-    void (async () => {
-      try {
-        const rows = unwrapList<Warehouse & { isActive?: boolean }>(await apiFetch("warehouse", token));
-        const activos = rows.filter((w) => w.isActive !== false);
-        if (!vivo) return;
-        setWarehouses(activos);
-        setReceiptWarehouseId((actual) => actual || (activos[0] ? String(activos[0].id) : ""));
-      } catch {
-        if (vivo) setWarehouses([]);
-      }
-    })();
-    if (orders.length === 0) {
-      void apiFetch("procurement/purchase-orders", token)
-        .then((rows) => {
-          if (vivo) setOrders(unwrapList<PurchaseOrder>(rows));
-        })
-        .catch(() => undefined);
-    }
-    return () => {
-      vivo = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, showReceiptForm]);
+    // El primero queda propuesto; si ya eligieron otro, se respeta.
+    if (warehouses.length > 0) setReceiptWarehouseId((actual) => actual || String(warehouses[0].id));
+  }, [warehouses]);
+
+  // Las órdenes se piden aquí solo si la pestaña de órdenes todavía no las trajo.
+  const ordenesDeRecepcion = useListaDeApoyo<PurchaseOrder>(
+    claveRecepcion && orders.length === 0 ? claveRecepcion : null,
+    async () => unwrapList<PurchaseOrder>(await apiFetch("procurement/purchase-orders", token)),
+    "las órdenes de compra",
+  );
+  const ordenesLlegadas = ordenesDeRecepcion.lista;
+  useEffect(() => {
+    if (ordenesLlegadas.length > 0) setOrders(ordenesLlegadas);
+  }, [ordenesLlegadas]);
 
   // ── Listas filtradas ────────────────────────────────────────────────────
   const visibleOrders = useMemo(() => {
@@ -1234,6 +1233,19 @@ export default function ProcurementPage() {
   const totalReq = reqItems.reduce((acc, i) => acc + (Number(i.estimatedCost) || 0) * (Number(i.quantity) || 0), 0);
   const totalPo = poItems.reduce((acc, i) => acc + (Number(i.unitPrice) || 0) * (Number(i.quantity) || 0), 0);
   const ordenRecepcionFuera = receiptPoId && !ordenesAbiertas.some((o) => String(o.id) === receiptPoId);
+  // Con órdenes ya cargadas manda lo que hay; si hubo que pedirlas aquí, manda en qué quedó esa carga.
+  const rotuloOrdenRecepcion =
+    ordenesAbiertas.length > 0
+      ? "Elige la orden…"
+      : orders.length > 0
+        ? "No hay órdenes abiertas por recibir"
+        : rotuloDeApoyo(ordenesDeRecepcion, {
+            elige: "Elige la orden…",
+            vacia: "No hay órdenes abiertas por recibir",
+            fallo: "No se pudieron cargar las órdenes",
+          });
+  // El formulario de cotización se llena con lo que trae la pestaña: si esa carga falló, no hay «aún no hay».
+  const rfqSinListas = Boolean(errorCarga) && !cargado.rfq;
   const poNumberFiltro = poId ? receipts.find((r) => String(r.purchaseOrderId) === poId)?.purchaseOrder?.poNumber : null;
 
   const tituloSeccion = primeraCarga
@@ -1896,6 +1908,15 @@ export default function ProcurementPage() {
           </>
         }
       >
+        {rfqSinListas && (
+          <InlineAlert
+            variant="danger"
+            dense
+            title="No se pudieron cargar las requisiciones ni los proveedores"
+            message={errorCarga ?? "Vuelve a intentarlo."}
+            action={<Button size="sm" variant="secondary" loading={loading} onClick={() => void load()}>Reintentar</Button>}
+          />
+        )}
         <div className={s.rejilla}>
           <label className={`${s.campo} ${s.ancho}`}>
             <span className={s.etiqueta}>Requisición</span>
@@ -1916,8 +1937,10 @@ export default function ProcurementPage() {
               {rfqForm.supplierIds.length > 0 ? ` · ${rfqForm.supplierIds.length} elegidos` : ""}
             </legend>
             <div className={s.opciones}>
-              {suppliers.length === 0 && (
-                <span className={s.ayuda}>Aún no hay proveedores. Da de alta el primero con «Nuevo proveedor».</span>
+              {suppliers.length === 0 && !rfqSinListas && (
+                <span className={s.ayuda}>
+                  {cargado.rfq ? "Aún no hay proveedores. Da de alta el primero con «Nuevo proveedor»." : "Cargando proveedores…"}
+                </span>
               )}
               {suppliers.map((sp) => {
                 const checked = rfqForm.supplierIds.includes(sp.id);
@@ -1981,11 +2004,12 @@ export default function ProcurementPage() {
           </>
         }
       >
+        <AvisoDeApoyo de={[ordenesDeRecepcion, almacenesDeRecepcion]} />
         <div className={s.rejilla}>
           <label className={`${s.campo} ${s.ancho}`}>
             <span className={s.etiqueta}>Orden de compra que llegó</span>
             <select value={receiptPoId} onChange={(e) => elegirOrdenRecepcion(e.target.value)} className={s.input}>
-              <option value="">{ordenesAbiertas.length ? "Elige la orden…" : "No hay órdenes abiertas por recibir"}</option>
+              <option value="">{rotuloOrdenRecepcion}</option>
               {ordenRecepcionFuera && (
                 <option value={receiptPoId}>{poDetail && String(poDetail.id) === receiptPoId ? poDetail.poNumber : "Orden elegida"}</option>
               )}

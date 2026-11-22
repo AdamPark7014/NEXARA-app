@@ -7,6 +7,7 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import LibraryAddOutlinedIcon from "@mui/icons-material/LibraryAddOutlined";
 import { Badge, Button } from "@/components/base";
 import type { PlantillasSegmento } from "@/lib/cotizaciones-api";
+import type { EstadoDeApoyo } from "@/lib/lista-de-apoyo";
 import {
   esBloqueDePaquete,
   mover,
@@ -18,6 +19,15 @@ import { Campo, Hoja, ListaEditable, TextoAuto } from "./campos";
 import styles from "./editor.module.css";
 
 type Cambiar = (cambio: (doc: DocumentoCotizacion) => DocumentoCotizacion) => void;
+
+/** Lo que dice el panel de subsecciones cuando no tiene ninguna que ofrecer. */
+const PISTA_SIN_PLANTILLAS: Record<EstadoDeApoyo, string> = {
+  espera: "Cargando plantillas…",
+  cargando: "Cargando plantillas…",
+  lista: "Este segmento no tiene subsecciones sugeridas. Agrega la tuya con «+ Subsección».",
+  fallo: "No se pudieron cargar las plantillas. Reintenta desde el aviso de arriba.",
+  reintentando: "Cargando plantillas…",
+};
 
 function origen(b: BloqueEditor): string | null {
   if (esBloqueDePaquete(b)) {
@@ -37,6 +47,7 @@ export default function SeccionAlcance({
   cambiar,
   editable,
   plantillas,
+  cargaPlantillas = "lista",
   excluida,
   onIncluir,
 }: {
@@ -47,6 +58,8 @@ export default function SeccionAlcance({
   cambiar: Cambiar;
   editable: boolean;
   plantillas: PlantillasSegmento["bloques"];
+  /** En qué quedó la carga de las plantillas: vacío no es lo mismo que «todavía no llegan» o «no llegaron». */
+  cargaPlantillas?: EstadoDeApoyo;
 }) {
   const [verPlantillas, setVerPlantillas] = useState(false);
   const titulos = useRef(new Map<string, HTMLTextAreaElement>());
@@ -96,7 +109,7 @@ export default function SeccionAlcance({
             </button>
           );
         })}
-        {!plantillas.length ? <p className={styles.pista}>Cargando plantillas…</p> : null}
+        {!plantillas.length ? <p className={styles.pista}>{PISTA_SIN_PLANTILLAS[cargaPlantillas]}</p> : null}
       </div>
     </div>
   ) : null;

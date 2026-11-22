@@ -98,9 +98,38 @@ export type ProductoDeCatalogo = {
   tipoArticulo?: string | null;
 };
 
+const PRODUCTOS_POR_PAGINA = 200;
+/** Tope de seguridad: 25 páginas. Un catálogo más grande ya no cabe en un selector. */
+const TOPE_DE_PRODUCTOS = 5000;
+
+/**
+ * El catálogo entero para los selectores de almacén. La API lo entrega por páginas; antes se
+ * pedía solo la primera y, con más de 200 productos, los demás no se podían elegir en un
+ * movimiento. Si una página falla, falla todo: medio catálogo no se hace pasar por el catálogo.
+ */
 export async function listCatalogProducts(token: string) {
-  const raw = await stockRequest<ProductoDeCatalogo[] | { data: ProductoDeCatalogo[] }>("catalog/products?take=200", token, {}, "No se pudieron cargar productos");
-  return unwrapArray(raw);
+  const todos: ProductoDeCatalogo[] = [];
+  const vistos = new Set<number>();
+  for (let skip = 0; skip < TOPE_DE_PRODUCTOS; skip += PRODUCTOS_POR_PAGINA) {
+    const raw = await stockRequest<ProductoDeCatalogo[] | { data: ProductoDeCatalogo[]; total?: number }>(
+      `catalog/products?take=${PRODUCTOS_POR_PAGINA}${skip ? `&skip=${skip}` : ""}`,
+      token,
+      {},
+      "No se pudieron cargar productos",
+    );
+    const pagina = unwrapArray(raw);
+    const antes = todos.length;
+    for (const producto of pagina) {
+      if (vistos.has(producto.id)) continue;
+      vistos.add(producto.id);
+      todos.push(producto);
+    }
+    const total = raw && !Array.isArray(raw) && typeof raw.total === "number" ? raw.total : null;
+    const ultima = pagina.length < PRODUCTOS_POR_PAGINA || (total !== null && skip + pagina.length >= total);
+    // Una página que no trae nada nuevo: el servidor no está avanzando, se deja de pedir.
+    if (ultima || todos.length === antes) break;
+  }
+  return todos;
 }
 
 export async function createStockMovement(

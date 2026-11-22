@@ -21,6 +21,7 @@ import InsightsOutlined from "@mui/icons-material/InsightsOutlined";
 import SwapHorizOutlined from "@mui/icons-material/SwapHorizOutlined";
 import FactCheckOutlined from "@mui/icons-material/FactCheckOutlined";
 import Modal from "@/components/ui/Modal";
+import AvisoDeApoyo from "@/components/ui/AvisoDeApoyo";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import ContextRail from "@/components/ui/ContextRail";
 import { Money } from "@/components/ui/DataTable";
@@ -117,6 +118,7 @@ import {
   type ProductoDeCatalogo,
 } from "@/lib/stock-api";
 import { formatApiError, errorSeguidoDe } from "@/lib/erp-api";
+import { rotuloDeApoyo, useListaDeApoyo } from "@/lib/lista-de-apoyo";
 import { crearEmpaque, listarEmpaques, type Empaque } from "@/lib/almacen-api";
 import { etiquetaCantidad, previsualizarConversion } from "@/lib/empaque";
 import { toast } from "@/components/Toast";
@@ -276,11 +278,15 @@ export function VistaAlmacen({
   const [editing, setEditing] = useState<StockRow | null>(null);
   const [minimo, setMinimo] = useState(5);
   const [savingMinimo, setSavingMinimo] = useState(false);
-  const [products, setProducts] = useState<ProductoDeCatalogo[]>([]);
+  // Catálogo y almacenes alimentan el formulario de movimiento: si no cargan, se dice (no «no hay»).
+  const catalogo = useListaDeApoyo<ProductoDeCatalogo>(token || null, () => listCatalogProducts(token), "los productos");
+  const products = catalogo.lista;
   // Alta / edición de artículo con su tipo (Equipo, Consumible, Por medida).
   const puedeEditarCatalogo = hasPermission(user, PERMISSIONS.CATALOG_MANAGE);
   const [articulo, setArticulo] = useState<{ producto: ProductoEditable | null; empaque?: EmpaqueBase | null } | null>(null);
-  const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([]);
+  const almacenes = useListaDeApoyo<{ id: number; name: string }>(token || null, () => listWarehouses(token), "los almacenes");
+  const warehouses = almacenes.lista;
+  const loadWarehouses = almacenes.recargar;
   const [showMovementForm, setShowMovementForm] = useState(false);
   const [movement, setMovement] = useState({ ...MOVIMIENTO_VACIO });
   // Norma de empaque del producto elegido: se captura en cajas y se guarda en piezas.
@@ -359,11 +365,6 @@ export function VistaAlmacen({
     router.replace(`${almacenBase}${query}`, { scroll: false });
   };
 
-  const loadWarehouses = useCallback(() => {
-    if (!token) return;
-    void listWarehouses(token).then(setWarehouses).catch(() => undefined);
-  }, [token]);
-
   const createWarehouse = async () => {
     if (!token || !warehouseForm.name.trim()) return;
     setSavingWarehouse(true);
@@ -419,15 +420,6 @@ export function VistaAlmacen({
     void load();
   }, [load]);
 
-  useEffect(() => {
-    loadWarehouses();
-  }, [loadWarehouses]);
-
-  useEffect(() => {
-    if (!token) return;
-    void listCatalogProducts(token).then(setProducts).catch(() => undefined);
-  }, [token]);
-
   // Tipo de cada fila: el que trae la existencia o, si la API de niveles aún no lo manda,
   // el del catálogo. El empaque de consumibles y material por medida se pide aparte si falta.
   const tipoPorProducto = useMemo(
@@ -459,8 +451,7 @@ export function VistaAlmacen({
   const alGuardarArticulo = async (guardado: ArticuloGuardado, modo: "alta" | "editar") => {
     setArticulo(null);
     olvidarEmpaque(guardado.id);
-    const lista = await listCatalogProducts(token).catch(() => null);
-    if (lista) setProducts(lista);
+    void catalogo.recargar();
     void load();
     if (modo === "alta" && cfg.canCreate) {
       setMovement({ ...MOVIMIENTO_VACIO, productId: String(guardado.id) });
@@ -1509,6 +1500,8 @@ export function VistaAlmacen({
   const movimientoIncompleto =
     !movement.productId || !movement.warehouseId || movement.quantity <= 0 || (movement.type === "TRANSFER" && !movement.toWarehouseId);
 
+  // Vacío de verdad: el catálogo llegó y no trae nada (no es lo mismo que no haber llegado).
+  const catalogoVacio = catalogo.estado === "lista" && products.length === 0;
   const opcionesProducto = products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>);
   const opcionesAlmacen = warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>);
 
@@ -1615,6 +1608,7 @@ export function VistaAlmacen({
         }
       >
         <form className={s.formDialogo} onSubmit={(e) => { e.preventDefault(); void saveMovement(); }}>
+          <AvisoDeApoyo de={[catalogo, almacenes]} style={{ marginBottom: 0 }} />
           <Grupo paso={1} titulo="Qué se mueve">
             <Field label="Tipo de movimiento" required>
               <Select
@@ -1631,7 +1625,13 @@ export function VistaAlmacen({
             </Field>
             <Field label="Producto" required>
               <Select value={movement.productId} onChange={(e) => setMovement((m) => ({ ...m, productId: e.target.value, packagingId: "" }))}>
-                <option value="">{products.length ? "Elige el producto" : "No hay productos en el catálogo"}</option>
+                <option value="">
+                  {rotuloDeApoyo(catalogo, {
+                    elige: "Elige el producto",
+                    vacia: "No hay productos en el catálogo",
+                    fallo: "No se pudieron cargar los productos",
+                  })}
+                </option>
                 {opcionesProducto}
               </Select>
             </Field>
@@ -1697,7 +1697,13 @@ export function VistaAlmacen({
           <Grupo paso={2} titulo="Dónde">
             <Field label={esEntrada ? "Almacén destino" : "Almacén origen"} required>
               <Select value={movement.warehouseId} onChange={(e) => setMovement((m) => ({ ...m, warehouseId: e.target.value }))}>
-                <option value="">{warehouses.length ? "Elige el almacén" : "Primero crea un almacén"}</option>
+                <option value="">
+                  {rotuloDeApoyo(almacenes, {
+                    elige: "Elige el almacén",
+                    vacia: "Primero crea un almacén",
+                    fallo: "No se pudieron cargar los almacenes",
+                  })}
+                </option>
                 {opcionesAlmacen}
               </Select>
             </Field>
@@ -1955,7 +1961,14 @@ export function VistaAlmacen({
                 ) : (
                   <Stat label="Registros de stock" value={cantidad(items.length)} hint="Producto por almacén" icon={<Inventory2Outlined />} />
                 )}
-                <Stat label="Almacenes" value={warehouses.length} hint="Ubicaciones configuradas" icon={<WarehouseOutlined />} iconTone="neutral" />
+                <Stat
+                  label="Almacenes"
+                  // Mientras llegan, o si no llegaron, no se afirma que hay cero.
+                  value={almacenes.estado === "lista" || warehouses.length > 0 ? warehouses.length : "—"}
+                  hint={almacenes.noCargo ? "No se pudieron cargar" : "Ubicaciones configuradas"}
+                  icon={<WarehouseOutlined />}
+                  iconTone="neutral"
+                />
               </StatRow>
             ) : undefined
           }
@@ -2073,11 +2086,11 @@ export function VistaAlmacen({
                     title: "Aún no hay stock registrado",
                     // Sin artículos en el catálogo no hay a qué darle entrada: primero el alta.
                     description:
-                      products.length === 0 && puedeEditarCatalogo
+                      catalogoVacio && puedeEditarCatalogo
                         ? "Da de alta el primer artículo (equipo, consumible o por medida) y registra su entrada."
                         : "Crea un almacén y registra la primera entrada para empezar el inventario.",
                     action:
-                      products.length === 0 && puedeEditarCatalogo ? (
+                      catalogoVacio && puedeEditarCatalogo ? (
                         <Button size="sm" variant="primary" iconStart={<AddOutlined fontSize="small" />} onClick={() => setArticulo({ producto: null })}>
                           Nuevo artículo
                         </Button>

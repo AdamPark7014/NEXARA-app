@@ -202,3 +202,64 @@ describe('CatalogService · edición con tipo', () => {
     expect(libre.product.update.mock.calls[0][0].data.sku).toBeUndefined();
   });
 });
+
+/**
+ * La lista del catálogo se pide por páginas (almacén la recorre entera). Sin desempate, dos
+ * productos con la misma categoría y nombre pueden cambiar de lugar entre una página y la
+ * siguiente: uno sale dos veces y otro no sale.
+ */
+describe('CatalogService · lista por páginas', () => {
+  function servicioConLista() {
+    const prisma: any = {
+      product: { findMany: jest.fn(async () => []), count: jest.fn(async () => 0) },
+    };
+    return { prisma, servicio: new CatalogService(prisma) };
+  }
+  const pedido = (prisma: any) => prisma.product.findMany.mock.calls[0][0];
+
+  it('ordena por categoría y nombre, y desempata por id para que las páginas no se traslapen', async () => {
+    const { prisma, servicio } = servicioConLista();
+    await servicio.listProducts({ companyId: 1, skip: 200, take: 200 });
+    expect(pedido(prisma).orderBy).toEqual([{ category: 'asc' }, { name: 'asc' }, { id: 'asc' }]);
+    expect(pedido(prisma).skip).toBe(200);
+    expect(pedido(prisma).take).toBe(200);
+  });
+
+  it('sin tamaño de página entrega 50', async () => {
+    const { prisma, servicio } = servicioConLista();
+    await servicio.listProducts({ companyId: 1 });
+    expect(pedido(prisma).take).toBe(50);
+    expect(pedido(prisma).skip).toBe(0);
+  });
+
+  it('una página nunca pasa de 500 productos, pidan lo que pidan', async () => {
+    const { prisma, servicio } = servicioConLista();
+    await servicio.listProducts({ companyId: 1, take: 1_000_000 });
+    expect(pedido(prisma).take).toBe(500);
+  });
+
+  it('un tamaño o un salto que no son números no tiran la consulta: valen lo de siempre', async () => {
+    const { prisma, servicio } = servicioConLista();
+    await servicio.listProducts({ companyId: 1, take: Number('abc'), skip: Number('xyz') });
+    expect(pedido(prisma).take).toBe(50);
+    expect(pedido(prisma).skip).toBe(0);
+  });
+
+  it('cero, negativos y decimales se llevan a un valor que la base acepta', async () => {
+    const { prisma, servicio } = servicioConLista();
+    await servicio.listProducts({ companyId: 1, take: 0, skip: -5 });
+    expect(pedido(prisma).take).toBe(50);
+    expect(pedido(prisma).skip).toBe(0);
+    prisma.product.findMany.mockClear();
+    await servicio.listProducts({ companyId: 1, take: 20.7, skip: 40.2 });
+    expect(pedido(prisma).take).toBe(20);
+    expect(pedido(prisma).skip).toBe(40);
+  });
+
+  it('entrega la página y el total, que es lo que deja saber cuándo terminar', async () => {
+    const { prisma, servicio } = servicioConLista();
+    prisma.product.findMany.mockResolvedValueOnce([{ id: 1, name: 'Cámara demo' }]);
+    prisma.product.count.mockResolvedValueOnce(431);
+    await expect(servicio.listProducts({ companyId: 1 })).resolves.toEqual({ data: [{ id: 1, name: 'Cámara demo' }], total: 431 });
+  });
+});

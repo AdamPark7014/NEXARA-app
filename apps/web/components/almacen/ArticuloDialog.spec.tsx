@@ -156,4 +156,61 @@ describe("edición de artículo", () => {
       empaque: { nombre: "Bolsa", capacidad: 50 },
     });
   });
+
+  const AVISO_EMPAQUE = "No se pudo cargar su empaque actual. Si dejas estos campos vacíos, se conserva el que ya tiene.";
+
+  /** `fetch` de mentira donde la consulta del empaque falla y lo demás contesta bien. */
+  function stubSinEmpaque(producto: Record<string, unknown>) {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) =>
+      String(input).includes("/empaques")
+        ? new Response(JSON.stringify({ message: "Internal server error" }), { status: 500 })
+        : new Response(JSON.stringify(producto), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("si su empaque no carga lo dice: los campos vacíos no son «no tiene», y guardar así lo conserva", async () => {
+    const fetchMock = stubSinEmpaque({ id: 4, sku: "TAQ-14", name: "Taquete 1/4", tipoArticulo: "CONSUMIBLE" });
+    const onGuardado = vi.fn();
+    render(
+      <ArticuloDialog
+        open
+        onClose={vi.fn()}
+        onGuardado={onGuardado}
+        producto={{ id: 4, name: "Taquete 1/4", sku: "TAQ-14", category: "Fijación", tipoArticulo: "CONSUMIBLE" }}
+      />,
+    );
+    expect(await screen.findByText(AVISO_EMPAQUE)).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /Empaque/ })).toHaveValue("");
+
+    await userEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+    await waitFor(() => expect(onGuardado).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }), "editar"));
+    const patch = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH") as [string, RequestInit];
+    // Sin `empaque` en el cuerpo, el servidor no toca el que ya tiene.
+    expect(JSON.parse(String(patch[1].body))).toEqual({ name: "Taquete 1/4", category: "Fijación", tipoArticulo: "CONSUMIBLE" });
+  });
+
+  it("un equipo no lleva empaque: ese aviso no le sale aunque la consulta falle", async () => {
+    const fetchMock = stubSinEmpaque({ id: 5, sku: "CAM-01", name: "Cámara bala", tipoArticulo: "EQUIPO" });
+    render(
+      <ArticuloDialog
+        open
+        onClose={vi.fn()}
+        onGuardado={vi.fn()}
+        producto={{ id: 5, name: "Cámara bala", sku: "CAM-01", category: "CCTV", tipoArticulo: "EQUIPO" }}
+      />,
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(await screen.findByText("Se cuenta por pieza y no lleva empaque.")).toBeInTheDocument();
+    expect(screen.queryByText(AVISO_EMPAQUE)).not.toBeInTheDocument();
+  });
+
+  it("en un alta no hay empaque que cargar ni aviso que dar", async () => {
+    const fetchMock = stubSinEmpaque({});
+    render(<ArticuloDialog open onClose={vi.fn()} onGuardado={vi.fn()} />);
+    await userEvent.click(screen.getByRole("radio", { name: "Consumible" }));
+    expect(screen.queryByText(AVISO_EMPAQUE)).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

@@ -26,6 +26,8 @@ import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { triggerFileDownload } from "@/lib/file-download";
 import { formatApiError } from "@/lib/erp-api";
+import { useListaDeApoyo } from "@/lib/lista-de-apoyo";
+import AvisoDeApoyo from "@/components/ui/AvisoDeApoyo";
 import {
   SEGMENTO_LABEL,
   actualizarCotizacion,
@@ -252,8 +254,12 @@ export default function EditorCotizacion({
   docRef.current = doc;
 
   const [versiones, setVersiones] = useState<VersionCotizacion[]>([]);
-  const [plantillas, setPlantillas] = useState<PlantillasSegmento[]>([]);
-  const [paquetes, setPaquetes] = useState<PaqueteCotizacion[]>([]);
+  // Plantillas del segmento y paquetes: si no cargan se avisa arriba, con «Reintentar». Antes el
+  // fallo se callaba: «Cargando plantillas…» para siempre y «Paquetes» apagado sin decir por qué.
+  const cargaPlantillas = useListaDeApoyo<PlantillasSegmento>(token || null, () => listarPlantillas(token ?? ""), "las plantillas");
+  const plantillas = cargaPlantillas.lista;
+  const cargaPaquetes = useListaDeApoyo<PaqueteCotizacion>(token || null, () => listarPaquetes(token ?? ""), "los paquetes");
+  const paquetes = cargaPaquetes.lista;
   /** Sube cuando cambió algo del lado del servidor que el borrador no trae (planos, paquete, envío). */
   const [recargaVista, setRecargaVista] = useState(0);
   /** Sección donde está el cursor: la vista previa va a su hoja. */
@@ -296,12 +302,6 @@ export default function EditorCotizacion({
   useEffect(() => {
     if (!token) return;
     let vivo = true;
-    listarPlantillas(token)
-      .then((p) => vivo && setPlantillas(p))
-      .catch(() => undefined);
-    listarPaquetes(token)
-      .then((p) => vivo && setPaquetes(p))
-      .catch(() => undefined);
     if (idRef.current) {
       versionesDeCotizacion(token, idRef.current)
         .then((v) => vivo && setVersiones(v))
@@ -543,6 +543,8 @@ export default function EditorCotizacion({
   );
   const completas = seccionesCompletas(doc, detalle?.planos?.length ?? 0);
   const plantillaSegmento = plantillas.find((p) => p.segmento === doc.segmento) ?? null;
+  // Solo estorba a quien puede escribir: una cotización ganada o bloqueada no usa estas listas.
+  const listasCaidas = editable && (cargaPlantillas.noCargo || cargaPaquetes.noCargo);
   const version = `${Math.max(1, (detalle?.revision ?? 1) + (detalle?.sentAt && detalle.estado === "BORRADOR" ? 1 : 0))}.0`;
   const faltasEnvio = faltaParaEnviar(doc);
 
@@ -854,8 +856,9 @@ export default function EditorCotizacion({
         />
       </div>
 
-      {aprobada || (bloqueada && detalle) || detalle?.rejectedReason || error ? (
+      {aprobada || (bloqueada && detalle) || detalle?.rejectedReason || error || listasCaidas ? (
         <div className={styles.avisos}>
+          {listasCaidas ? <AvisoDeApoyo de={[cargaPlantillas, cargaPaquetes]} /> : null}
           {aprobada ? (
             <Alert tone="success">
               Ganada: es el compromiso con el cliente y ya no se edita. Puedes descargar el PDF cuando quieras.
@@ -956,6 +959,7 @@ export default function EditorCotizacion({
             cambiar={cambiar}
             editable={editable}
             plantillas={plantillaSegmento?.bloques ?? []}
+            cargaPlantillas={cargaPlantillas.estado}
             excluida={!doc.opciones.secciones.alcance}
             onIncluir={() => incluirSeccion("alcance")}
           />
