@@ -18,12 +18,15 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { OcultarMontosInterceptor } from '../common/visibilidad/ocultar-montos.interceptor.js';
+import { CotizacionVisibleInterceptor } from '../common/visibilidad/cotizacion-visible.interceptor.js';
 
 const SALES_VIEW_ACCESS = [PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
 const SALES_MANAGE_ACCESS = [PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
 
+// `CotizacionVisibleInterceptor`: las rutas con `:id` o `:cotizacionId` responden 404 si quien pregunta no
+// puede ver esa cotización, igual que en `/cotizaciones`.
 @Controller('ventas/cotizaciones')
-@UseInterceptors(OcultarMontosInterceptor)
+@UseInterceptors(OcultarMontosInterceptor, CotizacionVisibleInterceptor)
 export class VentasCotizacionesController {
   constructor(private readonly ventasService: VentasService) {}
 
@@ -31,12 +34,13 @@ export class VentasCotizacionesController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
   findAll(
+    @CurrentUser() user: any,
     @Query('clientName') clientName?: string,
     @Query('status') status?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.ventasService.findCotizacionesForVentas(clientName, status, startDate, endDate);
+    return this.ventasService.findCotizacionesForVentas(clientName, status, startDate, endDate, user);
   }
 
   @Get(':id')

@@ -1,5 +1,22 @@
 # RELEVO
 
+- **21-11 ~22:13 México (claude-code, nube) — Vuelta 19 de pulido: las cotizaciones vistas desde Ventas respetan «quién ve qué». Solo API; sin migraciones; sin desplegar.**
+  - **El defecto:** `GET /ventas/cotizaciones` (lista) y `GET /ventas/cotizaciones/:id` (detalle), más
+    `POST /ventas/cotizaciones/:cotizacionId/link/:opportunityId`, no pasaban por la regla del 20-11 (cada quien ve las
+    suyas, las que le mandaron y en las que participa). Con el interruptor `visibilidad.compartimentada` prendido,
+    cualquiera con el panel de ventas listaba y abría por id las cotizaciones de los demás.
+  - **El arreglo:** la lista suma `whereCotizacionesVisibles(actor)` a sus filtros (`ventas.service.ts`,
+    `findCotizacionesForVentas`) y el controlador lleva `CotizacionVisibleInterceptor`, el mismo de `/cotizaciones`
+    (404 si no la ve). Con el interruptor apagado no cambia nada.
+  - **Pruebas:** `ventas/cotizaciones-desde-ventas.spec.ts` (7). Aviso para el hilo de «quién ve qué»: esta ruta no
+    estaba en su matriz; ya quedó cubierta aquí.
+  - **Corrección a la nota de la vuelta 18:** ahí anoté que varios reportes (ventas, SLA, RH, accesos) «no filtran por
+    empresa». No es una fuga: `prisma.service.ts` tiene un candado global por empresa (`TENANT_SCOPED_MODELS`, 162
+    modelos, falla cerrado) que acota esas consultas aunque el servicio no ponga `companyId`. No hay nada que arreglar ahí.
+  - **Paridad:** API hecho · Web no aplica (usa la misma ruta y pinta lo que llega) · Android e iOS no aplica (no usan
+    `/ventas/cotizaciones`).
+  - **Verificado:** junto con la vuelta 20: `npm run typecheck:api` 0; jest del API 543 suites, 6,801 pruebas; `nest build` bien.
+
 - **21-11 ~22:06 México (claude-code, nube) — Vuelta 18 de pulido: el día, la semana, el mes y la hora de un instante son los de la empresa. Solo API; sin migraciones; sin desplegar.**
   - **El defecto:** quedaban módulos que leían el reloj del servidor (UTC) con `getDate()`, `getHours()`, `setDate()` o
     `toISOString().slice(0, 10)` sobre un instante. Lo que se veía:
@@ -29,9 +46,8 @@
     herramientas, usuarios, SLA, almacén, compras, PAC, folios y costos no se puede volver a usar `getDate()`,
     `getHours()`, `setDate()` y compañía; y ninguna gráfica agrupa con `d.toISOString()`). 25 se vieron fallar con
     `TZ=UTC` antes del cambio. En `kit-inspecciones.spec.ts` la prueba «cae a medianoche» ahora pide medianoche UTC.
-  - **Visto y no tocado (para la vuelta 19):** varios reportes no filtran por empresa: métricas y cockpit de ventas
-    (`getMetricsByPeriod`, `getExecutiveInsights`, `getManagerCockpit`, cuotas), todo el tablero de SLA
-    (`sla-tracker`), evaluaciones en `getPeopleInsights` y los inicios de sesión de `getIamInsights`.
+  - **Nota corregida en la vuelta 19:** aquí decía que varios reportes no filtran por empresa. No es una fuga: el
+    candado global de `prisma.service.ts` (`TENANT_SCOPED_MODELS`) los acota.
   - **Paridad:** API hecho · Web, Android e iOS no aplica (pintan lo que manda el servidor; la fecha del kit ya la leían
     como día).
   - **Verificado:** `npm run typecheck:api` 0; jest del API 541 suites, 6,783 pruebas; los módulos tocados también con

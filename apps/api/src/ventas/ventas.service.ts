@@ -70,6 +70,7 @@ import { padronParaComparar } from './clientes-parecidos.service.js';
 import { checkUrlAccess } from '../common/rbac/url-matrix.js';
 import type { RoleKey } from '../common/rbac/roles.v2.js';
 import { workClock, workDayStart, workMonthStart, workYearStart } from '../common/time/workday.js';
+import { whereCotizacionesVisibles, type Actor } from '../common/visibilidad/visibilidad.js';
 import { pdfFecha } from '../common/pdf/nexara-pdf-theme.js';
 
 @Injectable()
@@ -2525,7 +2526,13 @@ export class VentasService {
     };
   }
 
-  async findCotizacionesForVentas(clientName?: string, status?: string, startDate?: string, endDate?: string) {
+  async findCotizacionesForVentas(
+    clientName?: string,
+    status?: string,
+    startDate?: string,
+    endDate?: string,
+    actor?: Actor | null,
+  ) {
     const where: any = {};
 
     if (clientName) {
@@ -2542,8 +2549,11 @@ export class VentasService {
       if (endDate) where.issueDate.lte = new Date(endDate);
     }
 
+    // «Quién ve qué» (20-11-2026): cada quien ve las suyas, las que le mandaron y en las que participa.
+    // Con las reglas apagadas el filtro viene vacío y la lista queda como antes.
+    const visibles = whereCotizacionesVisibles(actor);
     return this.prisma.cotizacion.findMany({
-      where,
+      where: Object.keys(visibles).length ? { AND: [where, visibles] } : where,
       orderBy: { issueDate: 'desc' },
       include: { items: true, createdBy: true, salesQuotes: true },
     });
