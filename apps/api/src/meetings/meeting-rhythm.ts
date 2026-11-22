@@ -1,3 +1,5 @@
+import { workDateColumn, workDateParts } from '../common/time/workday.js';
+
 /**
  * El ritmo de trabajo que describe el organigrama, en código.
  *
@@ -101,7 +103,7 @@ export function daysOverdue(
     agreement.fechaCompromiso!.getUTCMonth(),
     agreement.fechaCompromiso!.getUTCDate(),
   );
-  const hoy = Date.UTC(at.getFullYear(), at.getMonth(), at.getDate());
+  const hoy = workDateColumn(at).getTime();
   return Math.round((hoy - compromiso) / 86_400_000);
 }
 
@@ -121,7 +123,8 @@ function calendarDayUtc(d: Date): number {
   return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
 }
 
-/** "Hoy" para quien mira el tablero. */
+/** «Hoy» para la empresa (hora de México), no para el reloj del servidor. */
 function calendarDayLocal(d: Date): number {
-  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  const { year, month, day } = workDateParts(d);
+  return year * 10000 + month * 100 + day;
 }

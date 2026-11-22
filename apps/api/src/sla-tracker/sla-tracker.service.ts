@@ -1,6 +1,7 @@
 import { contarEs } from '../common/contar-es.js';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { ultimosDiasLaborales, workDateKey } from '../common/time/workday.js';
 import { OPEN_ACTIVITY_WHERE, isClosedStatus } from '../activities/activity-status.js';
 import { normalizarPrioridad } from '../activities/actividad-tiempos.js';
 import { finDelPeriodo, periodoDeActividad } from '../activities/actividad-periodo.js';
@@ -339,11 +340,11 @@ export class SlaTrackerService {
       select: { fechaAsignacion: true },
     });
 
-    const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+    // Por día de la empresa: con el del servidor, lo abierto o cerrado por la tarde caía en «mañana».
+    const dayKey = (d: Date) => workDateKey(d);
     const openedByDay: Record<string, number> = {};
     const closedByDay: Record<string, number> = {};
-    for (let i = 13; i >= 0; i--) {
-      const k = dayKey(new Date(now - i * 86_400_000));
+    for (const k of ultimosDiasLaborales(new Date(now), 14)) {
       openedByDay[k] = 0;
       closedByDay[k] = 0;
     }

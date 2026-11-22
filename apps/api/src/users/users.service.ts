@@ -10,6 +10,7 @@ import * as bcrypt from 'bcryptjs';
 import { PERMISSIONS } from '../common/permissions.js';
 import { ChatService } from '../chat/chat.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { ultimosDiasLaborales, workClock, workDateKey } from '../common/time/workday.js';
 import { IntegraAcsFanoutService } from '../integra/integra-acs-fanout.service.js';
 import { CredentialVaultService } from '../credential-vault/credential-vault.service.js';
 import { NON_EMPLOYEE_EMAILS, PLATFORM_DEVELOPER_EMAIL, STORE_REVIEWER_EMAIL, TESTER_CEO_EMAIL, sinActividades } from '../common/platform-accounts.js';
@@ -1482,12 +1483,13 @@ export class UsersService {
       orderBy: { createdAt: 'asc' },
     });
 
-    const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+    // Día y hora de la empresa: con los del servidor, «hora pico» salía seis horas corrida y el
+    // inicio de sesión de la tarde contaba en mañana.
+    const dayKey = (d: Date) => workDateKey(d);
     const successByDay: Record<string, number> = {};
     const failedByDay: Record<string, number> = {};
     const hourBuckets = Array.from({ length: 24 }, () => 0);
-    for (let i = 13; i >= 0; i--) {
-      const k = dayKey(new Date(now.getTime() - i * 86_400_000));
+    for (const k of ultimosDiasLaborales(now, 14)) {
       successByDay[k] = 0;
       failedByDay[k] = 0;
     }
@@ -1495,7 +1497,7 @@ export class UsersService {
       const k = dayKey(ev.createdAt);
       if (ev.action === 'LOGIN_SUCCESS') {
         if (k in successByDay) successByDay[k] += 1;
-        hourBuckets[ev.createdAt.getHours()] += 1;
+        hourBuckets[workClock(ev.createdAt).hour] += 1;
       } else if (k in failedByDay) {
         failedByDay[k] += 1;
       }

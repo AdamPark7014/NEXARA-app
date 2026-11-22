@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { workDayEnd, workDayStart } from '../common/time/workday.js';
 
 @Injectable()
 export class CrmActivitiesService {
@@ -139,6 +140,9 @@ export class CrmActivitiesService {
     const scope = companyWhere(tenantId);
     const now = new Date();
     const next7 = new Date(now.getTime() + 7 * 86400000);
+    // «Hoy» es el día de la empresa: con el reloj del servidor, de las 18:00 en adelante eran los de mañana.
+    const hoyEmpieza = workDayStart(now);
+    const mananaEmpieza = new Date(workDayEnd(now).getTime() + 1);
     const [pendingToday, overdue, upcoming, recentlyCompleted, totalsByType] = await Promise.all([
       this.prisma.crmActivity.findMany({
         where: {
@@ -146,8 +150,8 @@ export class CrmActivitiesService {
           ownerId,
           status: 'PENDING',
           dueDate: {
-            gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
-            lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
+            gte: hoyEmpieza,
+            lt: mananaEmpieza,
           },
         },
         include: {

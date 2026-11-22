@@ -1,3 +1,5 @@
+import { workDateParts } from '../time/workday.js';
+
 /**
  * Catálogo de series de folio.
  *
@@ -55,7 +57,7 @@ export const FOLIO_SERIES: Record<SerieKey, SerieDef> = {
   TENDER: {
     tabla: 'tenders',
     columna: 'tenderNumber',
-    prefijo: (at) => `LIC-${at.getFullYear()}-`,
+    prefijo: (at) => `LIC-${workDateParts(at).year}-`,
     ancho: 5,
   },
   STOCK_MOVEMENT: { tabla: 'stock_movements', columna: 'movementNumber', prefijo: 'SM-', ancho: 6 },

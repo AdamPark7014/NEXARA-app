@@ -66,10 +66,9 @@ describe('proximaInspeccion', () => {
     expect(proximaInspeccion(HOY, 0)).toBeNull();
   });
 
-  it('la próxima cae a medianoche: es un día, no una hora', () => {
+  it('la próxima es un día de calendario (medianoche UTC, como la leen la web y las apps), no una hora', () => {
     const proxima = proximaInspeccion(HOY, 30)!;
-    expect(proxima.getHours()).toBe(0);
-    expect(proxima.getMinutes()).toBe(0);
+    expect(proxima.toISOString()).toBe('2026-10-19T00:00:00.000Z');
   });
 });
 

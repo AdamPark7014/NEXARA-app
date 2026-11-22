@@ -5,7 +5,7 @@ import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagina
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { NON_EMPLOYEE_EMAILS } from '../common/platform-accounts.js';
 import { expectedStartHm, isLateVsSchedule } from '../attendance/attendance-hybrid.match.js';
-import { addDaysToKey, workDateKey, WORKDAY_TIMEZONE } from '../common/time/workday.js';
+import { addDaysToKey, workDateKey, workDateParts, WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { buildAccessScheduleAssignment } from '../integra/access-schedule-defaults.js';
 import { SolicitudAprobacionService } from '../common/aprobaciones/solicitud-aprobacion.service.js';
 import { AVISO_RH_PENDIENTE } from '../common/aprobaciones/avisos-rh.js';
@@ -181,7 +181,8 @@ export class HrService {
 
   async getLeaveBalance(userId: number, companyId?: number | null, year?: number) {
     const tenantId = requireCompanyId(companyId);
-    const y = year ?? new Date().getFullYear();
+    // El año de la empresa: la tarde del 31 de diciembre todavía es este año.
+    const y = year ?? workDateParts(new Date()).year;
     const startOfYear = new Date(`${y}-01-01`);
     const endOfYear = new Date(`${y}-12-31`);
 
@@ -343,10 +344,12 @@ export class HrService {
     const tenantId = requireCompanyId(companyId);
     const scope = companyWhere(tenantId);
     const now = new Date();
-    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    // Mes y año de la empresa. `startDate` es un día de calendario: el día 1 va a medianoche UTC,
+    // o los permisos que empiezan justo el día 1 se quedaban fuera de «este mes».
+    const hoy = workDateParts(now);
+    const startMonth = new Date(Date.UTC(hoy.year, hoy.month - 1, 1));
     const d30 = new Date(now.getTime() - 30 * 86_400_000);
-    const since12m = new Date(now);
-    since12m.setMonth(since12m.getMonth() - 12);
+    const since12m = new Date(Date.UTC(hoy.year - 1, hoy.month - 1, hoy.day));
 
     const [
       pendingLeaves,

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { workDateKey } from '../common/time/workday.js';
 import { ClaudeService } from '../ai/claude/claude.service.js';
 import { redondear } from './calculos/numeros.js';
 import { horasEfectivas } from './calculos/libro-costos.js';
@@ -117,7 +118,8 @@ export class CostosLigaService {
       const fila = porActividad.get(s.activityId) ?? { horas: 0, personas: new Set<number>(), dias: new Set<string>() };
       fila.horas += h;
       fila.personas.add(s.userId);
-      fila.dias.add(s.startedAt.toISOString().slice(0, 10));
+      // Día de la empresa: la jornada de la noche es del mismo día que la de la mañana.
+      fila.dias.add(workDateKey(s.startedAt));
       porActividad.set(s.activityId, fila);
     }
 

@@ -13,7 +13,7 @@ import {
   type StockMovementPdfRow,
 } from './stock-movement-pdf.js';
 import { pdfPeriodo } from '../common/pdf/nexara-pdf-theme.js';
-import { workDateKey, workDateRange } from '../common/time/workday.js';
+import { ultimosDiasLaborales, workDateKey, workDateRange } from '../common/time/workday.js';
 import { EmpaqueInvalidoError, convertirCaptura, type Empaque } from './empaque.js';
 import {
   TIPOS_QUE_SACAN_LA_PIEZA,
@@ -1205,11 +1205,11 @@ export class WarehouseService {
       }),
     ]);
 
-    const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+    // Por día de la empresa: con el del servidor, la salida de la tarde caía en «mañana».
+    const dayKey = (d: Date) => workDateKey(d);
     const inflowByDay: Record<string, number> = {};
     const outflowByDay: Record<string, number> = {};
-    for (let i = 13; i >= 0; i--) {
-      const k = dayKey(new Date(now.getTime() - i * 86_400_000));
+    for (const k of ultimosDiasLaborales(now, 14)) {
       inflowByDay[k] = 0;
       outflowByDay[k] = 0;
     }

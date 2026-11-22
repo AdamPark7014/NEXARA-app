@@ -9,6 +9,8 @@
  * Aritmética de fechas pura: sin Prisma ni reloj del sistema.
  */
 
+import { workDateColumn, workDateKeyOf } from '../common/time/workday.js';
+
 export const ESTADOS_INSPECCION = ['OK', 'OBSERVADO', 'DANADO'] as const;
 export type EstadoInspeccion = (typeof ESTADOS_INSPECCION)[number];
 
@@ -46,12 +48,13 @@ export function normalizarCadencia(valor: unknown): number | null {
   return Math.min(730, Math.max(1, Math.trunc(n)));
 }
 
-/** Suma días sin arrastrar la hora del reloj: la revisión es de un día, no de un minuto. */
+/**
+ * Suma días de calendario al día de la empresa. La revisión es de un día, no de un minuto: se guarda
+ * como ese día a medianoche UTC, que es como la web y las apps leen la fecha. Con el reloj del
+ * servidor, la revisión hecha a las 7 de la tarde programaba la siguiente un día después.
+ */
 function sumarDias(desde: Date, dias: number): Date {
-  const d = new Date(desde.getTime());
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + dias);
-  return d;
+  return new Date(workDateColumn(desde).getTime() + dias * 86_400_000);
 }
 
 /**
@@ -91,7 +94,9 @@ export function estadoProgramacion(
   if (!proxima) {
     return { vencida: false, diasDeAtraso: 0, diasParaLaProxima: null, porVencer: false };
   }
-  const dias = Math.ceil((proxima.getTime() - ahora.getTime()) / 86_400_000);
+  // Por días de calendario de la empresa: la revisión de mañana no está vencida esta tarde.
+  const diaProxima = new Date(`${workDateKeyOf(proxima, ahora)}T00:00:00.000Z`).getTime();
+  const dias = Math.round((diaProxima - workDateColumn(ahora).getTime()) / 86_400_000);
   if (dias <= 0) {
     return {
       vencida: true,

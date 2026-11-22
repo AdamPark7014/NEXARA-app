@@ -2920,16 +2920,10 @@ export class VentasService {
   // ===== REPORTING METHODS =====
 
   async getMetricsByPeriod(period: 'week' | 'month' | 'year', user?: any) {
-    const now = new Date();
-    let startDate = new Date();
-
-    if (period === 'week') {
-      startDate.setDate(now.getDate() - now.getDay());
-    } else if (period === 'month') {
-      startDate.setDate(1);
-    } else if (period === 'year') {
-      startDate.setMonth(0, 1);
-    }
+    // El periodo de la empresa, desde las 00:00 de su primer día. Antes se armaba con el reloj del
+    // servidor y conservaba la hora en curso: a las 3 de la tarde, «este mes» dejaba fuera lo del día 1
+    // por la mañana, y la tarde del último día ya contaba el mes siguiente.
+    const startDate = this.getPeriodStart(period);
 
     // Managers y roles de jerarquía superior ven métricas del equipo completo.
     // Vendedores individuales (v2: 'vendedor') ven solo sus propios registros.
@@ -2983,16 +2977,10 @@ export class VentasService {
   }
 
   async getVendorStatsByPeriod(period: 'week' | 'month' | 'year', user?: any, companyId?: number | null) {
-    const now = new Date();
-    let startDate = new Date();
-
-    if (period === 'week') {
-      startDate.setDate(now.getDate() - now.getDay());
-    } else if (period === 'month') {
-      startDate.setDate(1);
-    } else if (period === 'year') {
-      startDate.setMonth(0, 1);
-    }
+    // El periodo de la empresa, desde las 00:00 de su primer día. Antes se armaba con el reloj del
+    // servidor y conservaba la hora en curso: a las 3 de la tarde, «este mes» dejaba fuera lo del día 1
+    // por la mañana, y la tarde del último día ya contaba el mes siguiente.
+    const startDate = this.getPeriodStart(period);
 
     const canViewAllSellers = this.isSuperAdminUser(user) || this.isConsoleAdminUser(user);
 

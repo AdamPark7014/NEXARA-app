@@ -464,7 +464,8 @@ export class ProcurementService {
       },
       createdByName: po.createdBy?.nombre ?? null,
       approvedByName: po.approvedBy?.nombre ?? null,
-      approvedAt: po.approvedAt ? po.approvedAt.toISOString().slice(0, 10) : null,
+      // La autorización es un instante: su día es el de la empresa (a las 19:00 no es «mañana»).
+      approvedAt: po.approvedAt ? workDateKey(po.approvedAt) : null,
       requisitionNumber: po.requisition?.reqNumber ?? null,
       items: (po.items ?? []).map((item) => ({
         description: item.description,
@@ -945,7 +946,7 @@ export class ProcurementService {
   async getProcurementDashboardForPdf(fromDate?: string, toDate?: string, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     const scope = companyWhere(tenantId);
-    const from = fromDate ? new Date(fromDate) : new Date(new Date().setDate(new Date().getDate() - 30));
+    const from = fromDate ? new Date(fromDate) : new Date(Date.now() - 30 * 86_400_000);
     const to = toDate ? new Date(toDate) : new Date();
 
     const [

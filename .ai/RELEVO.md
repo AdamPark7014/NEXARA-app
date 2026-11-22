@@ -1,5 +1,42 @@
 # RELEVO
 
+- **21-11 ~22:06 México (claude-code, nube) — Vuelta 18 de pulido: el día, la semana, el mes y la hora de un instante son los de la empresa. Solo API; sin migraciones; sin desplegar.**
+  - **El defecto:** quedaban módulos que leían el reloj del servidor (UTC) con `getDate()`, `getHours()`, `setDate()` o
+    `toISOString().slice(0, 10)` sobre un instante. Lo que se veía:
+    - **Ventas (métricas y tablero de vendedores):** «este mes» empezaba el día 1 **a la hora en curso** (a las 3 de la
+      tarde dejaba fuera lo del día 1 por la mañana) y la tarde del último día ya contaba el mes siguiente. Igual semana
+      y año. Ya existía `getPeriodStart` bien hecho; estos dos métodos no lo usaban.
+    - **CRM (mi agenda):** «pendientes de hoy» eran los de mañana de las 18:00 en adelante.
+    - **Reuniones:** el acuerdo que vence hoy salía vencido por la tarde, y el de ayer con 2 días de atraso.
+    - **Compras:** el precio por volumen vigente hasta hoy dejaba de aplicar a las 18:00 (y el que empieza mañana ya
+      aplicaba); la orden autorizada a las 19:00 se imprimía con fecha del día siguiente; la licitación creada la
+      tarde del 31 de diciembre tomaba folio del año siguiente.
+    - **Kits de herramienta:** la revisión hecha por la tarde programaba la siguiente un día después, y la revisión de
+      mañana salía «vencida» desde las 18:00 (lista y aviso diario).
+    - **Tableros con gráfica por día** (almacén, accesos, servicio/SLA, finanzas): lo de la tarde caía en «mañana» y
+      la gráfica terminaba en mañana; «hora pico» de accesos salía seis horas corrida. En finanzas, la factura que
+      vence hoy se clasificaba como vencida de 1 a 30 días.
+    - **RH:** saldo de vacaciones del año equivocado la tarde del 31 de diciembre; «permisos aprobados este mes» dejaba
+      fuera los que empiezan el día 1.
+    - **Costos (horas por ligar):** la jornada de la noche contaba como otro día trabajado.
+    - **CFDI sellado por nosotros (adaptadores SW y Finkok, hoy sin uso):** la fecha salía en hora del servidor, seis
+      horas en el futuro. Facturama (el PAC elegido) ya iba bien.
+  - **El arreglo:** todo con `common/time/workday.ts` (`workDateKey`, `workDateColumn`, `workDateParts`, `workClock`,
+    `workDayStart`/`workDayEnd`) y uno nuevo, `ultimosDiasLaborales(ahora, n)`, para las gráficas de «últimos n días».
+    `proximaInspeccion` del kit se guarda como día de calendario (medianoche UTC), que es como ya la leían la web y las
+    apps.
+  - **Pruebas:** `common/time/el-dia-de-un-instante.spec.ts` (27, con dos candados: en ventas, CRM, reuniones, RH,
+    herramientas, usuarios, SLA, almacén, compras, PAC, folios y costos no se puede volver a usar `getDate()`,
+    `getHours()`, `setDate()` y compañía; y ninguna gráfica agrupa con `d.toISOString()`). 25 se vieron fallar con
+    `TZ=UTC` antes del cambio. En `kit-inspecciones.spec.ts` la prueba «cae a medianoche» ahora pide medianoche UTC.
+  - **Visto y no tocado (para la vuelta 19):** varios reportes no filtran por empresa: métricas y cockpit de ventas
+    (`getMetricsByPeriod`, `getExecutiveInsights`, `getManagerCockpit`, cuotas), todo el tablero de SLA
+    (`sla-tracker`), evaluaciones en `getPeopleInsights` y los inicios de sesión de `getIamInsights`.
+  - **Paridad:** API hecho · Web, Android e iOS no aplica (pintan lo que manda el servidor; la fecha del kit ya la leían
+    como día).
+  - **Verificado:** `npm run typecheck:api` 0; jest del API 541 suites, 6,783 pruebas; los módulos tocados también con
+    `TZ=UTC` (101 suites, 1,355 pruebas); `nest build` bien. La web no cambió. CI de la vuelta 17 en verde sobre `666d7ba`.
+
 - **21-11 ~21:52 México (claude-code, nube) — Vuelta 17 de pulido: «hoy» y «este mes» son los de México en contabilidad, asistencia y mis actividades. Solo API; sin migraciones; sin desplegar.**
   - **El defecto:** el servidor corre en UTC y varios módulos leían su reloj (`now.getMonth()`, `now.getDate()`,
     `toLocaleDateString('sv-SE')`). De las 18:00 de México en adelante ya era «mañana», y la tarde del último día

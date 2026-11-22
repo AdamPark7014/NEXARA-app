@@ -16,7 +16,7 @@ import { DomainEventBusService } from '../domain-events/domain-event-bus.service
 import { BASE_CHART_OF_ACCOUNTS } from './base-chart-of-accounts.js';
 import { polizaFacturaEmitida, polizaPagoFactura, type RenglonPoliza } from './mesa-contable/polizas-mesa.js';
 import { celdaCsv } from '../common/security/celda-csv.js';
-import { addDaysToKey, workDateColumn, workDateKey, workDateKeyOf, workDateParts } from '../common/time/workday.js';
+import { addDaysToKey, ultimosDiasLaborales, workDateColumn, workDateKey, workDateKeyOf, workDateParts } from '../common/time/workday.js';
 
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -3517,13 +3517,15 @@ export class AccountingService {
     const arAging = bucket();
     const apAging = bucket();
 
+    // El vencimiento es un día de calendario: lo que vence hoy es corriente hasta que el día termina.
+    const hoyColumna = workDateColumn(now);
     const classify = (target: ReturnType<typeof bucket>, due: Date | null, pending: number) => {
       target.amount += pending;
-      if (!due || due >= now) {
+      if (!due || due >= hoyColumna) {
         target.current += pending;
         return;
       }
-      const days = Math.floor((now.getTime() - due.getTime()) / 86_400_000);
+      const days = Math.round((hoyColumna.getTime() - due.getTime()) / 86_400_000);
       if (days <= 30) target.d1_30 += pending;
       else if (days <= 60) target.d31_60 += pending;
       else if (days <= 90) target.d61_90 += pending;
@@ -3546,11 +3548,11 @@ export class AccountingService {
       },
     });
 
-    const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+    // Los últimos 90 días de la empresa; la fecha de pago es un día de calendario.
+    const dayKey = (d: Date) => workDateKeyOf(d);
     const inflow: Record<string, number> = {};
     const outflow: Record<string, number> = {};
-    for (let i = 89; i >= 0; i--) {
-      const k = dayKey(new Date(now.getTime() - i * 86_400_000));
+    for (const k of ultimosDiasLaborales(now, 90)) {
       inflow[k] = 0;
       outflow[k] = 0;
     }
@@ -3601,21 +3603,21 @@ export class AccountingService {
       netBurn > 0 ? Math.round((base.cash.totalBalance / netBurn) * 10) / 10 : null;
 
     const weeklyCashflow = [];
+    // Semanas de siete días que terminan en el día de la empresa (las claves `AAAA-MM-DD` se comparan como texto).
+    const hoyClave = workDateKey(now);
     for (let w = 12; w >= 0; w--) {
-      const end = new Date(now.getTime() - w * 7 * 86_400_000);
-      const start = new Date(end.getTime() - 7 * 86_400_000);
+      const finClave = addDaysToKey(hoyClave, -7 * w);
+      const inicioClave = addDaysToKey(finClave, -7);
       let inn = 0;
       let out = 0;
       for (const [k, v] of Object.entries(inflow)) {
-        const d = new Date(k);
-        if (d >= start && d < end) inn += v;
+        if (k > inicioClave && k <= finClave) inn += v;
       }
       for (const [k, v] of Object.entries(outflow)) {
-        const d = new Date(k);
-        if (d >= start && d < end) out += v;
+        if (k > inicioClave && k <= finClave) out += v;
       }
       weeklyCashflow.push({
-        weekEnding: end.toISOString().slice(0, 10),
+        weekEnding: finClave,
         inflow: Math.round(inn * 100) / 100,
         outflow: Math.round(out * 100) / 100,
         net: Math.round((inn - out) * 100) / 100,

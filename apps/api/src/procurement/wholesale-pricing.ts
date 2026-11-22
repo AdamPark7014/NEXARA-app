@@ -1,3 +1,5 @@
+import { workDateParts } from '../common/time/workday.js';
+
 /**
  * Precio de compra a mayorista.
  *
@@ -58,9 +60,10 @@ function storedCalendarDay(d: Date): number {
   return toDayNumber(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
 }
 
-/** "Hoy" para quien compra: el día del calendario donde está parado. */
+/** «Hoy» para quien compra: el día de la empresa (hora de México), no el del servidor. */
 function localCalendarDay(d: Date): number {
-  return toDayNumber(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  const { year, month, day } = workDateParts(d);
+  return toDayNumber(year, month, day);
 }
 
 /**
@@ -241,9 +244,9 @@ export function purchaseWarnings(input: {
 /** Fecha de vencimiento según los días de crédito pactados. */
 export function dueDateFromTerms(terms: WholesaleTerms | null | undefined, orderDate: Date): Date {
   const dias = Number(terms?.creditoDias ?? 0);
-  const due = new Date(orderDate);
-  if (Number.isFinite(dias) && dias > 0) due.setDate(due.getDate() + Math.floor(dias));
-  return due;
+  // Días de calendario completos: la fecha de la orden es un día, no una hora.
+  const extra = Number.isFinite(dias) && dias > 0 ? Math.floor(dias) : 0;
+  return new Date(orderDate.getTime() + extra * 86_400_000);
 }
 
 function round2(n: number): number {

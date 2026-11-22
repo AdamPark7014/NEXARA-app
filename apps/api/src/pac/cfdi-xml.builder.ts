@@ -1,6 +1,7 @@
 import type { CsdService } from './csd.service.js';
 import type { PacStampInput } from './pac.types.js';
 import { impuestosDrDePago, xmlNodosImpuestosDr } from './pago-impuestos-dr.js';
+import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
 
 /**
  * Constructor de CFDI 4.0 sellado (cadena original + sello con CSD).
@@ -62,10 +63,27 @@ function r6(n: number): string {
   return (Math.round((n + Number.EPSILON) * 1_000_000) / 1_000_000).toFixed(6);
 }
 
-/** Fecha CFDI: `yyyy-MM-ddTHH:mm:ss` en hora local (sin zona). */
-function cfdiDate(d: Date): string {
-  const p = (x: number) => String(x).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+const FORMATO_FECHA_CFDI = new Intl.DateTimeFormat('en-CA', {
+  timeZone: WORKDAY_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+});
+
+/**
+ * Fecha CFDI: `yyyy-MM-ddTHH:mm:ss` en la hora del lugar de expedición (México), sin zona. Con la hora
+ * del servidor (UTC) el comprobante salía fechado seis horas en el futuro y el PAC lo rechaza.
+ */
+export function cfdiDate(d: Date): string {
+  const p: Record<string, string> = {};
+  for (const parte of FORMATO_FECHA_CFDI.formatToParts(d)) p[parte.type] = parte.value;
+  // Algunos ICU devuelven «24» a medianoche con `hour12: false`.
+  const hora = String(Number(p.hour) % 24).padStart(2, '0');
+  return `${p.year}-${p.month}-${p.day}T${hora}:${p.minute}:${p.second}`;
 }
 
 interface BuiltConcept {

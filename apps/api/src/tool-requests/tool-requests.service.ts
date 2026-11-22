@@ -32,6 +32,7 @@ import {
   pistaDeSerie,
 } from './tool-nomenclature.js';
 import { buildToolLabelPdf, buildToolLabelZpl } from './tool-label.js';
+import { workDateColumn } from '../common/time/workday.js';
 import { normalizarFotosEvidencia, resolverDevolucion } from './evidencia-prestamo.js';
 import {
   inicioDeHoyEnMexico,
@@ -1758,9 +1759,9 @@ export class ToolRequestsService {
   ) {
     const tenantId = requireCompanyId(companyId);
     const ahora = new Date();
-    const corte = opciones?.incluirPorVencer
-      ? new Date(ahora.getTime() + 7 * 86_400_000)
-      : ahora;
+    // `proximaInspeccion` es un día de calendario (medianoche UTC): se corta en el día de la empresa.
+    const hoy = workDateColumn(ahora);
+    const corte = opciones?.incluirPorVencer ? new Date(hoy.getTime() + 7 * 86_400_000) : hoy;
 
     const filas = await (this.prisma as any).toolKitAssignment.findMany({
       where: {

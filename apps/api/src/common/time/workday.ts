@@ -120,6 +120,15 @@ export function addDaysToKey(dia: string, dias: number): string {
   return new Date(Date.UTC(y, m - 1, d + dias)).toISOString().slice(0, 10);
 }
 
+/**
+ * Las claves de los últimos `n` días de la empresa, del más viejo a hoy. Para las gráficas «últimos
+ * 14 días»: armadas con el reloj del servidor terminaban en mañana a partir de las 18:00.
+ */
+export function ultimosDiasLaborales(ahora: Date, n: number, tz = WORKDAY_TIMEZONE): string[] {
+  const hoy = workDateKey(ahora, tz);
+  return Array.from({ length: n }, (_, i) => addDaysToKey(hoy, i - (n - 1)));
+}
+
 /** Hora (0–23) y día de la semana (0 = domingo) de un instante en la zona. */
 export function workClock(instante: Date, tz = WORKDAY_TIMEZONE): { hour: number; weekday: number } {
   const p = partesEn(instante, tz);
