@@ -3,11 +3,13 @@ import * as path from 'node:path';
 import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
-import ExcelJS from 'exceljs';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { DescargaMasivaService } from '../../pac/descarga-masiva/descarga-masiva.service.js';
 import { resolveUploadsDir } from '../../common/uploads-path.js';
 import { WORKDAY_TIMEZONE } from '../../common/time/workday.js';
+import { crearReporte, type ColumnaReporte } from '../../common/excel/reporte-excel.js';
+import { ETIQUETA_ESTATUS_SAT, ETIQUETA_LISTA_69B, ETIQUETA_PESTANA_BUZON_SAT } from '../../common/excel/etiquetas.js';
+import { pdfPeriodo } from '../../common/pdf/nexara-pdf-theme.js';
 import { runScheduledJob } from '../../common/cron/run-scheduled-job.js';
 import { requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import { CfdiInvalidoError, leerCfdi } from '../mesa-contable/cfdi-xml.js';
@@ -24,6 +26,20 @@ import { PolizaPropuestaService } from './poliza-propuesta.service.js';
 import { JobQueueService } from '../../jobs/job-queue.service.js';
 
 type Pestana = 'recibidos' | 'emitidos' | 'cancelados' | 'alertas';
+
+/** Columnas del Excel del buzón: las de la pantalla más el UUID completo, el IVA y el estatus ante el SAT. */
+export const COLUMNAS_BUZON_SAT: ColumnaReporte<any>[] = [
+  { clave: 'issueDate', titulo: 'Fecha', tipo: 'fecha' },
+  { clave: 'emisorName', titulo: 'Emisor', ancho: 44, ajustar: true },
+  { clave: 'emisorRfc', titulo: 'RFC emisor', ancho: 16 },
+  { clave: 'receptorName', titulo: 'Receptor', ancho: 36, ajustar: true },
+  { clave: 'cfdiUuid', titulo: 'UUID', ancho: 42 },
+  { clave: 'satEstatus', titulo: 'Estatus SAT', etiquetas: ETIQUETA_ESTATUS_SAT, ancho: 14 },
+  { clave: 'lista69B', titulo: 'Lista 69-B', etiquetas: ETIQUETA_LISTA_69B, ancho: 14 },
+  // Los importes al final, juntos y a la derecha, como en cualquier hoja contable.
+  { clave: 'totalAmount', titulo: 'Total', tipo: 'dinero', total: 'suma' },
+  { clave: 'taxAmount', titulo: 'IVA', tipo: 'dinero', total: 'suma' },
+];
 
 @Injectable()
 export class BuzonSatService implements OnModuleInit {
@@ -336,29 +352,26 @@ export class BuzonSatService implements OnModuleInit {
     return { entradas: entradas.length, proveedoresMarcados: proveedores.length };
   }
 
-  async excel(companyIdRaw: number | null, q: { pestana?: string; desde?: string; hasta?: string }) {
+  /**
+   * El buzón en Excel, con el tema de los demás reportes. Antes era un volcado sin formato: la
+   * fecha no cabía en su columna («###»), los importes iban sin separador de miles, «Generado»
+   * traía la hora del servidor en ISO y los estatus salían como en la base.
+   */
+  async excel(
+    companyIdRaw: number | null,
+    q: { pestana?: string; desde?: string; hasta?: string },
+    generadoPor?: string | null,
+  ) {
     const data = await this.listar(companyIdRaw, q);
-    const libro = new ExcelJS.Workbook();
-    const hoja = libro.addWorksheet('Buzón SAT');
-    hoja.addRow(['NEXARA · Buzón SAT']);
-    hoja.addRow([`Rango: ${data.desde ?? '…'} – ${data.hasta ?? '…'}`]);
-    hoja.addRow([`Generado: ${new Date().toISOString()}`]);
-    hoja.addRow([]);
-    hoja.addRow(['Fecha', 'UUID', 'Emisor', 'RFC', 'Total', 'IVA', 'Estatus', '69-B']);
-    for (const r of data.items) {
-      hoja.addRow([
-        r.issueDate,
-        r.cfdiUuid,
-        r.emisorName,
-        r.emisorRfc,
-        Number(r.totalAmount),
-        Number(r.taxAmount),
-        r.satEstatus,
-        r.lista69B,
-      ]);
-    }
-    const buf = Buffer.from(await libro.xlsx.writeBuffer());
-    return { buffer: buf, nombre: `buzon-sat-${diaMexico()}.xlsx` };
+    const buffer = await crearReporte({
+      hoja: 'Buzón SAT',
+      titulo: `Buzón SAT · ${ETIQUETA_PESTANA_BUZON_SAT[data.pestana] ?? 'Recibidos'}`,
+      subtitulo: pdfPeriodo(data.desde, data.hasta, 'Todas las fechas'),
+      generadoPor,
+      columnas: COLUMNAS_BUZON_SAT,
+      filas: data.items,
+    });
+    return { buffer, nombre: `buzon-sat-${diaMexico()}.xlsx` };
   }
 
   async correrDescargaAutomatica(companyId?: number) {

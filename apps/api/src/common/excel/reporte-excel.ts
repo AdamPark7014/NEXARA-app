@@ -41,7 +41,9 @@ export const EXCEL_COLORES = {
   blanco: 'FFFFFFFF',
 } as const;
 
-const FUENTE = 'Segoe UI';
+/** Tipografía de todas las hojas. */
+export const EXCEL_FUENTE = 'Segoe UI';
+const FUENTE = EXCEL_FUENTE;
 /** Ancho mínimo y máximo de columna, en caracteres. Más de esto se envuelve. */
 const ANCHO_MIN = 10;
 const ANCHO_MAX = 46;
@@ -417,43 +419,52 @@ function textoFiltros(filtros?: FiltroReporte[]): string {
     .join('  ·  ');
 }
 
-type ContextoLibro = { generadoPor?: string | null; generadoEn: Date; idLogo?: number };
+export type BandaDeTitulo = {
+  titulo: string;
+  subtitulo?: string;
+  filtros?: FiltroReporte[];
+  generadoPor?: string | null;
+  generadoEn?: Date;
+  /** Lo que devuelve `registrarLogo`; sin él, la banda sale sin imagen. */
+  idLogo?: number;
+};
 
-function escribirHoja(
-  workbook: ExcelJS.Workbook,
-  hoja: HojaReporte<any>,
-  ctx: ContextoLibro,
-  usados: Set<string>,
-): ExcelJS.Worksheet {
-  const columnas = hoja.columnas;
-  const nCols = Math.max(columnas.length, 1);
-  const ws = workbook.addWorksheet(nombreHojaValido(hoja.hoja, usados), {
-    views: [{ showGridLines: false }],
-  });
+/** El logo NEXARA dentro del libro, una sola vez para todas sus hojas. */
+export function registrarLogo(workbook: ExcelJS.Workbook): number | undefined {
+  const logo = logoNexara();
+  return logo ? workbook.addImage({ buffer: logo as any, extension: 'png' }) : undefined;
+}
 
-  // ── Banda de título ──────────────────────────────────────────────────────────
+/**
+ * Banda de título de cualquier hoja NEXARA: logo, título, subtítulo, filtros, «Generado por» y
+ * el filete teal que la cierra. Devuelve la fila donde van los encabezados.
+ *
+ * Exportada para las hojas que no son una tabla plana (los estados financieros llevan
+ * secciones y fórmulas propias) y aun así tienen que verse como las demás.
+ */
+export function escribirBanda(ws: ExcelJS.Worksheet, nCols: number, banda: BandaDeTitulo): number {
   const lineas: Array<{ texto: string; alto: number; fuente: Partial<ExcelJS.Font> }> = [];
   // Fila 1: solo el logo (la imagen flota, no ocupa celda).
   lineas.push({ texto: '', alto: 30, fuente: { size: 8 } });
   lineas.push({
-    texto: hoja.titulo,
+    texto: banda.titulo,
     alto: 24,
     fuente: { size: 16, bold: true, color: { argb: EXCEL_COLORES.navy } },
   });
-  if (hoja.subtitulo) {
+  if (banda.subtitulo) {
     lineas.push({
-      texto: hoja.subtitulo,
+      texto: banda.subtitulo,
       alto: 17,
       fuente: { size: 11, color: { argb: EXCEL_COLORES.gris } },
     });
   }
-  const filtros = textoFiltros(hoja.filtros);
+  const filtros = textoFiltros(banda.filtros);
   if (filtros) {
     lineas.push({ texto: filtros, alto: 15, fuente: { size: 9, color: { argb: EXCEL_COLORES.gris } } });
   }
-  const generadoPor = ctx.generadoPor?.trim();
+  const generadoPor = banda.generadoPor?.trim();
   lineas.push({
-    texto: `Generado por ${generadoPor || 'NEXARA'} · ${fechaLarga(ctx.generadoEn)}`,
+    texto: `Generado por ${generadoPor || 'NEXARA'} · ${fechaLarga(banda.generadoEn ?? new Date())}`,
     alto: 14,
     fuente: { size: 9, italic: true, color: { argb: EXCEL_COLORES.grisSuave } },
   });
@@ -480,29 +491,77 @@ function escribirHoja(
     regla.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_COLORES.teal } };
   }
 
-  if (ctx.idLogo !== undefined) {
+  if (banda.idLogo !== undefined) {
     const logo = logoNexara();
     const medidas = logo ? medidasPng(logo) : null;
     // La fila 1 mide 30 pt (40 px): 32 px de alto deja aire arriba y abajo.
     const alto = 32;
     const ancho = medidas ? Math.round((medidas.ancho / medidas.alto) * alto) : 96;
-    ws.addImage(ctx.idLogo, {
+    ws.addImage(banda.idLogo, {
       tl: { col: 0.2, row: 0.12 } as ExcelJS.Anchor,
       ext: { width: Math.min(ancho, 220), height: alto },
       editAs: 'absolute',
     });
   }
 
+  return filaRegla + 1;
+}
+
+/** Celda de encabezado de tabla: teal, blanco en negrita, centrado. */
+export function estiloEncabezado(celda: ExcelJS.Cell, texto: string): void {
+  celda.value = texto;
+  celda.font = { name: FUENTE, size: 10, bold: true, color: { argb: EXCEL_COLORES.blanco } };
+  celda.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_COLORES.teal } };
+  celda.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+}
+
+/** Impresión: ajuste al ancho, encabezado repetido en cada página y «Página N de M» al pie. */
+export function configurarImpresion(
+  ws: ExcelJS.Worksheet,
+  opciones: { titulo: string; filaEncabezado: number; apaisado: boolean },
+): void {
+  ws.pageSetup = {
+    orientation: opciones.apaisado ? 'landscape' : 'portrait',
+    paperSize: 9, // A4
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    horizontalCentered: true,
+    printTitlesRow: `${opciones.filaEncabezado}:${opciones.filaEncabezado}`,
+    margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
+  };
+  const pie = `&L&"${FUENTE}"&8${opciones.titulo.replace(/&/g, '&&')}&C&"${FUENTE}"&8Página &P de &N&R&"${FUENTE}"&8NEXARA`;
+  ws.headerFooter = { oddFooter: pie, evenFooter: pie };
+}
+
+type ContextoLibro = { generadoPor?: string | null; generadoEn: Date; idLogo?: number };
+
+function escribirHoja(
+  workbook: ExcelJS.Workbook,
+  hoja: HojaReporte<any>,
+  ctx: ContextoLibro,
+  usados: Set<string>,
+): ExcelJS.Worksheet {
+  const columnas = hoja.columnas;
+  const nCols = Math.max(columnas.length, 1);
+  const ws = workbook.addWorksheet(nombreHojaValido(hoja.hoja, usados), {
+    views: [{ showGridLines: false }],
+  });
+
+  const filaEncabezado = escribirBanda(ws, nCols, {
+    titulo: hoja.titulo,
+    subtitulo: hoja.subtitulo,
+    filtros: hoja.filtros,
+    generadoPor: ctx.generadoPor,
+    generadoEn: ctx.generadoEn,
+    idLogo: ctx.idLogo,
+  });
+
   // ── Encabezados ──────────────────────────────────────────────────────────────
-  const filaEncabezado = filaRegla + 1;
   const encabezado = ws.getRow(filaEncabezado);
   encabezado.height = 26;
   columnas.forEach((columna, i) => {
-    const celda = encabezado.getCell(i + 1);
-    celda.value = columna.titulo;
-    celda.font = { name: FUENTE, size: 10, bold: true, color: { argb: EXCEL_COLORES.blanco } };
-    celda.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_COLORES.teal } };
-    celda.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    estiloEncabezado(encabezado.getCell(i + 1), columna.titulo);
   });
 
   // ── Datos ────────────────────────────────────────────────────────────────────
@@ -610,22 +669,7 @@ function escribirHoja(
   }
 
   // ── Impresión ────────────────────────────────────────────────────────────────
-  const apaisado = nCols > 6;
-  ws.pageSetup = {
-    orientation: apaisado ? 'landscape' : 'portrait',
-    paperSize: 9, // A4
-    fitToPage: true,
-    fitToWidth: 1,
-    fitToHeight: 0,
-    horizontalCentered: true,
-    printTitlesRow: `${filaEncabezado}:${filaEncabezado}`,
-    margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
-  };
-  const pie = (t: string) => t.replace(/&/g, '&&');
-  ws.headerFooter = {
-    oddFooter: `&L&"${FUENTE}"&8${pie(hoja.titulo)}&C&"${FUENTE}"&8Página &P de &N&R&"${FUENTE}"&8NEXARA`,
-    evenFooter: `&L&"${FUENTE}"&8${pie(hoja.titulo)}&C&"${FUENTE}"&8Página &P de &N&R&"${FUENTE}"&8NEXARA`,
-  };
+  configurarImpresion(ws, { titulo: hoja.titulo, filaEncabezado, apaisado: nCols > 6 });
 
   return ws;
 }
@@ -709,11 +753,10 @@ export async function crearReporte<T = any>(opciones: OpcionesReporte<T>): Promi
   workbook.title = opciones.titulo;
   workbook.company = 'NEXARA';
 
-  const logo = logoNexara();
   const ctx: ContextoLibro = {
     generadoPor: opciones.generadoPor ?? null,
     generadoEn: opciones.generadoEn ?? new Date(),
-    idLogo: logo ? workbook.addImage({ buffer: logo as any, extension: 'png' }) : undefined,
+    idLogo: registrarLogo(workbook),
   };
 
   const usados = new Set<string>();

@@ -96,8 +96,9 @@ export class BuzonSatController {
     @Query('desde') desde?: string,
     @Query('hasta') hasta?: string,
     @Res() res?: Response,
+    @CurrentUser() user?: { nombre?: string | null },
   ) {
-    const { buffer, nombre } = await this.buzon.excel(companyId, { pestana, desde, hasta });
+    const { buffer, nombre } = await this.buzon.excel(companyId, { pestana, desde, hasta }, user?.nombre ?? null);
     res!.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res!.setHeader('Content-Disposition', `attachment; filename="${nombre}"`);
     res!.send(buffer);

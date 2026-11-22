@@ -231,4 +231,36 @@ describe("exportToExcel · contrato viejo de las pantallas", () => {
     expect(textos).toContain("Sin registros para los filtros aplicados");
     expect(hoja.autoFilter).toBeUndefined();
   });
+
+  it("una celda con texto ajustado hace crecer su fila: antes solo se veía el primer renglón", async () => {
+    descargas.length = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("sin red"); }));
+    type Nota = { folio: string; nota: string };
+    const larga =
+      "Se revisaron las ocho cámaras del estacionamiento, se cambió el conector de la cámara 3 y queda pendiente la fuente de la 7.";
+    exportToExcel<Nota>(
+      [
+        { folio: "AN-0001", nota: larga },
+        { folio: "AN-0002", nota: "Sin novedades." },
+      ],
+      [
+        { key: "folio", label: "Folio" },
+        { key: "nota", label: "Nota", ancho: 40, ajustar: true },
+      ],
+      "notas",
+      "Notas de servicio",
+    );
+    const wb = await esperarLibro();
+    const hoja = wb.worksheets[0];
+    let filaLarga = 0;
+    hoja.eachRow((f, n) => {
+      if (f.getCell(2).value === larga) filaLarga = n;
+    });
+    expect(filaLarga).toBeGreaterThan(0);
+    expect(hoja.getRow(filaLarga).getCell(2).alignment).toMatchObject({ wrapText: true });
+    // 122 caracteres en una columna de 40: cuatro renglones.
+    expect(hoja.getRow(filaLarga).height).toBe(Math.ceil(4 * 13.5 + 5));
+    // La nota corta conserva el alto normal.
+    expect(hoja.getRow(filaLarga + 1).height).toBe(17);
+  });
 });

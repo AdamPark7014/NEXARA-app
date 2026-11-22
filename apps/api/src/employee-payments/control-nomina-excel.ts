@@ -18,7 +18,7 @@ import {
  *   1. «Entradas y salidas» — CONTROL DE ENTRADAS Y SALIDAS: encabezado de dos niveles (el día,
  *      «LUNES» y debajo «28», sobre ENTRADA · SALIDA · HORAS), sábado y domingo siempre, «00:00»
  *      en amarillo cuando un día laborable no tiene checada y «HORAS SEMANA TOTAL» al final.
- *   2. «Nómina» — CONTROL DE NOMINA NEXARA: dónde trabajó cada día, horas, sueldo, pago por hora,
+ *   2. «Nómina» — CONTROL DE NÓMINA NEXARA (en su archivo, sin acento): dónde trabajó cada día, horas, sueldo, pago por hora,
  *      viáticos, área, extras, subtotal, descuentos y total, con autofiltro y notas a la derecha.
  *   3. «Cómo se calcula» — las reglas en palabras.
  *
@@ -293,7 +293,8 @@ function hojaEntradas(wb: ExcelJS.Workbook, d: DatosExcelControl, subtitulo: str
   ws.getColumn(1).width = 34;
   d.dias.forEach((_, i) => {
     const c = 2 + i * 3;
-    ws.getColumn(c).width = 8.5;
+    // «ENTRADA» en negrita no cabía en 8.5 y se partía en «ENTRAD / A».
+    ws.getColumn(c).width = 9.5;
     ws.getColumn(c + 1).width = 8.5;
     ws.getColumn(c + 2).width = 7.5;
   });
@@ -335,7 +336,7 @@ function hojaNomina(wb: ExcelJS.Workbook, d: DatosExcelControl, subtitulo: strin
     notas: 11 + nDias,
   };
   const nCols = col.notas;
-  const r0 = banda(ws, nCols, 'CONTROL DE NOMINA NEXARA', subtitulo, idLogo);
+  const r0 = banda(ws, nCols, 'CONTROL DE NÓMINA NEXARA', subtitulo, idLogo);
   const rEnc = r0;
   const primeraFila = rEnc + 1;
 
@@ -497,7 +498,8 @@ function hojaNomina(wb: ExcelJS.Workbook, d: DatosExcelControl, subtitulo: strin
 
   ws.getColumn(col.nombre).width = 34;
   d.dias.forEach((_, i) => {
-    ws.getColumn(col.dia0 + i).width = 13;
+    // 14 para que «MIÉRCOLES 30» quede en un renglón, como los otros días.
+    ws.getColumn(col.dia0 + i).width = 14;
   });
   ws.getColumn(col.horas).width = 10;
   ws.getColumn(col.sueldo).width = 13;

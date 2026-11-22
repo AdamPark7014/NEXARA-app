@@ -413,6 +413,27 @@ export const ETIQUETA_COMPARATIVA_INVENTARIO: Record<string, string> = {
   REMOVED: 'Retirado',
 };
 
+// ─────────────────────────────────────────────────────────────── buzón SAT
+
+/** Estatus del CFDI ante el SAT (`Invoice.satEstatus` se guarda en minúsculas). */
+export const ETIQUETA_ESTATUS_SAT: Record<string, string> = {
+  VIGENTE: 'Vigente',
+  CANCELADO: 'Cancelado',
+};
+
+/** Situación del emisor en la lista 69-B del SAT (operaciones simuladas). */
+export const ETIQUETA_LISTA_69B: Record<string, string> = {
+  PRESUNTO: 'Presunto',
+  DEFINITIVO: 'Definitivo',
+};
+
+export const ETIQUETA_PESTANA_BUZON_SAT: Record<string, string> = {
+  recibidos: 'Recibidos',
+  emitidos: 'Emitidos',
+  cancelados: 'Cancelados',
+  alertas: 'Alertas',
+};
+
 /**
  * El texto en español de un valor interno. Lo que no está en la lista no sale crudo
  * (`PARTIALLY_RECEIVED`): se escribe legible («Partially received») y un vacío es «-».

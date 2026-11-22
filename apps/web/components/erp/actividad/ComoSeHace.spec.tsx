@@ -61,7 +61,8 @@ describe("ComoSeHace", () => {
     expect(screen.getByText("Cómo se hace")).toBeTruthy();
     await waitFor(() => expect(screen.getAllByText("Cámara 1–4").length).toBeGreaterThan(0));
     expect(screen.getByText("Antes")).toBeTruthy();
-    expect(screen.getByText("Durante")).toBeTruthy();
+    // El encabezado usa el mismo nombre del momento que el resto de la plataforma (`MOMENTO_LABEL`).
+    expect(screen.getByText("En progreso")).toBeTruthy();
     expect(screen.getByText("Después")).toBeTruthy();
     expect(screen.getByText("1 de 4")).toBeTruthy();
     expect(screen.getByText(/Llevar escalera/)).toBeTruthy();

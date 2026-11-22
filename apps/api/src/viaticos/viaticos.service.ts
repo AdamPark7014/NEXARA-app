@@ -25,6 +25,7 @@ import {
   type Parte,
   repartirEnPartesIguales,
 } from './viatico-reparto.js';
+import { workDateRange } from '../common/time/workday.js';
 
 /** Cap list endpoints when the client omits limit (mobile dashboard was unbounded). */
 const DEFAULT_LIST_TAKE = 200;
@@ -1149,10 +1150,8 @@ export class ViaticosService {
     const where: Record<string, unknown> = { ...this.buildListWhere(currentUser, companyId) };
     if (filters.projectId) where.projectId = filters.projectId;
     if (filters.from || filters.to) {
-      where.fechaSolicitud = {
-        ...(filters.from ? { gte: new Date(filters.from) } : {}),
-        ...(filters.to ? { lte: new Date(`${filters.to}T23:59:59.999Z`) } : {}),
-      };
+      // Días de la empresa, no del servidor: un viático pedido a las 19:00 es de ese día.
+      where.fechaSolicitud = workDateRange(filters.from, filters.to);
     }
 
     const rows = await this.prisma['viatico'].findMany({
@@ -1284,10 +1283,8 @@ export class ViaticosService {
     const where: Record<string, unknown> = { ...this.buildListWhere(currentUser, companyId) };
     if (filters.projectId) where.projectId = filters.projectId;
     if (filters.from || filters.to) {
-      where.fechaSolicitud = {
-        ...(filters.from ? { gte: new Date(filters.from) } : {}),
-        ...(filters.to ? { lte: new Date(`${filters.to}T23:59:59.999Z`) } : {}),
-      };
+      // Días de la empresa, no del servidor: un viático pedido a las 19:00 es de ese día.
+      where.fechaSolicitud = workDateRange(filters.from, filters.to);
     }
     const rows = await this.prisma['viatico'].findMany({
       where,

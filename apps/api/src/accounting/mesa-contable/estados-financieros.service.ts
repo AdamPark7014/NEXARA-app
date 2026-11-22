@@ -2,6 +2,16 @@ import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { requireCompanyId } from '../../common/tenant/tenant-scope.js';
+import {
+  EXCEL_COLORES,
+  EXCEL_FUENTE,
+  altoParaLineas,
+  configurarImpresion,
+  escribirBanda,
+  estiloEncabezado,
+  lineasDeTexto,
+  registrarLogo,
+} from '../../common/excel/reporte-excel.js';
 import { diaMexico } from './por-facturar.js';
 import { PagosGastosService } from './pagos-gastos.service.js';
 import {
@@ -161,8 +171,18 @@ export class EstadosFinancierosService {
     };
   }
 
-  /** Libro con tres hojas: estado de resultados, balance general y balanza, con fórmulas en los totales. */
-  async excel(companyId: number | null | undefined, periodo?: string, fecha?: string): Promise<{ buffer: Buffer; nombre: string }> {
+  /**
+   * Libro con tres hojas: estado de resultados, balance general y balanza, con fórmulas en los
+   * totales. Lleva la misma banda, tipografía e impresión que los demás Excel de NEXARA
+   * (`common/excel/reporte-excel.ts`): antes salía sin marca y, al imprimirlo, las columnas de
+   * comparación caían en hojas aparte.
+   */
+  async excel(
+    companyId: number | null | undefined,
+    periodo?: string,
+    fecha?: string,
+    generadoPor?: string | null,
+  ): Promise<{ buffer: Buffer; nombre: string }> {
     const tenantId = requireCompanyId(companyId);
     const er = await this.resultados(tenantId, periodo, fecha);
     const bg = await this.balance(tenantId, er.periodo.to.slice(0, 7));
@@ -171,38 +191,79 @@ export class EstadosFinancierosService {
     const libro = new ExcelJS.Workbook();
     libro.creator = 'NEXARA Core · Mesa contable';
     libro.created = new Date();
+    libro.company = 'NEXARA';
+    const idLogo = registrarLogo(libro);
+    const generadoEn = libro.created;
     const moneda = '#,##0.00;[Red]-#,##0.00';
-    const verde = 'FF168570';
-    const encabezado = (ws: ExcelJS.Worksheet, titulo: string, sub: string, columnas: string[]) => {
-      ws.addRow([titulo]).font = { bold: true, size: 14 };
-      ws.addRow([sub]).font = { color: { argb: 'FF5B6272' } };
-      ws.addRow([]);
-      const h = ws.addRow(columnas);
-      h.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      h.eachCell((c) => (c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: verde } }));
+    const relleno = (argb: string): ExcelJS.Fill => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+
+    type Estilo = 'cuenta' | 'seccion' | 'suma' | 'total' | 'final' | 'grupo';
+    /** Abre la hoja con la banda y los encabezados; devuelve la fila de encabezados. */
+    const abrir = (nombre: string, titulo: string, sub: string, columnas: Array<{ titulo: string; ancho: number }>) => {
+      const ws = libro.addWorksheet(nombre, { views: [{ showGridLines: false }] });
+      columnas.forEach((c, i) => (ws.getColumn(i + 1).width = c.ancho));
+      const filaEncabezado = escribirBanda(ws, columnas.length, { titulo, subtitulo: sub, generadoPor, generadoEn, idLogo });
+      const h = ws.getRow(filaEncabezado);
+      h.height = 26;
+      columnas.forEach((c, i) => estiloEncabezado(h.getCell(i + 1), c.titulo));
+      ws.views = [{ state: 'frozen', ySplit: filaEncabezado, showGridLines: false }];
+      configurarImpresion(ws, { titulo, filaEncabezado, apaisado: false });
+      return { ws, filaEncabezado };
+    };
+    /** Da a una fila el aspecto de su papel en el estado; `nCols` y la columna del nombre para el ajuste de texto. */
+    const vestir = (ws: ExcelJS.Worksheet, fila: ExcelJS.Row, estilo: Estilo, nCols: number, colNombre = 1) => {
+      const negrita = estilo !== 'cuenta' && estilo !== 'suma';
+      const nombre = String(fila.getCell(colNombre).value ?? '');
+      const lineas = lineasDeTexto(nombre, Number(ws.getColumn(colNombre).width ?? 40) * (negrita ? 0.9 : 1));
+      const altoBase = estilo === 'final' ? 22 : estilo === 'cuenta' ? 17 : 19;
+      fila.height = lineas > 1 ? altoParaLineas(lineas, altoBase) : altoBase;
+      for (let c = 1; c <= nCols; c += 1) {
+        const celda = fila.getCell(c);
+        const esNumero = typeof celda.value === 'number' || (celda.value != null && typeof celda.value === 'object' && 'formula' in celda.value);
+        celda.font = {
+          name: EXCEL_FUENTE,
+          size: estilo === 'final' || estilo === 'grupo' ? 11 : 10,
+          bold: negrita,
+          italic: estilo === 'suma',
+          color: { argb: estilo === 'suma' ? EXCEL_COLORES.gris : negrita ? EXCEL_COLORES.navy : EXCEL_COLORES.texto },
+        };
+        celda.alignment = {
+          vertical: 'middle',
+          horizontal: esNumero ? 'right' : 'left',
+          // Las cuentas van sangradas bajo su sección; en la balanza (nombre en la 2.ª columna) no hay secciones.
+          indent: esNumero ? 0 : c === colNombre && colNombre === 1 && estilo === 'cuenta' ? 2 : 1,
+          wrapText: c === colNombre,
+        };
+        if (estilo === 'seccion') celda.fill = relleno(EXCEL_COLORES.tealTenue);
+        else if (estilo === 'cuenta' || estilo === 'suma') celda.border = { bottom: { style: 'hair', color: { argb: EXCEL_COLORES.filete } } };
+        else if (estilo === 'total') celda.border = { top: { style: 'thin', color: { argb: EXCEL_COLORES.teal } } };
+        else if (estilo === 'final') {
+          celda.border = { top: { style: 'medium', color: { argb: EXCEL_COLORES.teal } } };
+          celda.fill = relleno(EXCEL_COLORES.tealTenue);
+        }
+      }
     };
 
     // ── Estado de resultados ──
-    const ws1 = libro.addWorksheet('Estado de resultados');
-    ws1.columns = [{ width: 44 }, { width: 14 }, { width: 18 }, { width: 18 }, { width: 12 }];
-    encabezado(ws1, 'Estado de resultados', `${er.periodo.etiqueta} · comparado con ${er.comparado.etiqueta}`, [
-      'Cuenta',
-      'Agrupador SAT',
-      er.periodo.etiqueta,
-      er.comparado.etiqueta,
-      'Variación',
+    const comparacion = `${er.periodo.etiqueta} · comparado con ${er.comparado.etiqueta}`;
+    const { ws: ws1, filaEncabezado: h1 } = abrir('Estado de resultados', 'Estado de resultados', comparacion, [
+      { titulo: 'Cuenta', ancho: 52 },
+      { titulo: 'Agrupador SAT', ancho: 16 },
+      { titulo: er.periodo.etiqueta, ancho: 18 },
+      { titulo: er.comparado.etiqueta, ancho: 18 },
+      { titulo: 'Variación', ancho: 12 },
     ]);
     const totalesFila: Record<string, number> = {};
     for (const sec of er.secciones) {
-      const t = ws1.addRow([sec.titulo]);
-      t.font = { bold: true };
-      t.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F3F6' } };
+      vestir(ws1, ws1.addRow([sec.titulo]), 'seccion', 5);
       const primera = ws1.rowCount + 1;
-      for (const f of sec.filas) ws1.addRow([`${f.codigo} ${f.nombre}`, f.agrupador ?? 'Sin agrupador', f.actual, f.anterior, null]);
+      for (const f of sec.filas) {
+        vestir(ws1, ws1.addRow([`${f.codigo} ${f.nombre}`, f.agrupador ?? 'Sin agrupador', f.actual, f.anterior, null]), 'cuenta', 5);
+      }
       const ultima = ws1.rowCount;
       const suma = (col: string) => (ultima >= primera ? { formula: `SUM(${col}${primera}:${col}${ultima})` } : 0);
       const filaSuma = ws1.addRow([`Suma de ${sec.titulo.toLowerCase()}`, null, suma('C'), suma('D'), null]);
-      filaSuma.font = { italic: true };
+      vestir(ws1, filaSuma, 'suma', 5);
       totalesFila[sec.clave] = filaSuma.number;
       if (sec.total) {
         // Total de ingresos = suma; utilidad bruta = ingresos − costos; de operación = bruta − gastos.
@@ -213,60 +274,68 @@ export class EstadosFinancierosService {
               ? `${col}${totalesFila.ingresos}-${col}${totalesFila.costos}`
               : `${col}${totalesFila.ingresos}-${col}${totalesFila.costos}-${col}${totalesFila.gastos}`;
         const tot = ws1.addRow([sec.total.nombre, null, { formula: ref('C') }, { formula: ref('D') }, null]);
-        tot.font = { bold: true };
+        vestir(ws1, tot, 'total', 5);
         totalesFila[`total-${sec.clave}`] = tot.number;
       }
     }
     const uo = totalesFila['total-gastos'];
     const fin = totalesFila.financieros;
     const neta = ws1.addRow(['Utilidad neta', null, { formula: `C${uo}+C${fin}` }, { formula: `D${uo}+D${fin}` }, null]);
-    neta.font = { bold: true, size: 12 };
     ws1.eachRow((row, n) => {
-      if (n <= 4) return;
+      if (n <= h1) return;
       row.getCell(3).numFmt = moneda;
       row.getCell(4).numFmt = moneda;
       if (row.getCell(3).value != null && row.getCell(1).value) {
         row.getCell(5).value = { formula: `IF(D${n}=0,"",(C${n}-D${n})/ABS(D${n}))` };
         row.getCell(5).numFmt = '0.0%';
+        row.getCell(5).font = { ...row.getCell(4).font };
+        row.getCell(5).alignment = { vertical: 'middle', horizontal: 'right' };
       }
     });
+    vestir(ws1, neta, 'final', 5);
 
     // ── Balance general ──
-    const ws2 = libro.addWorksheet('Balance general');
-    ws2.columns = [{ width: 48 }, { width: 14 }, { width: 18 }];
-    encabezado(ws2, 'Balance general', bg.etiqueta, ['Cuenta', 'Agrupador SAT', 'Saldo']);
+    const { ws: ws2, filaEncabezado: h2 } = abrir('Balance general', 'Balance general', bg.etiqueta, [
+      { titulo: 'Cuenta', ancho: 50 },
+      { titulo: 'Agrupador SAT', ancho: 16 },
+      { titulo: 'Saldo', ancho: 20 },
+    ]);
     const lado = (titulo: string, l: typeof bg.activo) => {
-      ws2.addRow([titulo]).font = { bold: true, size: 12 };
+      vestir(ws2, ws2.addRow([titulo]), 'grupo', 3);
       const subtotales: number[] = [];
       for (const sec of l.secciones) {
-        ws2.addRow([sec.titulo]).font = { bold: true };
+        vestir(ws2, ws2.addRow([sec.titulo]), 'seccion', 3);
         const primera = ws2.rowCount + 1;
-        for (const f of sec.filas) ws2.addRow([f.nombre, f.agrupador ?? '', f.saldo]);
+        for (const f of sec.filas) vestir(ws2, ws2.addRow([f.nombre, f.agrupador ?? '', f.saldo]), 'cuenta', 3);
         const r = ws2.addRow([`Total ${sec.titulo.toLowerCase()}`, null, { formula: `SUM(C${primera}:C${ws2.rowCount})` }]);
-        r.font = { italic: true };
+        vestir(ws2, r, 'suma', 3);
         subtotales.push(r.number);
       }
       const t = ws2.addRow([`Total ${titulo.toLowerCase()}`, null, subtotales.length ? { formula: subtotales.map((n) => `C${n}`).join('+') } : 0]);
-      t.font = { bold: true };
-      ws2.addRow([]);
+      vestir(ws2, t, 'total', 3);
+      ws2.addRow([]).height = 8;
       return t.number;
     };
     const fa = lado('Activo', bg.activo);
     const fp = lado('Pasivo', bg.pasivo);
     const fc = lado('Capital', bg.capital);
     const cheque = ws2.addRow(['Activo − (pasivo + capital)', null, { formula: `C${fa}-(C${fp}+C${fc})` }]);
-    cheque.font = { bold: true };
+    vestir(ws2, cheque, 'final', 3);
     ws2.eachRow((row, n) => {
-      if (n > 4) row.getCell(3).numFmt = moneda;
+      if (n > h2) row.getCell(3).numFmt = moneda;
     });
 
     // ── Balanza ──
-    const ws3 = libro.addWorksheet('Balanza');
-    ws3.columns = [{ width: 12 }, { width: 40 }, { width: 14 }, { width: 18 }, { width: 18 }];
-    encabezado(ws3, 'Balanza de comprobación', er.periodo.etiqueta, ['Cuenta', 'Nombre', 'Agrupador SAT', 'Cargos', 'Abonos']);
+    const { ws: ws3, filaEncabezado: h3 } = abrir('Balanza', 'Balanza de comprobación', er.periodo.etiqueta, [
+      { titulo: 'Cuenta', ancho: 12 },
+      { titulo: 'Nombre', ancho: 46 },
+      { titulo: 'Agrupador SAT', ancho: 16 },
+      { titulo: 'Cargos', ancho: 18 },
+      { titulo: 'Abonos', ancho: 18 },
+    ]);
     const primeraB = ws3.rowCount + 1;
     for (const x of [...balanza].sort((a, b) => a.codigo.localeCompare(b.codigo))) {
-      ws3.addRow([x.codigo, x.nombre, x.agrupador ?? 'Sin agrupador', x.debe, x.haber]);
+      vestir(ws3, ws3.addRow([x.codigo, x.nombre, x.agrupador ?? 'Sin agrupador', x.debe, x.haber]), 'cuenta', 5, 2);
     }
     const ultimaB = ws3.rowCount;
     const tb = ws3.addRow([
@@ -276,13 +345,16 @@ export class EstadosFinancierosService {
       ultimaB >= primeraB ? { formula: `SUM(D${primeraB}:D${ultimaB})` } : 0,
       ultimaB >= primeraB ? { formula: `SUM(E${primeraB}:E${ultimaB})` } : 0,
     ]);
-    tb.font = { bold: true };
+    vestir(ws3, tb, 'final', 5, 2);
     ws3.eachRow((row, n) => {
-      if (n > 4) {
+      if (n > h3) {
         row.getCell(4).numFmt = moneda;
         row.getCell(5).numFmt = moneda;
       }
     });
+    if (ultimaB >= primeraB) {
+      ws3.autoFilter = { from: { row: h3, column: 1 }, to: { row: ultimaB, column: 5 } };
+    }
 
     const buffer = Buffer.from(await libro.xlsx.writeBuffer());
     const nombre = `estados-financieros-${er.periodo.from.slice(0, 7)}.xlsx`;

@@ -37,13 +37,14 @@ export class ExpensesController {
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   analytics(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
     const departmentId = user.isSuperAdmin || user.permissions?.includes(PERMISSIONS.CONTABILIDAD_MANAGE)
       ? undefined
       : user.departmentId;
-    return this.expensesService.analytics({ from, to }, departmentId);
+    return this.expensesService.analytics({ from, to }, departmentId, companyId);
   }
 
   @Get('report.pdf')
@@ -51,6 +52,7 @@ export class ExpensesController {
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   async reportPdf(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Res() res?: Response,
@@ -62,6 +64,7 @@ export class ExpensesController {
       { from, to },
       user?.nombre ?? null,
       departmentId,
+      companyId,
     );
     res!.header('Content-Type', 'application/pdf');
     res!.header(

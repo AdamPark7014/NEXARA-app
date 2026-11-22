@@ -214,7 +214,7 @@ describe('Excel del control de nómina', () => {
     it('mismo encabezado con lema y el título de su formato', () => {
       const marca = ws.getCell('A1').value as ExcelJS.CellRichTextValue;
       expect(marca.richText.map((t) => t.text).join('')).toContain(LEMA_NEXARA);
-      expect(ws.getCell('A2').value).toBe('CONTROL DE NOMINA NEXARA');
+      expect(ws.getCell('A2').value).toBe('CONTROL DE NÓMINA NEXARA');
     });
 
     it('columnas de su Excel, con autofiltro y notas a la derecha', () => {

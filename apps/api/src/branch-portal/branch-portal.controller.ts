@@ -11,6 +11,7 @@ import { ServiceClientsService } from '../service-clients/service-clients.servic
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { isFinishedStatus, ACTIVITY_STATUS } from '../activities/activity-status.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { parseWorkDate, parseWorkDateEnd } from '../common/time/workday.js';
 
 @Controller('branch-portal')
 @UseGuards(BranchPortalGuard)
@@ -468,8 +469,9 @@ export class BranchPortalController {
     const createdByType = ['CLIENT', 'BRANCH', 'CONSOLE'].includes(normalizedOrigin)
       ? (normalizedOrigin as 'CLIENT' | 'BRANCH' | 'CONSOLE')
       : undefined;
-    const parsedFrom = from ? new Date(`${from}T00:00:00`) : undefined;
-    const parsedTo = to ? new Date(`${to}T23:59:59.999`) : undefined;
+    // Días de la empresa, no del servidor (que corre en UTC).
+    const parsedFrom = from ? parseWorkDate(from) : undefined;
+    const parsedTo = to ? parseWorkDateEnd(to) : undefined;
 
     return this.inventoriesService.list({
       clientId: user.clientId,

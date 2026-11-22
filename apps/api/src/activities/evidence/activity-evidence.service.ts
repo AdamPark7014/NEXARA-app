@@ -45,6 +45,7 @@ import PDFDocument from 'pdfkit';
 import { leerRevisores } from '../../me/revision-evidencias.js';
 import fs from 'fs';
 import path from 'path';
+import { parseWorkDate, parseWorkDateEnd } from '../../common/time/workday.js';
 
 type ActivityEvidenceStatus = EvidenceStep;
 
@@ -1407,8 +1408,9 @@ export class ActivityEvidenceService {
       throw new BadRequestException('Usuario no autenticado');
     }
 
-    const start = from ? new Date(`${from}T00:00:00`) : null;
-    const end = to ? new Date(`${to}T23:59:59.999`) : null;
+    // Días de la empresa, no del servidor (que corre en UTC).
+    const start = from ? parseWorkDate(from) : null;
+    const end = to ? parseWorkDateEnd(to) : null;
 
     if (start && Number.isNaN(start.getTime())) {
       throw new BadRequestException('Fecha inicial inválida');

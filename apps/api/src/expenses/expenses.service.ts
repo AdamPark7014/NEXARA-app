@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { ACTIVITY_STATUS } from '../activities/activity-status.js';
 import { pdfFechaHora, pdfPeriodo, pdfZona } from '../common/pdf/nexara-pdf-theme.js';
+import { workDateRange } from '../common/time/workday.js';
 
 const ADMIN_EXPENSE_ACTIVITY_AN = 'SYS-ADMIN-GASTOS';
 
@@ -442,12 +443,18 @@ export class ExpensesService {
     return updated;
   }
 
-  async analytics(filters: { from?: string; to?: string }, departmentId?: number) {
-    const where = this.adminWhere(departmentId);
+  /**
+   * Resumen del panel de gastos administrativos.
+   *
+   * La empresa viaja desde el controlador. Antes no llegaba y `adminWhere` caía en el candado de
+   * «sin empresa no hay filas» (`companyId: -1`): el panel y su PDF salían en ceros para todos,
+   * aunque la lista de la misma pantalla sí mostraba los gastos.
+   */
+  async analytics(filters: { from?: string; to?: string }, departmentId?: number, companyId?: number | null) {
+    const where = this.adminWhere(departmentId, companyId);
     if (filters.from || filters.to) {
-      where.fechaSolicitud = {};
-      if (filters.from) where.fechaSolicitud.gte = new Date(`${filters.from}T00:00:00`);
-      if (filters.to) where.fechaSolicitud.lte = new Date(`${filters.to}T23:59:59`);
+      // Días de la empresa, no del servidor: un gasto capturado a las 19:00 es de ese día.
+      where.fechaSolicitud = workDateRange(filters.from, filters.to);
     }
 
     const rows = await this.prisma.expense.findMany({
@@ -505,8 +512,13 @@ export class ExpensesService {
     };
   }
 
-  async reportPdf(filters: { from?: string; to?: string }, preparedBy?: string | null, departmentId?: number) {
-    const analytics = await this.analytics(filters, departmentId);
+  async reportPdf(
+    filters: { from?: string; to?: string },
+    preparedBy?: string | null,
+    departmentId?: number,
+    companyId?: number | null,
+  ) {
+    const analytics = await this.analytics(filters, departmentId, companyId);
     return generateExpensesReportPdf({
       title: 'Control de gastos administrativos',
       periodLabel: pdfPeriodo(filters.from, filters.to),

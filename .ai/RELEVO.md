@@ -1,5 +1,65 @@
 # RELEVO
 
+- **21-11 ~20:16 México (claude-code, nube; Cursor/Codex no alcanzables) — Décima vuelta de pulido: los Excel que se descargan y las fechas de los reportes. Sin migraciones; sin desplegar.**
+  - **Cómo se revisó:** cada Excel se generó con datos de demostración, se convirtió a PDF con LibreOffice (así se ve
+    cómo se imprime) y se leyó hoja por hoja. Los de operación (actividades, evidencias, vehículos, viáticos,
+    asistencia, KPIs, pre-nómina) ya usaban el tema de `common/excel/reporte-excel.ts` y estaban bien. Los de
+    contabilidad no.
+  - **Contabilidad, tres libros fuera del tema:**
+    - *Buzón SAT, CFDI y Por contabilizar (web, `lib/contabilidad-excel.ts`):* armaban su propio libro, sin banda ni
+      logo, con la fecha como texto («2026-10-05T00:00:00.000Z»), los estatus como en la base y sin configuración de
+      impresión (la mitad de las columnas caía en una segunda hoja). Ahora traducen sus columnas y delegan en
+      `exportToExcelAsync`, el tema que usan las otras ~60 pantallas. Misma firma; se agregaron `titulo`,
+      `etiquetas`, `ajustar` y `generadoPor`. Un importe que no viene queda vacío (antes se escribía 0).
+    - *Buzón SAT (API, `GET accounting/.../buzon-sat/excel`):* era un volcado crudo (fecha «###», «Generado» en ISO
+      con hora del servidor). Ahora sale de `crearReporte` con `COLUMNAS_BUZON_SAT`. Nadie lo llama desde la web hoy;
+      queda parejo por si se usa.
+    - *Estados financieros (API):* tenía formato propio y, al imprimir, el comparativo y la variación se iban a otras
+      hojas (5 en total). Conserva sus fórmulas y secciones y toma la banda, tipografía, encabezado e impresión del
+      tema: una hoja de ancho por estado, nombres largos ajustados, pie «Página N de M», «Generado por».
+  - **Piezas nuevas del tema (API):** `escribirBanda`, `registrarLogo`, `estiloEncabezado`, `configurarImpresion` y
+    `EXCEL_FUENTE`, exportadas de `reporte-excel.ts` para las hojas que no son una tabla plana. `escribirHoja` las usa:
+    mismo resultado (sus 31 pruebas no cambiaron).
+  - **Tema web (`lib/export-excel.ts`):** una celda con texto ajustado dejaba la fila en su alto fijo y Excel solo
+    enseñaba el primer renglón. Ahora la fila crece (`lineasDeTexto`, gemelo del API) y hay `ajustar` por columna.
+    Aplica a todas las pantallas que exportan textos largos.
+  - **Control de nómina:** «CONTROL DE NÓMINA NEXARA» con acento (la pestaña ya decía «Nómina»); «ENTRADA» se partía en
+    «ENTRAD / A» (columna de 8.5 a 9.5); «MIÉRCOLES 30» era el único día en dos renglones (13 a 14). El formato de
+    Adam no cambió.
+  - **Fechas de los reportes (falla de datos, no de diseño):** el tope de un rango se armaba con
+    `${dia}T23:59:59.999Z` o con la hora del servidor, que corre en UTC: el día terminaba a las 18:00 de México. Lo
+    registrado esa tarde quedaba fuera del reporte de su día y aparecía en el del siguiente. `workDateRange` y
+    `parseWorkDateEnd` (`common/time/workday.ts`) convierten días de la empresa en instantes. Aplicado en: panel y PDF
+    de viáticos, panel y PDF de gastos, PDF de actividades, movimientos de almacén (ahí «hasta el 21» además cortaba
+    al *empezar* el 21), inventarios (consola, portal de cliente y de sucursal) e historial propio de evidencias. Solo
+    columnas con hora; las `@db.Date` (facturas, pólizas, incidencias) ya estaban bien y no se tocaron.
+  - **Gastos administrativos salía vacío:** `GET expenses/analytics` y `expenses/report.pdf` no pasaban la empresa al
+    servicio, así que el filtro caía en el candado «sin empresa no hay filas» (`companyId: -1`): el panel y su PDF
+    salían en ceros para todos, aunque la lista de la misma pantalla sí mostraba los gastos. Ahora la empresa viaja
+    desde el controlador, igual que en la lista. El candado sigue: sin empresa no devuelve nada.
+  - **Textos:** «Kárdex» con acento en el PDF de almacén, como en la pantalla.
+  - **Prueba que ya venía en rojo:** `ComoSeHace.spec.tsx` fallaba desde ab230df (20-11): ese commit cambió el
+    encabezado de la tabla al nombre común del momento (`MOMENTO_LABEL`, «En progreso», el mismo de Android) y la
+    prueba se quedó esperando «Durante». Se puso al día la aserción (una línea; no se saltó ni se apagó nada). Con
+    esto la corrida de la web queda completa en verde y el trabajo de pruebas web del CI deja de estar en rojo.
+  - **Pendiente visto y no hecho:** las pantallas de la mesa contable (buzón SAT, CFDI, por contabilizar) siguen con
+    estilos en línea y enseñan los estatus crudos; `GET audit/export.csv` es técnico a propósito (ISO, inglés).
+    Consultas que arman su filtro con `companyWhere(x)` sin que el controlador les pase la empresa: no es fuga (el
+    middleware de Prisma ya filtra por empresa toda petición), es el riesgo contrario, que salgan vacías como la de
+    gastos. Un barrido con el compilador (llamadas que omiten un `companyId` opcional que el método usa para
+    filtrar) dio 14: la más visible es `GET activities/export/xlsx`, el Excel de actividades de la página
+    Exportaciones, que por lo mismo baja sin renglones; también `kb` (artículo y categorías), `projects`
+    (`findAll`/`findOne`), `mobile-crm` (agenda) y `generateTicketReport` desde los portales. Sin corregir aquí: es
+    la siguiente vuelta, con su prueba cada una.
+  - **Paridad:** API hecho · Web hecho · Android e iOS no aplica: no descargan estos Excel ni consumen el panel de
+    gastos (`GastosApi.kt` lo dice), y los filtros de fecha los resuelve el servidor para todos.
+  - **Verificado:** `npm run typecheck` 0; jest API 528 suites, 6,654 pruebas en verde (corrida completa; después solo cambió el ancho de una columna del buzón y se repitieron sus 7 suites, 22 pruebas); vitest web 297 archivos, 2,405 pruebas, todas en verde. Pruebas nuevas:
+    `estados-financieros-excel.spec.ts` (10), `buzon-sat-excel.spec.ts` (6), `expenses-analytics.spec.ts` (5),
+    `contabilidad-excel.spec.ts` (4), más 5 en `workday.spec.ts` y 1 en `export-excel.spec.ts`.
+  - **Antes y después (datos de demostración):** `rediseno/antes-despues-2026-11-21/excel-contabilidad.png` en los
+    archivos del proyecto. Se vio con LibreOffice, que sustituye Segoe UI: conviene abrir uno en Excel tras el
+    despliegue.
+
 - **21-11 ~19:45 México (claude-code, nube; Cursor/Codex no alcanzables) — Novena vuelta de pulido: los PDF que salen de la plataforma. Sin migraciones; sin desplegar.**
   - **Cómo se revisó:** los 15 documentos que usan el tema común (`common/pdf/nexara-pdf-theme.ts`) se generaron con
     datos de demostración, se pasaron a imagen y se leyeron hoja por hoja, antes y después. La cotización al cliente

@@ -13,7 +13,7 @@ import {
   type StockMovementPdfRow,
 } from './stock-movement-pdf.js';
 import { pdfPeriodo } from '../common/pdf/nexara-pdf-theme.js';
-import { workDateKey } from '../common/time/workday.js';
+import { workDateKey, workDateRange } from '../common/time/workday.js';
 import { EmpaqueInvalidoError, convertirCaptura, type Empaque } from './empaque.js';
 import {
   normalizarFotosMovimiento,
@@ -829,9 +829,8 @@ export class WarehouseService {
       where.OR = [{ fromWarehouseId: filters.warehouseId }, { toWarehouseId: filters.warehouseId }];
     }
     if (filters?.from || filters?.to) {
-      where.createdAt = {};
-      if (filters.from) where.createdAt.gte = new Date(filters.from);
-      if (filters.to) where.createdAt.lte = new Date(filters.to);
+      // Un `AAAA-MM-DD` es un día de la empresa: antes «hasta el 21» cortaba al empezar el 21 (en UTC).
+      where.createdAt = workDateRange(filters.from, filters.to);
     }
     return this.prisma.stockMovement.findMany({
       where,
@@ -1014,7 +1013,7 @@ export class WarehouseService {
         ? 'Traspasos de almacén'
         : filters?.type === 'ADJUSTMENT'
           ? 'Ajustes de inventario'
-          : 'Kardex de movimientos';
+          : 'Kárdex de movimientos';
 
     const pdf = await generateStockMovementsPdf({
       title,

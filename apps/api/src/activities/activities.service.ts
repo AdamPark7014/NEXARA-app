@@ -57,6 +57,7 @@ import { esActividadNoProgramada } from './aviso-luis.js';
 import { avisoActividadNoProgramada as textoAvisoLuis } from '../chat/avisos-chat.js';
 import fs from 'fs/promises';
 import path from 'path';
+import { workDateRange } from '../common/time/workday.js';
 
 /** Cap list endpoints when the client omits limit (mobile dashboard was unbounded). */
 const DEFAULT_LIST_TAKE = 200;
@@ -1111,10 +1112,8 @@ export class ActivitiesService {
       where.responsableId = { in: opts.responsableIds };
     }
     if (filters.from || filters.to) {
-      where.fechaAsignacion = {
-        ...(filters.from ? { gte: new Date(filters.from) } : {}),
-        ...(filters.to ? { lte: new Date(`${filters.to}T23:59:59.999Z`) } : {}),
-      };
+      // Días de la empresa, no del servidor: lo asignado a las 19:00 es de ese día.
+      where.fechaAsignacion = workDateRange(filters.from, filters.to);
     }
 
     const rows = await this.prisma['activity'].findMany({

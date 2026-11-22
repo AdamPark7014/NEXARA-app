@@ -170,3 +170,35 @@ export function parseWorkDate(valor: string, tz = WORKDAY_TIMEZONE): Date {
   const anclaje = new Date(Date.UTC(Number(y), Number(mes) - 1, Number(d), 12, 0, 0));
   return workDayStart(anclaje, tz);
 }
+
+/**
+ * Último instante del día laboral `AAAA-MM-DD`, para cerrar un rango «del día X al día Y».
+ *
+ * Los reportes armaban el tope con `${dia}T23:59:59.999Z` (o sin la `Z`, que en el servidor es
+ * lo mismo): el día terminaba a las 18:00 de México, así que lo registrado esa tarde quedaba
+ * fuera del reporte de su día y aparecía en el del siguiente. Un valor que ya trae hora se
+ * respeta tal cual.
+ */
+export function parseWorkDateEnd(valor: string, tz = WORKDAY_TIMEZONE): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor.trim())) return new Date(valor);
+  return workDayEnd(parseWorkDate(valor, tz), tz);
+}
+
+/**
+ * Filtro `{ gte, lte }` para una columna con hora (`DateTime`) a partir de un rango de días de
+ * la empresa. Para una columna `@db.Date` no sirve: esas guardan el día a medianoche UTC.
+ * Un extremo vacío o ilegible no se filtra; sin ningún extremo válido devuelve `undefined`, que
+ * Prisma lee como «sin filtro» (antes una fecha ilegible llegaba a la consulta y tronaba).
+ */
+export function workDateRange(
+  desde?: string | null,
+  hasta?: string | null,
+  tz = WORKDAY_TIMEZONE,
+): { gte?: Date; lte?: Date } | undefined {
+  const rango: { gte?: Date; lte?: Date } = {};
+  const inicio = desde?.trim() ? parseWorkDate(desde, tz) : null;
+  const fin = hasta?.trim() ? parseWorkDateEnd(hasta, tz) : null;
+  if (inicio && !Number.isNaN(inicio.getTime())) rango.gte = inicio;
+  if (fin && !Number.isNaN(fin.getTime())) rango.lte = fin;
+  return rango.gte || rango.lte ? rango : undefined;
+}

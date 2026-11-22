@@ -201,8 +201,9 @@ export class MesaContableController {
     @Res() res: Response,
     @Query('periodo') periodo?: string,
     @Query('fecha') fecha?: string,
+    @CurrentUser() user?: { nombre?: string | null },
   ) {
-    const { buffer, nombre } = await this.estados.excel(companyId, periodo, fecha);
+    const { buffer, nombre } = await this.estados.excel(companyId, periodo, fecha, user?.nombre ?? null);
     res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.header('Content-Disposition', `attachment; filename="${nombre}"`);
     return res.send(buffer);

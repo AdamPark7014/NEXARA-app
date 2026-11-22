@@ -15,6 +15,13 @@ import { toast } from "@/components/Toast";
 
 type Pestana = "recibidos" | "emitidos" | "cancelados" | "alertas";
 
+const TITULO_PESTANA: Record<Pestana, string> = {
+  recibidos: "Recibidos",
+  emitidos: "Emitidos",
+  cancelados: "Cancelados",
+  alertas: "Alertas",
+};
+
 type Item = {
   id: number;
   issueDate: string;
@@ -29,7 +36,7 @@ type Item = {
 };
 
 export default function BuzonSatPage() {
-  const { token } = useUser();
+  const { token, user } = useUser();
   const [pestana, setPestana] = useState<Pestana>("recibidos");
   const [preset, setPreset] = useState<ContabilidadFechaPreset>("este_mes");
   const [rango, setRango] = useState<RangoContabilidad>(() => rangoDePresetContabilidad("este_mes"));
@@ -64,20 +71,21 @@ export default function BuzonSatPage() {
     await descargarExcelContabilidad({
       nombreArchivo: `cfdi-${pestana}`,
       tituloHoja: "Buzón SAT",
-      empresa: "NEXARA",
+      titulo: `Buzón SAT · ${TITULO_PESTANA[pestana]}`,
       rango,
       columnas: [
         { key: "issueDate", header: "Fecha", tipo: "fecha" },
-        { key: "emisorName", header: "Emisor" },
-        { key: "emisorRfc", header: "RFC" },
+        { key: "emisorName", header: "Emisor", ancho: 44, ajustar: true },
+        { key: "emisorRfc", header: "RFC emisor", ancho: 16 },
+        { key: "cfdiUuid", header: "UUID", ancho: 42 },
+        { key: "satEstatus", header: "Estatus SAT", ancho: 14, etiquetas: { VIGENTE: "Vigente", CANCELADO: "Cancelado" } },
+        { key: "lista69B", header: "Lista 69-B", ancho: 14, etiquetas: { PRESUNTO: "Presunto", DEFINITIVO: "Definitivo" } },
         { key: "totalAmount", header: "Total", tipo: "moneda" },
         { key: "taxAmount", header: "IVA", tipo: "moneda" },
-        { key: "cfdiUuid", header: "UUID" },
-        { key: "satEstatus", header: "Estatus" },
-        { key: "lista69B", header: "69-B" },
       ],
       filas: items as unknown as Record<string, unknown>[],
-      columnasConTotal: [3, 4],
+      columnasConTotal: [6, 7],
+      generadoPor: user?.nombre ?? null,
     });
   }
 
@@ -108,7 +116,7 @@ export default function BuzonSatPage() {
               borderBottom: pestana === p ? "2px solid var(--primary, #168570)" : "2px solid transparent",
             }}
           >
-            {p === "recibidos" ? "Recibidos" : p === "emitidos" ? "Emitidos" : p === "cancelados" ? "Cancelados" : "Alertas"}
+            {TITULO_PESTANA[p]}
           </button>
         ))}
       </div>

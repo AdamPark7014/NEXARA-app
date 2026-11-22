@@ -1,8 +1,10 @@
 import {
   WORKDAY_TIMEZONE,
   parseWorkDate,
+  parseWorkDateEnd,
   workDateColumn,
   workDateKey,
+  workDateRange,
   workDayBounds,
   workDayEnd,
   workDayStart,
@@ -116,6 +118,46 @@ describe('interpretar AAAA-MM-DD', () => {
     expect(parseWorkDate('2026-08-15T20:00:00Z', MX).getTime()).toBe(
       new Date('2026-08-15T20:00:00Z').getTime(),
     );
+  });
+});
+
+describe('rango de días para un reporte', () => {
+  it('el día termina a las 23:59:59.999 de México, no a las 18:00', () => {
+    expect(parseWorkDateEnd('2026-11-21', MX).toISOString()).toBe('2026-11-22T05:59:59.999Z');
+  });
+
+  it('lo registrado a las 19:30 entra en el reporte de su día y no en el del siguiente', () => {
+    // 21-nov 19:30 en México = 22-nov 01:30 UTC. Con el tope en UTC quedaba fuera del 21.
+    const registrado = new Date('2026-11-22T01:30:00.000Z');
+    const del21 = workDateRange('2026-11-01', '2026-11-21', MX)!;
+    expect(registrado.getTime()).toBeGreaterThanOrEqual(del21.gte!.getTime());
+    expect(registrado.getTime()).toBeLessThanOrEqual(del21.lte!.getTime());
+    const del22 = workDateRange('2026-11-22', '2026-11-22', MX)!;
+    expect(registrado.getTime()).toBeLessThan(del22.gte!.getTime());
+  });
+
+  it('un solo día cubre sus 24 horas y dos días seguidos no se enciman ni dejan hueco', () => {
+    const a = workDateRange('2026-11-20', '2026-11-20', MX)!;
+    const b = workDateRange('2026-11-21', '2026-11-21', MX)!;
+    expect(a.lte!.getTime() - a.gte!.getTime()).toBe(24 * 3_600_000 - 1);
+    expect(b.gte!.getTime() - a.lte!.getTime()).toBe(1);
+  });
+
+  it('acepta un solo extremo y no filtra por uno vacío o ilegible', () => {
+    expect(workDateRange('2026-11-01', undefined, MX)).toEqual({ gte: new Date('2026-11-01T06:00:00.000Z') });
+    expect(workDateRange(null, '2026-11-21', MX)).toEqual({ lte: new Date('2026-11-22T05:59:59.999Z') });
+    // Sin ningún extremo válido no hay filtro (Prisma ignora `undefined`).
+    expect(workDateRange('', '  ', MX)).toBeUndefined();
+    expect(workDateRange('no es fecha', 'tampoco', MX)).toBeUndefined();
+    expect(workDateRange(undefined, undefined, MX)).toBeUndefined();
+  });
+
+  it('un extremo que ya trae hora se respeta tal cual', () => {
+    expect(parseWorkDateEnd('2026-11-21T20:00:00Z', MX).toISOString()).toBe('2026-11-21T20:00:00.000Z');
+    expect(workDateRange('2026-11-21T08:00:00Z', '2026-11-21T20:00:00Z', MX)).toEqual({
+      gte: new Date('2026-11-21T08:00:00.000Z'),
+      lte: new Date('2026-11-21T20:00:00.000Z'),
+    });
   });
 });
 

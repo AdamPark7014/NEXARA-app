@@ -56,6 +56,8 @@ export type ExcelColumn<T extends object> = {
   /** Traducción de claves de enum a la etiqueta que muestra la UI. */
   etiquetas?: Record<string, string>;
   ancho?: number;
+  /** Fuerza el ajuste de texto (por omisión solo si el contenido rebasa el tope de ancho). */
+  ajustar?: boolean;
 };
 
 export type ExcelExportOptions = {
@@ -277,6 +279,39 @@ function numerica<T extends object>(columna: ExcelColumn<T>, fila: T, n: number,
   }
 }
 
+/** Alto de una línea de texto a 10 pt, en puntos. */
+const ALTO_LINEA = 13.5;
+
+/**
+ * Líneas que ocupa `texto` ajustado por palabras en una columna de `ancho` caracteres.
+ * Excel no recalcula el alto de una fila con alto fijo: sin esto, de un texto ajustado solo
+ * se veía el primer renglón. Gemelo de `lineasDeTexto` del API.
+ */
+export function lineasDeTexto(texto: string, ancho: number): number {
+  const util = Math.max(1, Math.floor(ancho) - 1);
+  let lineas = 0;
+  for (const parrafo of String(texto ?? "").split("\n")) {
+    let n = 1;
+    let actual = 0;
+    for (const palabra of parrafo.split(/\s+/).filter(Boolean)) {
+      if (actual === 0) actual = palabra.length;
+      else if (actual + 1 + palabra.length <= util) actual += 1 + palabra.length;
+      else {
+        n += 1;
+        actual = palabra.length;
+      }
+      while (actual > util) {
+        n += 1;
+        actual -= util;
+      }
+    }
+    lineas += n;
+  }
+  return Math.max(1, lineas);
+}
+
+const altoParaLineas = (lineas: number, minimo: number) => Math.max(minimo, Math.ceil(lineas * ALTO_LINEA + 5));
+
 /** El logo de `public/`. Si falla (offline, SSR), el reporte sale sin imagen. */
 async function cargarLogo(): Promise<{ buffer: ArrayBuffer; ancho: number; alto: number } | null> {
   try {
@@ -423,12 +458,16 @@ async function buildAndDownload<T extends object>(
   // ── Datos ───────────────────────────────────────────────────────────────────
   const primeraFilaDatos = filaEncabezado + 1;
   const anchoNatural = columns.map((c) => c.label.length + 3);
+  const textos: string[][] = [];
 
   rows.forEach((row, idx) => {
     const excelRow = ws.getRow(primeraFilaDatos + idx);
     excelRow.height = 17;
+    const textosFila: string[] = [];
+    textos.push(textosFila);
     columns.forEach((col, colIdx) => {
       const { valor, formato, alinear, texto } = prepararCelda(col, row);
+      textosFila.push(texto);
       const celda = excelRow.getCell(colIdx + 1);
       celda.value = valor;
       if (formato) celda.numFmt = formato;
@@ -475,16 +514,33 @@ async function buildAndDownload<T extends object>(
   }
 
   // ── Anchos, congelado, autofiltro ───────────────────────────────────────────
+  const anchos: number[] = [];
+  const envuelve: boolean[] = [];
   columns.forEach((col, i) => {
     const natural = col.ancho ?? Math.min(ANCHO_MAX, anchoNatural[i]);
-    ws.getColumn(i + 1).width = Math.max(ANCHO_MIN, natural);
-    if (col.ancho === undefined && anchoNatural[i] > ANCHO_MAX && hayDatos) {
+    const ancho = Math.max(ANCHO_MIN, natural);
+    ws.getColumn(i + 1).width = ancho;
+    anchos.push(ancho);
+    const envolver = col.ajustar ?? (col.ancho === undefined && anchoNatural[i] > ANCHO_MAX);
+    envuelve.push(envolver);
+    if (envolver && hayDatos) {
       for (let r = primeraFilaDatos; r <= ultimaFilaDatos; r += 1) {
         const celda = ws.getRow(r).getCell(i + 1);
         celda.alignment = { ...celda.alignment, wrapText: true };
       }
     }
   });
+
+  // El encabezado y las filas con texto ajustado crecen lo necesario: con alto fijo, Excel
+  // solo enseñaba el primer renglón.
+  const lineasEncabezado = Math.max(1, ...columns.map((c, i) => lineasDeTexto(c.label, anchos[i] * 0.9)));
+  encabezado.height = altoParaLineas(lineasEncabezado, 26);
+  if (hayDatos && envuelve.some(Boolean)) {
+    textos.forEach((textosFila, idx) => {
+      const lineas = Math.max(1, ...textosFila.map((t, i) => (envuelve[i] && t ? lineasDeTexto(t, anchos[i]) : 1)));
+      if (lineas > 1) ws.getRow(primeraFilaDatos + idx).height = altoParaLineas(lineas, 17);
+    });
+  }
 
   ws.views = [{ state: "frozen", ySplit: filaEncabezado, showGridLines: false }];
   if (hayDatos) {

@@ -24,7 +24,7 @@ type Item = {
 };
 
 export default function PorContabilizarPage() {
-  const { token } = useUser();
+  const { token, user } = useUser();
   const [items, setItems] = useState<Item[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,11 +104,11 @@ export default function PorContabilizarPage() {
               nombreArchivo: "por-contabilizar",
               tituloHoja: "Por contabilizar",
               columnas: [
-                { key: "emisor", header: "Emisor" },
+                { key: "emisor", header: "Emisor", ancho: 40, ajustar: true },
+                { key: "cuenta", header: "Cuenta", ancho: 14 },
+                { key: "confianza", header: "Confianza", ancho: 12, etiquetas: { ALTA: "Alta", MEDIA: "Media", BAJA: "Baja" } },
+                { key: "explicacion", header: "Explicación", ancho: 64, ajustar: true },
                 { key: "total", header: "Total", tipo: "moneda" },
-                { key: "cuenta", header: "Cuenta" },
-                { key: "confianza", header: "Confianza" },
-                { key: "explicacion", header: "Explicación" },
               ],
               filas: items.map((i) => ({
                 emisor: i.invoice.emisorName,
@@ -117,7 +117,8 @@ export default function PorContabilizarPage() {
                 confianza: i.confianza,
                 explicacion: i.explicacion,
               })),
-              columnasConTotal: [1],
+              columnasConTotal: [4],
+              generadoPor: user?.nombre ?? null,
             })
           }
         >

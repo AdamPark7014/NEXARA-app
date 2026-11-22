@@ -8,6 +8,7 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { InventoriesService } from './inventories.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
+import { parseWorkDate, parseWorkDateEnd } from '../common/time/workday.js';
 
 @Controller('inventories')
 @UseGuards(RbacGuard)
@@ -34,8 +35,9 @@ export class InventoriesController {
     @Query('search') search?: string,
     @Query() query?: PaginationQueryDto,
   ) {
-    const parsedFrom = from ? new Date(`${from}T00:00:00`) : undefined;
-    const parsedTo = to ? new Date(`${to}T23:59:59.999`) : undefined;
+    // Días de la empresa, no del servidor (que corre en UTC).
+    const parsedFrom = from ? parseWorkDate(from) : undefined;
+    const parsedTo = to ? parseWorkDateEnd(to) : undefined;
 
     return this.inventoriesService.list({
       clientId: clientId ? Number(clientId) : undefined,

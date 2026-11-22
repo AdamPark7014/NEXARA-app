@@ -101,7 +101,7 @@ export const generateStockMovementsPdf = (payload: StockMovementsPdfPayload): Pr
     const header = () =>
       drawNexaraHeader(doc, {
         docTitle: payload.title,
-        docSubtitle: payload.subtitle ?? 'Kardex / movimientos de inventario',
+        docSubtitle: payload.subtitle ?? 'Kárdex / movimientos de inventario',
         accent: ACCENT,
         logo,
         meta: headerMeta.slice(0, 5),
@@ -200,7 +200,7 @@ export const generateStockMovementsPdf = (payload: StockMovementsPdfPayload): Pr
       });
     }
 
-    drawNexaraFooterOnEveryPage(doc, 'NEXARA · Kardex de inventario · Documento confidencial');
+    drawNexaraFooterOnEveryPage(doc, 'NEXARA · Kárdex de inventario · Documento confidencial');
     doc.end();
   });
 };

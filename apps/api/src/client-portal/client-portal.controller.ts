@@ -18,6 +18,7 @@ import { Request } from 'express';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { isFinishedStatus, statusVariants, ACTIVITY_STATUS } from '../activities/activity-status.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { parseWorkDate, parseWorkDateEnd } from '../common/time/workday.js';
 
 const ensureBranchUploadsDir = () => {
   const segments = __dirname.split(path.sep);
@@ -934,8 +935,9 @@ export class ClientPortalController {
     const createdByType = ['CLIENT', 'BRANCH', 'CONSOLE'].includes(normalizedOrigin)
       ? (normalizedOrigin as 'CLIENT' | 'BRANCH' | 'CONSOLE')
       : undefined;
-    const parsedFrom = from ? new Date(`${from}T00:00:00`) : undefined;
-    const parsedTo = to ? new Date(`${to}T23:59:59.999`) : undefined;
+    // Días de la empresa, no del servidor (que corre en UTC).
+    const parsedFrom = from ? parseWorkDate(from) : undefined;
+    const parsedTo = to ? parseWorkDateEnd(to) : undefined;
 
     return this.inventoriesService.list({
       clientId: user.clientId,
