@@ -14,7 +14,7 @@ import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
 import { EmpaqueInvalidoError, convertirCaptura, type Empaque } from '../warehouse/empaque.js';
 import { generatePurchaseOrderPdf, type PurchaseOrderPdfPayload } from './purchase-order-pdf.js';
 import { generateGoodsReceiptPdf, type GoodsReceiptPdfPayload } from './goods-receipt-pdf.js';
-import { workDateKey } from '../common/time/workday.js';
+import { workDateColumn, workDateKey } from '../common/time/workday.js';
 
 @Injectable()
 export class ProcurementService {
@@ -912,7 +912,8 @@ export class ProcurementService {
       this.prisma.purchaseRequisition.count({ where: { status: 'SUBMITTED', ...scope } }),
       this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED'] }, ...scope } }),
       this.prisma.purchaseOrder.count({
-        where: { status: { in: ['CONFIRMED', 'PARTIALLY_RECEIVED'] }, expectedDate: { lt: new Date() }, ...scope },
+        // La entrega estimada es un día de calendario: se atrasa cuando ese día termina.
+        where: { status: { in: ['CONFIRMED', 'PARTIALLY_RECEIVED'] }, expectedDate: { lt: workDateColumn(new Date()) }, ...scope },
       }),
       this.prisma.purchaseOrder.aggregate({
         where: { status: { notIn: ['CANCELLED'] }, ...scope },
@@ -969,7 +970,7 @@ export class ProcurementService {
       this.prisma.purchaseOrder.count({
         where: {
           status: { in: ['CONFIRMED', 'PARTIALLY_RECEIVED'] },
-          expectedDate: { lt: new Date(), gte: from, lte: to },
+          expectedDate: { lt: workDateColumn(new Date()), gte: from, lte: to },
           ...scope,
         },
       }),

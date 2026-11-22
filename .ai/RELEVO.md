@@ -1,5 +1,34 @@
 # RELEVO
 
+- **21-11 ~21:44 México (claude-code, nube) — Vuelta 16 de pulido: el servidor ya no da por vencido lo que vence hoy o mañana. Solo API; sin migraciones; sin desplegar.**
+  - **El defecto:** vencimiento, entrega estimada y visita programada son días de calendario (`@db.Date`, medianoche
+    UTC = 18:00 de la víspera en México) y se comparaban con `new Date()`. Resultado:
+    - **Facturas:** desde las 18:00 la factura que vence **mañana** ya salía en «vencidas» (lista y contadores de
+      contabilidad), y el correo de las 8:00 «factura vencida» llegaba el mismo día del vencimiento, con «0 días».
+    - **Compras:** la orden que llega hoy (y desde las 18:00, la de mañana) contaba como «entrega atrasada» en el
+      tablero y en su PDF. El recordatorio de las 9:00 no incluía la que llega hoy.
+    - **Portal del cliente:** la visita de hoy (y desde las 18:00, la de mañana) desaparecía de «Próximas visitas».
+      Igual el contador de visitas del tablero de dirección.
+    - **Avisos de SLA:** la visita de mañana se avisaba «⛔ SLA vencido… Reasigna o reprograma» desde la tarde anterior.
+    - **Cartera de proveedores:** «hoy» salía del reloj del servidor; después de las 18:00 toda la antigüedad
+      saltaba un día.
+  - **El arreglo:** en todos se compara contra `workDateColumn(ahora)` (el día de la empresa como valor de columna):
+    `common/cron/cron.service.ts`, `accounting/accounting.service.ts` (3 sitios),
+    `accounting/vendor-project-finance.service.ts`, `procurement/procurement.service.ts` (2),
+    `client-portal/client-portal.controller.ts`, `executive/executive.service.ts`, `alerts/alerts.service.ts`.
+    Los días de atraso del correo se cuentan por calendario.
+  - **Pruebas:** `common/time/vence-al-terminar-su-dia.spec.ts` (12: a las 8:00 y a las 19:30 de México, más una
+    guarda para que nadie vuelva a comparar esos campos con «ahora») y un caso nuevo en
+    `accounting/vendor-project-finance.spec.ts`. Todas se vieron fallar antes del cambio.
+  - **No se tocó (queda anotado):** `attendance/attendance.controller.ts:341,371` (día por omisión con el reloj del
+    servidor) y `me/my-activities.service.ts:1328` («hoy» del servidor para lo terminado hoy): mismos síntomas de la
+    vuelta 12, en asistencia y actividades. El tablero financiero (`getFinancialDashboard`) arma el mes con el reloj
+    del servidor: la tarde del último día del mes ya cuenta el mes siguiente.
+  - **Paridad:** API hecho · Web no aplica (pinta lo que manda el servidor; su parte se corrigió en la vuelta 15) ·
+    Android e iOS no aplica (consumen las mismas listas).
+  - **Verificado:** `npm run typecheck:api` 0; jest del API 539 suites, 6,743 pruebas (y las nuevas también con `TZ=UTC`,
+    como corre producción); `nest build` bien. La web no cambió desde su corrida en verde de la vuelta 15.
+
 - **21-11 ~21:31 México (claude-code, nube) — Vuelta 15 de pulido: las fechas de calendario ya no se ven (ni se cuentan) un día antes. Sin migraciones; sin desplegar.**
   - **El defecto:** una fecha sin hora (emisión, vencimiento, vigencia, visita programada, entrega estimada, ingreso,
     vacaciones) viaja a medianoche UTC. Leída con la hora de México cae a las 18:00 del día anterior. Se veía en:

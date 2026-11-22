@@ -186,7 +186,7 @@ export class ExecutiveService {
       (this.prisma as any).maintenanceContractVisit.count({
         where: {
           contract: tw,
-          scheduledDate: { gte: now, lte: new Date(now.getTime() + 30 * 86400000) },
+          scheduledDate: { gte: workDateColumn(now), lte: new Date(workDateColumn(now).getTime() + 30 * 86400000) },
           status: { in: ['SCHEDULED', 'GENERATED'] },
         },
       }).catch(kpiFallback('executive.service.ts:135', 0)),

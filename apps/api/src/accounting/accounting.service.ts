@@ -16,7 +16,7 @@ import { DomainEventBusService } from '../domain-events/domain-event-bus.service
 import { BASE_CHART_OF_ACCOUNTS } from './base-chart-of-accounts.js';
 import { polizaFacturaEmitida, polizaPagoFactura, type RenglonPoliza } from './mesa-contable/polizas-mesa.js';
 import { celdaCsv } from '../common/security/celda-csv.js';
-import { addDaysToKey, workDateKey, workDateKeyOf } from '../common/time/workday.js';
+import { addDaysToKey, workDateColumn, workDateKey, workDateKeyOf } from '../common/time/workday.js';
 
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -3308,7 +3308,8 @@ export class AccountingService {
       where: {
         deletedAt: null,
         status: { in: ['SENT', 'PARTIALLY_PAID'] },
-        dueDate: { lt: new Date() },
+        // Vence al terminar su día en la empresa, no a su medianoche UTC (18:00 de la víspera).
+        dueDate: { lt: workDateColumn(new Date()) },
         isCancelled: false,
         ...companyWhere(tenantId),
       },
@@ -3406,7 +3407,7 @@ export class AccountingService {
         take: 5,
       }),
       this.prisma.invoice.count({
-        where: { deletedAt: null, status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: now }, isCancelled: false, ...companyWhere(tenantId) },
+        where: { deletedAt: null, status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: workDateColumn(now) }, isCancelled: false, ...companyWhere(tenantId) },
       }),
       this.prisma.invoice.count({ where: { deletedAt: null, issueDate: { gte: startOfMonth }, ...companyWhere(tenantId) } }),
       this.prisma.invoice.count({ where: { deletedAt: null, issueDate: { gte: startOfYear }, ...companyWhere(tenantId) } }),
@@ -3681,7 +3682,7 @@ export class AccountingService {
         _count: true,
       }),
       this.prisma.invoice.count({
-        where: { deletedAt: null, status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: now }, isCancelled: false, ...companyWhere(tenantId) },
+        where: { deletedAt: null, status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: workDateColumn(now) }, isCancelled: false, ...companyWhere(tenantId) },
       }),
       this.prisma.invoice.count({
         where: { deletedAt: null, issueDate: { gte: startOfMonth, lte: endOfMonth }, ...companyWhere(tenantId) },

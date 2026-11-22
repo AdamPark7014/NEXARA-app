@@ -11,7 +11,7 @@ import { sinPlazoStatusVariants } from '../../activities/activity-status.js';
 import { finDelPeriodo, periodoDeActividad } from '../../activities/actividad-periodo.js';
 import { horasResolucionPorActividad, limiteResolucionMs } from '../../sla-tracker/sla-tracker.service.js';
 import { ProyectoCostosAvisosService } from './proyecto-costos-avisos.service.js';
-import { WORKDAY_TIMEZONE, workClock } from '../time/workday.js';
+import { WORKDAY_TIMEZONE, workClock, workDateColumn } from '../time/workday.js';
 
 @Injectable()
 export class CronService {
@@ -47,17 +47,20 @@ export class CronService {
   @Cron('0 8 * * *', { name: 'overdue-invoices', timeZone: WORKDAY_TIMEZONE })
   async handleOverdueInvoices() {
     this.logger.log('Verificando facturas vencidas...');
+    // El vencimiento es un día de calendario: la factura vence al terminar ese día, no a su
+    // medianoche UTC (las 18:00 de la víspera en México). Antes el aviso salía el mismo día, «0 días».
+    const hoy = workDateColumn(new Date());
     const overdue = await this.prisma.invoice.findMany({
       where: {
         status: { in: ['SENT', 'PARTIALLY_PAID'] },
-        dueDate: { lt: new Date() },
+        dueDate: { lt: hoy },
         isCancelled: false,
       },
       include: { client: true, createdBy: true },
     });
 
     for (const inv of overdue) {
-      const days = Math.floor((Date.now() - inv.dueDate.getTime()) / 86400000);
+      const days = Math.round((hoy.getTime() - inv.dueDate.getTime()) / 86400000);
       if (inv.createdBy?.email) {
         await this.email.sendInvoiceOverdue(
           inv.createdBy.email,
@@ -109,11 +112,13 @@ export class CronService {
   @Cron('0 9 * * *', { name: 'po-reminders', timeZone: WORKDAY_TIMEZONE })
   async handlePOReminders() {
     this.logger.log('Verificando órdenes de compra próximas...');
-    const threeDaysFromNow = new Date(Date.now() + 3 * 86400000);
+    // Días de calendario: de hoy (incluida la que llega hoy) a tres días más.
+    const hoy = workDateColumn(new Date());
+    const threeDaysFromNow = new Date(hoy.getTime() + 3 * 86400000);
     const upcoming = await this.prisma.purchaseOrder.findMany({
       where: {
         status: { in: ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED'] },
-        expectedDate: { lte: threeDaysFromNow, gte: new Date() },
+        expectedDate: { lte: threeDaysFromNow, gte: hoy },
       },
       include: { supplier: true, createdBy: true },
     });
@@ -200,7 +205,7 @@ export class CronService {
     ] = await Promise.all([
       this.prisma.activity.count({ where: { estatus: 'EN_PROGRESO' } }),
       this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'CONFIRMED'] } } }),
-      this.prisma.invoice.count({ where: { status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: new Date() }, isCancelled: false } }),
+      this.prisma.invoice.count({ where: { status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: workDateColumn(new Date()) }, isCancelled: false } }),
     ]);
 
     const today = new Date();

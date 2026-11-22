@@ -424,6 +424,23 @@ describe('antigüedad del saldo por pagar', () => {
     expect(porVencer.monto).toBe(10_000);
   });
 
+  it('a las 7:30 de la tarde en México, la que vence hoy sigue al corriente y la de ayer lleva un día', async () => {
+    // 21 de noviembre, 19:30 en México: en el reloj del servidor (UTC) ya es día 22.
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] }).setSystemTime(new Date('2026-11-22T01:30:00.000Z'));
+    try {
+      const res = await detalle([
+        factura(1, new Date('2026-11-21T00:00:00.000Z')),
+        factura(2, new Date('2026-11-20T00:00:00.000Z')),
+      ]);
+      const dias = Object.fromEntries(res.cuentasPorPagar.facturas.map((f) => [f.id, f.diasVencido]));
+      expect(dias).toEqual({ 1: 0, 2: 1 });
+      expect(res.resumen.vencido).toBe(10_000);
+      expect(res.resumen.porVencer).toBe(10_000);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('reparte el saldo en el tramo que le toca', async () => {
     const res = await detalle([
       factura(1, diasAtras(0)), // por vencer

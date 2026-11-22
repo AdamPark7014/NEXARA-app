@@ -18,7 +18,7 @@ import { Request } from 'express';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { isFinishedStatus, statusVariants, ACTIVITY_STATUS } from '../activities/activity-status.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
-import { parseWorkDate, parseWorkDateEnd } from '../common/time/workday.js';
+import { parseWorkDate, parseWorkDateEnd, workDateColumn } from '../common/time/workday.js';
 
 const ensureBranchUploadsDir = () => {
   const segments = __dirname.split(path.sep);
@@ -111,6 +111,8 @@ export class ClientPortalController {
     const clientId = user.clientId;
     const since = new Date();
     since.setDate(since.getDate() - 30);
+    // La visita es un día de calendario: la de hoy sigue siendo «próxima» hasta que el día termina.
+    const hoy = workDateColumn(new Date());
 
     const [
       projects,
@@ -154,7 +156,7 @@ export class ClientPortalController {
       (this.prisma as any).maintenanceContractVisit.findMany({
         where: {
           status: 'SCHEDULED',
-          scheduledDate: { gte: new Date(), lte: new Date(Date.now() + 30 * 86400000) },
+          scheduledDate: { gte: hoy, lte: new Date(hoy.getTime() + 30 * 86400000) },
           contract: { clientId, status: 'ACTIVE' },
         },
         include: {

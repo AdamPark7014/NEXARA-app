@@ -2,6 +2,7 @@ import { contarEs } from '../common/contar-es.js';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { workDateColumn } from '../common/time/workday.js';
 
 /**
  * Proveedores y Proyectos para el workspace de Contabilidad.
@@ -200,16 +201,15 @@ const utcMidnight = (value: Date): Date =>
   new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
 
 /**
- * «Hoy» es el día del calendario del SERVIDOR, expresado como medianoche UTC
+ * «Hoy» es el día de la EMPRESA (hora de México), expresado como medianoche UTC
  * para poder compararlo con las columnas `@db.Date`.
  *
- * Con `utcMidnight(new Date())` el día era el UTC: en la Ciudad de México
- * (UTC−6), a partir de las 18:00 «hoy» ya era mañana y la antigüedad de toda
- * la cartera del proveedor saltaba un día — la misma factura decía «al
- * corriente» en CxP (que sí usa el día local) y «vencida · 1 día» aquí.
+ * Con el día del reloj del servidor, que en producción corre en UTC, a partir
+ * de las 18:00 de México «hoy» ya era mañana y la antigüedad de toda la cartera
+ * del proveedor saltaba un día — la misma factura decía «al corriente» en CxP
+ * y «vencida · 1 día» aquí.
  */
-const hoyDelServidor = (ahora: Date = new Date()): Date =>
-  new Date(Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()));
+const hoyDelServidor = (ahora: Date = new Date()): Date => workDateColumn(ahora);
 
 /** Días completos de retraso. 0 o menos = todavía no vence. */
 const daysOverdue = (dueDate: Date | null | undefined, today: Date): number => {

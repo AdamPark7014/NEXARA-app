@@ -20,6 +20,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService, type INotificationPayload } from '../notifications/notifications.service.js';
 import { ORG_ROLE_KEYS, type OrgRoleKey } from '../common/org-roles.js';
 import { appUrls } from '../common/app-urls.js';
+import { workDateColumn } from '../common/time/workday.js';
 
 const MARGIN_ALERT_THRESHOLD_PERCENT = 10;
 const STOCK_ALERT_DEDUP_HOURS = 24;
@@ -204,7 +205,9 @@ export class AlertsService {
       let alerted = 0;
       for (const v of visits) {
         const scheduled = new Date(v.scheduledDate);
-        const overdue = scheduled.getTime() < now.getTime();
+        // Día de calendario: la visita se vence cuando su día termina, no a su medianoche UTC
+        // (las 18:00 de la víspera en México, cuando salía «SLA vencido» para la visita de mañana).
+        const overdue = scheduled.getTime() < workDateColumn(now).getTime();
         const targets = Array.from(new Set([
           ...recipientIds,
           ...(v.contract?.ownerId ? [v.contract.ownerId] : []),
