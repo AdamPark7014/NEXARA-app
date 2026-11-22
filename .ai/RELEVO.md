@@ -1,5 +1,14 @@
 # RELEVO
 
+- **21-11 ~20:59 México (claude-code, nube) — El CI ahora compila la web como en producción.**
+  - Trabajo nuevo en `.github/workflows/ci.yml`: «Web · compilar (producción)», que corre
+    `npm run build --workspace=apps/web` (el mismo `scripts/next-build-resilient.js` del despliegue) en cada push.
+    Es la red que faltó el 21-11: dos errores que solo ve `next build` estuvieron cuatro horas en `main` (ver la
+    vuelta 12). Si este trabajo sale en rojo, `main` no se puede desplegar aunque tipos y pruebas estén en verde.
+  - Cuesta unos minutos de GitHub Actions por push (Linux). Si estorba, se quita borrando ese trabajo; no toca nada más.
+  - Falta ver su primera corrida en GitHub: la compilación ya pasó en esta sesión con las mismas órdenes, pero no en
+    el corredor de GitHub.
+
 - **21-11 ~20:58 México (claude-code, nube; Cursor/Codex no alcanzables) — Vuelta 13 de pulido: en almacén, un número de serie que ya salió no puede volver a salir. Sin migraciones; sin desplegar.**
   - **El hueco:** una serie es una pieza, pero la misma serie se podía registrar en dos salidas (etiqueta leída dos
     veces, serie tecleada mal o un reintento). En la base local de demostración estaba el caso: `DS-2CD-0001` en

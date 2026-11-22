@@ -73,6 +73,34 @@ jobs:
       - name: Tests · Web
         run: npm test --workspace=apps/web
 
+  # La compilación de producción de la web encuentra lo que ni los tipos ni las pruebas ven:
+  # un `"use client"` que no es lo primero del archivo, o una página que exporta un ayudante.
+  # El 21-11-2026 dos errores así estuvieron en main cuatro horas sin que nada avisara; el
+  # primero en enterarse habría sido el despliegue. Va en su propio trabajo para que el fallo
+  # diga de una ojeada que lo roto es la compilación y no una prueba.
+  compilar-web:
+    name: Web · compilar (producción)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci --ignore-scripts
+
+      # El mismo guion que usa el despliegue (`scripts/next-build-resilient.js`): con revisión
+      # de tipos y sin reintento que la apague.
+      - name: Compilar la web
+        run: npm run build --workspace=apps/web
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
   fugas:
     name: Secretos en el código
     runs-on: ubuntu-latest
