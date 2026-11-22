@@ -5,7 +5,7 @@ import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagina
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { NON_EMPLOYEE_EMAILS } from '../common/platform-accounts.js';
 import { expectedStartHm, isLateVsSchedule } from '../attendance/attendance-hybrid.match.js';
-import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
+import { addDaysToKey, workDateKey, WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { buildAccessScheduleAssignment } from '../integra/access-schedule-defaults.js';
 import { SolicitudAprobacionService } from '../common/aprobaciones/solicitud-aprobacion.service.js';
 import { AVISO_RH_PENDIENTE } from '../common/aprobaciones/avisos-rh.js';
@@ -536,7 +536,8 @@ export class HrService {
     // Asistencia tendencia 14d (días con check-in)
     const presentByDay: Record<string, number> = {};
     for (let i = 13; i >= 0; i--) {
-      const k = new Date(now.getTime() - i * 86_400_000).toISOString().slice(0, 10);
+      // Los días son los de la empresa: con el reloj del servidor, por la tarde la serie ya incluía mañana.
+      const k = addDaysToKey(workDateKey(now), -i);
       presentByDay[k] = 0;
     }
     for (const d of attendanceDays30) {

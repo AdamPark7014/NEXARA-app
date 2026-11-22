@@ -16,6 +16,7 @@ import { DomainEventBusService } from '../domain-events/domain-event-bus.service
 import { BASE_CHART_OF_ACCOUNTS } from './base-chart-of-accounts.js';
 import { polizaFacturaEmitida, polizaPagoFactura, type RenglonPoliza } from './mesa-contable/polizas-mesa.js';
 import { celdaCsv } from '../common/security/celda-csv.js';
+import { addDaysToKey, workDateKey, workDateKeyOf } from '../common/time/workday.js';
 
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -917,10 +918,8 @@ export class AccountingService {
       this.getAccountByCode('102.01', input.companyId),
     ]);
 
-    const rawDate = input.date ? new Date(input.date) : new Date();
-    const date = Number.isNaN(rawDate.getTime())
-      ? new Date().toISOString().slice(0, 10)
-      : rawDate.toISOString().slice(0, 10);
+    // Día de la empresa: con el reloj del servidor (UTC), una póliza de las 7 de la tarde se fechaba mañana.
+    const date = workDateKeyOf(input.date);
 
     const entry = await this.createAndPostAutoJournal(
       reference,
@@ -970,10 +969,8 @@ export class AccountingService {
       this.getAccountByCode('115.01', input.companyId),
     ]);
 
-    const rawDate = input.date ? new Date(input.date) : new Date();
-    const date = Number.isNaN(rawDate.getTime())
-      ? new Date().toISOString().slice(0, 10)
-      : rawDate.toISOString().slice(0, 10);
+    // Día de la empresa: con el reloj del servidor (UTC), una póliza de las 7 de la tarde se fechaba mañana.
+    const date = workDateKeyOf(input.date);
 
     return this.createAndPostAutoJournal(
       reference,
@@ -1910,8 +1907,9 @@ export class AccountingService {
       throw new BadRequestException('No hay líneas pendientes de facturar (todas ya fueron facturadas)');
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-    const due = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    // Hoy en la empresa, no en el reloj del servidor (UTC): por la tarde la factura salía con fecha de mañana.
+    const today = workDateKey(new Date());
+    const due = addDaysToKey(today, 30);
     const receptorZip =
       client.fiscalZipCode?.trim() ||
       this.extractMexicanZip(client.fiscalAddress) ||

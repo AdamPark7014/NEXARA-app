@@ -8,6 +8,7 @@ import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog"
 import { exportToExcel } from "@/lib/export-excel";
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 import { FormField, FormGrid } from '@/components/ui/FormField';
+import { diaEnMexico } from '@/lib/dia-pactado';
 
 export type Branch = {
   id: number;
@@ -372,7 +373,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
       { key: 'address', label: 'Dirección', format: (v) => String(v ?? '') },
       { key: 'portalEmail', label: 'Usuario', format: (v) => String(v ?? '') },
       { key: 'isActive', label: 'Estatus', format: (v) => (v !== false ? 'Activa' : 'Inactiva') },
-    ], `sucursales-${new Date().toISOString().split('T')[0]}`, 'Sucursales');
+    ], `sucursales-${diaEnMexico()}`, 'Sucursales');
   };
 
   const handleSortChange = (field: SortField) => {

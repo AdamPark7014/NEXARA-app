@@ -1,10 +1,12 @@
 import {
   WORKDAY_TIMEZONE,
+  addDaysToKey,
   calendarMonthColumnRange,
   parseWorkDate,
   parseWorkDateEnd,
   workDateColumn,
   workDateKey,
+  workDateKeyOf,
   workDateRange,
   workDayBounds,
   workDayEnd,
@@ -204,6 +206,41 @@ describe('mes de la empresa', () => {
       gte: new Date('2026-02-01T00:00:00.000Z'),
       lte: new Date('2026-02-28T23:59:59.999Z'),
     });
+  });
+});
+
+describe('el día de la empresa de una fecha capturada o de un instante', () => {
+  // 21 de noviembre, 19:30 en México. En el reloj del servidor (UTC) ya es día 22.
+  const TARDE = new Date('2026-11-22T01:30:00.000Z');
+
+  it('sin fecha es hoy en la empresa, no «mañana» del servidor', () => {
+    expect(TARDE.toISOString().slice(0, 10)).toBe('2026-11-22'); // lo que se guardaba
+    expect(workDateKeyOf(undefined, TARDE, MX)).toBe('2026-11-21');
+    expect(workDateKeyOf(null, TARDE, MX)).toBe('2026-11-21');
+    expect(workDateKeyOf('', TARDE, MX)).toBe('2026-11-21');
+  });
+
+  it('un instante con hora cae en el día de la empresa', () => {
+    expect(workDateKeyOf(TARDE, new Date(), MX)).toBe('2026-11-21');
+    expect(workDateKeyOf('2026-11-22T01:30:00.000Z', new Date(), MX)).toBe('2026-11-21');
+    expect(workDateKeyOf('2026-11-21T15:00:00.000Z', new Date(), MX)).toBe('2026-11-21');
+  });
+
+  it('un día capturado sin hora se respeta tal cual', () => {
+    expect(workDateKeyOf('2026-11-21', TARDE, MX)).toBe('2026-11-21');
+    // Así llega una columna de solo día: medianoche UTC. Convertirla la mandaría al día 20.
+    expect(workDateKeyOf(new Date('2026-11-21T00:00:00.000Z'), TARDE, MX)).toBe('2026-11-21');
+    expect(workDateKeyOf('2026-11-21T00:00:00.000Z', TARDE, MX)).toBe('2026-11-21');
+  });
+
+  it('una fecha ilegible cae en hoy en vez de tronar', () => {
+    expect(workDateKeyOf('no es fecha', TARDE, MX)).toBe('2026-11-21');
+  });
+
+  it('sumar días a un día no depende de la hora', () => {
+    expect(addDaysToKey('2026-11-21', 30)).toBe('2026-12-21');
+    expect(addDaysToKey('2026-12-31', 1)).toBe('2027-01-01');
+    expect(addDaysToKey('2026-03-01', -1)).toBe('2026-02-28');
   });
 });
 

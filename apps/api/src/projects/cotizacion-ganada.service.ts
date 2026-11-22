@@ -6,6 +6,7 @@ import { alcanceDePartidas, type MedioAceptacion } from '../cotizaciones/hilo-ne
 import { PrismaService } from '../prisma/prisma.service.js';
 import { OperationalProjectsService } from './operational-projects.service.js';
 import { ProyectosProfesionalService } from './proyectos-profesional.service.js';
+import { workDateKey } from '../common/time/workday.js';
 
 export type DatosGanada = {
   via?: MedioAceptacion | null;
@@ -112,8 +113,8 @@ export class CotizacionGanadaService {
         scopeItems: alcanceDePartidas(cotizacion.items),
         ...(subtotal > 0 ? { budgetAmount: subtotal } : {}),
         ...(cotizacion.currency ? { currency: cotizacion.currency } : {}),
-        startDate: startDate || new Date().toISOString().slice(0, 10),
-        endDate: startDate || new Date().toISOString().slice(0, 10),
+        startDate: startDate || workDateKey(new Date()),
+        endDate: startDate || workDateKey(new Date()),
       } as any,
       { id: actor.id, isSuperAdmin: true },
       tenantId,

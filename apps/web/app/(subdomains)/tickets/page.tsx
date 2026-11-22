@@ -19,6 +19,7 @@ import { createRealtimeSocket } from '@/lib/realtime-socket';
 import { getIntegraUrl } from "@/lib/panel-urls";
 import PhoneField from "@/components/PhoneField";
 import { contar } from "@/lib/plural";
+import { diaEnMexico } from "@/lib/dia-pactado";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
@@ -150,7 +151,7 @@ export default function ClientTicketsPage() {
   const [reportPdfData, setReportPdfData] = useState<Uint8Array | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportModalTitle, setReportModalTitle] = useState("Reporte consolidado de tickets");
-  const [reportFileName, setReportFileName] = useState(`reporte-tickets-${new Date().toISOString().slice(0, 10)}.pdf`);
+  const [reportFileName, setReportFileName] = useState(`reporte-tickets-${diaEnMexico()}.pdf`);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -655,7 +656,7 @@ export default function ClientTicketsPage() {
     if (reportPdfUrl) URL.revokeObjectURL(reportPdfUrl);
     setReportPdfUrl(URL.createObjectURL(blob));
     setReportModalTitle("Reporte consolidado de tickets");
-    setReportFileName(`reporte-tickets-${new Date().toISOString().slice(0, 10)}.pdf`);
+    setReportFileName(`reporte-tickets-${diaEnMexico()}.pdf`);
     setShowReportModal(true);
     setReportGenerating(false);
   };

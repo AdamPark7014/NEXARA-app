@@ -37,6 +37,7 @@ import { resolveAssetUrl } from "@/lib/evidence-display";
 import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
 import { SesionPropia } from "@/components/pizarra/SesionActividad";
 import { normalizarPrioridad } from "@/lib/actividad-tiempos";
+import { fechasCambiadas, fechasParaEditar } from "@/lib/campo-fecha";
 import {
   Alert,
   Badge,
@@ -154,15 +155,6 @@ export default function ActivityDetailPage() {
     };
   }, [token, activity?.id]);
 
-  const toDateLocal = (iso?: string | null) => {
-    if (!iso) return "";
-    try { return new Date(iso).toISOString().slice(0, 16); } catch { return ""; }
-  };
-  const toDateOnly = (iso?: string | null) => {
-    if (!iso) return "";
-    try { return new Date(iso).toISOString().slice(0, 10); } catch { return ""; }
-  };
-
   const openEdit = useCallback(() => {
     if (!activity) return;
     setForm({
@@ -170,9 +162,8 @@ export default function ActivityDetailPage() {
       prioridad: activity.prioridad ? normalizarPrioridad(activity.prioridad) : "MEDIA",
       descripcion: activity.descripcion ?? "",
       indicaciones: activity.indicaciones ?? "",
-      fechaInicio: toDateLocal(activity.fechaInicio),
-      fechaEntregaEsperada: toDateOnly(activity.fechaEntregaEsperada),
-      fechaFinalizacion: toDateLocal(activity.fechaFinalizacion),
+      // En la hora de quien edita: recortar el instante del API metía la hora universal.
+      ...fechasParaEditar(activity),
     });
     setSaveErr(null);
     setMissingEvidence(null);
@@ -210,13 +201,10 @@ export default function ActivityDetailPage() {
         descripcion: form.descripcion || null,
         indicaciones: form.indicaciones || null,
       };
-      if (form.fechaInicio) payload.fechaInicio = new Date(form.fechaInicio).toISOString();
-      // La entrega solo se manda si se cambió: es un parámetro que solo ajusta un superior (y en la
-      // autoasignación la fija el sistema), y reenviarla igual la daría por cambiada.
-      if (form.fechaEntregaEsperada && form.fechaEntregaEsperada !== toDateOnly(activity?.fechaEntregaEsperada)) {
-        payload.fechaEntregaEsperada = new Date(form.fechaEntregaEsperada).toISOString();
-      }
-      if (form.fechaFinalizacion) payload.fechaFinalizacion = new Date(form.fechaFinalizacion).toISOString();
+      // Las fechas solo se mandan si se cambiaron. La entrega es un parámetro que solo ajusta un
+      // superior (y en la autoasignación la fija el sistema): reenviarla igual la daría por
+      // cambiada; y un inicio reenviado se volvía a validar contra la ventana de «desde ayer».
+      Object.assign(payload, fechasCambiadas(form, activity ?? {}));
       await apiFetch(`activities/${id}`, token, { method: "PATCH", body: JSON.stringify(payload) });
       setEditing(false);
       reload();
@@ -231,7 +219,7 @@ export default function ActivityDetailPage() {
     } finally {
       setSaving(false);
     }
-  }, [token, id, form, reload, activity?.fechaEntregaEsperada]);
+  }, [token, id, form, reload, activity]);
 
   // La ficha (shell) ya pinta la carga y el error cuando la actividad no llegó.
   if (!activity) return null;

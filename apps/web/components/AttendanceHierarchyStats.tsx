@@ -7,6 +7,7 @@ import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import styles from './AttendanceHierarchyStats.module.css';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 import { contar } from "@/lib/plural";
+import { diaEnMexico } from "@/lib/dia-pactado";
 
 interface UserAttendanceStats {
   userId: number;
@@ -42,14 +43,9 @@ const AttendanceHierarchyStats: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<AttendanceRangeResponse | null>(null);
-  const [rangeFrom, setRangeFrom] = useState<string>(() => {
-    const now = new Date();
-    const start = new Date(now);
-    start.setDate(now.getDate() - 7);
-    return start.toISOString().slice(0, 10);
-  });
+  const [rangeFrom, setRangeFrom] = useState<string>(() => diaEnMexico(new Date(Date.now() - 7 * 86_400_000)));
   const [rangeTo, setRangeTo] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10)
+    diaEnMexico()
   );
   const [expandedUsers, setExpandedUsers] = useState<Set<number>>(new Set());
   const [paymentDrafts, setPaymentDrafts] = useState<
@@ -57,7 +53,7 @@ const AttendanceHierarchyStats: React.FC = () => {
   >({});
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
 
-  const toInputDate = (date: Date) => date.toISOString().slice(0, 10);
+  const toInputDate = (date: Date) => diaEnMexico(date);
 
   const getWeekRange = () => {
     const now = new Date();

@@ -49,6 +49,7 @@ import {
 } from '@/lib/activity-geofence';
 import dynamic from 'next/dynamic';
 import { Alert, Badge, Button, DateInput, Field, Input, Select, Textarea } from '@/components/base';
+import { diaEnMexico } from '@/lib/dia-pactado';
 
 const VisorPdf = dynamic(
   () => import('@/components/ops/EquipoEvidencias').then((m) => m.VisorPdf),
@@ -3177,7 +3178,7 @@ const buildInitialServiceSheetFormData = (
   initialData?: Partial<ServiceSheetFormData> | null,
 ): ServiceSheetFormData => ({
   technicianName: initialData?.technicianName || '',
-  serviceDate: initialData?.serviceDate || new Date().toISOString().split('T')[0],
+  serviceDate: initialData?.serviceDate || diaEnMexico(),
   clientCompany: initialData?.clientCompany || '',
   clientPhone: initialData?.clientPhone || '',
   managerName: initialData?.managerName || '',

@@ -69,7 +69,7 @@ import { clientesParecidos } from './clientes-parecidos.js';
 import { padronParaComparar } from './clientes-parecidos.service.js';
 import { checkUrlAccess } from '../common/rbac/url-matrix.js';
 import type { RoleKey } from '../common/rbac/roles.v2.js';
-import { workDayStart, workMonthStart, workYearStart } from '../common/time/workday.js';
+import { workClock, workDayStart, workMonthStart, workYearStart } from '../common/time/workday.js';
 import { pdfFecha } from '../common/pdf/nexara-pdf-theme.js';
 
 @Injectable()
@@ -307,17 +307,15 @@ export class VentasService {
   }
 
   private getPeriodStart(period: 'week' | 'month' | 'year') {
+    // Semana, mes y año de la empresa. Con el reloj del servidor (hora universal) el periodo
+    // cambiaba a las 6 de la tarde del último día y lo vendido esa tarde caía en el siguiente.
     const now = new Date();
-    const startDate = new Date(now);
-    if (period === 'week') {
-      startDate.setDate(now.getDate() - now.getDay());
-    } else if (period === 'month') {
-      startDate.setDate(1);
-    } else if (period === 'year') {
-      startDate.setMonth(0, 1);
-    }
-    startDate.setHours(0, 0, 0, 0);
-    return startDate;
+    if (period === 'month') return workMonthStart(now);
+    if (period === 'year') return workYearStart(now);
+    // La semana empieza en domingo, como antes.
+    const hoy = workDayStart(now);
+    const domingo = new Date(hoy.getTime() - workClock(now).weekday * 24 * 3_600_000 + 12 * 3_600_000);
+    return workDayStart(domingo);
   }
 
   private getPeriodRange(period: 'week' | 'month' | 'year') {

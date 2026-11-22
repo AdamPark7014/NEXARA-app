@@ -27,6 +27,7 @@ import { UpdateProjectDto } from './dto/update-project.dto.js';
 import { RbacGuard } from '../common/rbac.guard.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { OcultarMontosInterceptor } from '../common/visibilidad/ocultar-montos.interceptor.js';
+import { workDateKey } from '../common/time/workday.js';
 
 interface MulterFile {
   fieldname: string;
@@ -86,7 +87,7 @@ export class ProjectsController {
   @Get('catalog-pdf/download')
   async downloadCatalogPdf(@Res() res: Response) {
     const pdfBuffer = await this.projectsService.buildCatalogPdf();
-    const filename = `cv-empresarial-proyectos-${new Date().toISOString().slice(0, 10)}.pdf`;
+    const filename = `cv-empresarial-proyectos-${workDateKey(new Date())}.pdf`;
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

@@ -1,5 +1,56 @@
 # RELEVO
 
+- **21-11 ~20:46 México (claude-code, nube; Cursor/Codex no alcanzables) — Vuelta 12 de pulido: «hoy» después de las 6 de la tarde, horas que se recorrían al editar, y una página que no compilaba para producción (error mío de la vuelta 2). Sin migraciones; sin desplegar.**
+  - **OJO, primero esto: `main` no compilaba la web desde `d99aa9a` (21-11, 16:38 México).** En
+    `app/(subdomains)/tickets/[branch]/page.tsx` un guion mío puso un `import` arriba de `"use client"` (el archivo
+    empezaba con una marca invisible, BOM, y el guion no reconoció la directiva). Next exige la directiva primero: la
+    compilación de producción falla con «The "use client" directive must be placed before other expressions». Ni los
+    tipos, ni vitest, ni el CI lo detectan (el CI no compila la web). Comprobado compilando ese archivo con el propio
+    compilador de Next en la capa de servidor: la versión de `main` da ese error; la corregida compila como componente
+    de cliente. **Cualquier despliegue de `main` entre `d99aa9a` y este commit habría fallado al construir la web.**
+    Ya está corregido y hay dos candados en `lib/hoy-en-mexico.spec.ts`: nada de código antes de `"use client"` y
+    ningún archivo con BOM. La compilación completa de producción (`next build`) no se
+    corrió antes de este commit; se corre enseguida y su resultado va en el siguiente apunte.
+  - **La causa del resto, una sola:** el servidor corre en hora universal y `toISOString()` también la da en el
+    navegador. Para ambos el día cambia a las 18:00 de México.
+  - **Servidor (`workDateKey`, y nuevos `workDateKeyOf` y `addDaysToKey` en `common/time/workday.ts`):** de las 6 de
+    la tarde en adelante salían con fecha de mañana la póliza automática de un desembolso y la del costo de una
+    salida de almacén (`accounting.service.ts`), la factura que nace de un proyecto vendido y su vencimiento, el
+    pago a empleados, la comprobación y el depósito de viáticos, la orden de venta de una cotización ganada, el
+    gasto administrativo, la orden de compra y los nombres de archivo de varios reportes. En RH, la tendencia de
+    14 días se armaba con días UTC.
+  - **Tablero de despacho (`activities.service.ts`):** «Completadas hoy» contaba desde las 18:00 de ayer y se vaciaba
+    a las 18:00 de hoy. Ahora es la medianoche de la empresa. **Ventana para editar el inicio** (mismo archivo):
+    «desde ayer» se medía con el día del servidor; después de las 6 pm rechazaba un inicio de ayer por la mañana.
+    **Aviso de prioridad** (`activity-evidence.service.ts`): comparaba contra las actividades del día UTC.
+    **Ventas** (`getPeriodStart`): semana, mes y año de la empresa (la semana sigue empezando en domingo).
+  - **Web, horas que se recorrían al guardar:** la ficha de una actividad (`erp/actividades/[id]`, botón Editar)
+    llenaba «Fecha inicio» y «Fecha finalización» recortando el instante del API (hora universal) y al guardar lo
+    leía como hora local: las 9:00 se veían como 15:00 y, con solo cambiar la descripción, la actividad quedaba
+    seis horas después; además reenviaba el inicio aunque nadie lo tocara y el servidor lo rechazaba por la
+    ventana si era de días atrás. «Entrega esperada» mostraba el día siguiente si la entrega era después de las
+    6 pm y, al cambiarla, mandaba la medianoche universal (las 6 pm del día anterior). Ahora
+    `lib/campo-fecha.ts`: los campos trabajan en la hora de quien edita, solo se manda la fecha que la persona
+    cambió, y al cambiar el día de la entrega se conserva la hora que tenía (sin entrega previa, fin de ese día).
+    Lo mismo en Comunicados (`erp/news`): reprogramar un comunicado lo movía seis horas.
+    **Para el hilo de actividades:** no se tocó ninguna regla (semáforo, «No cumplida», un día por actividad); solo
+    qué instante se muestra y se manda.
+  - **Web, «hoy» por omisión (`diaEnMexico`):** fecha de pago al cobrar una factura, fecha de la hoja de servicio,
+    orden de compra y recepción (y el calendario, que desde las 6 pm no dejaba elegir hoy), fecha de baja, inicio
+    de proyecto del cliente, rangos de reportes de tickets, asistencia y contabilidad, y nombres de archivo.
+  - **Pendiente visto y no hecho:** `vehicle-gps.controller.ts:40` toma el día por omisión en UTC (vehículos es de
+    otro hilo); `activity-overdue-alerts.service.ts:70` usa `setUTCHours(0,0,0,0)` (reglas de atraso, hilo de
+    actividades; no se revisó a fondo); `tool-requests/kit-inspecciones.ts:52` suma días con el reloj del servidor;
+    `lib/cotizacion-documento.ts hoyISO`, `ComidasPanel` y `CarteraView` usan el día del navegador (correcto en
+    México; mal solo con el equipo en otra zona). El paso «Tests · Web» del CI falló en `7f90d88` y pasó en
+    `46c114d` sin cambios en la web: hay alguna prueba inestable por ubicar.
+  - **Paridad:** API hecho · Web hecho · Android e iOS no aplica (no arman «hoy» en hora universal ni tienen esos
+    formularios de edición; se revisó con búsqueda en el código, no en un teléfono).
+  - **Verificado:** `npm run typecheck` 0; jest API 536 suites, 6,715 pruebas; vitest web 299 archivos, 2,419 pruebas. Cada corrección tiene una prueba que se vio fallar antes del cambio:
+    `hoy-de-la-empresa.spec.ts` (8), `hoy-en-actividades.spec.ts` (6), 5 más en `workday.spec.ts`,
+    `campo-fecha.spec.ts` (10) y `hoy-en-mexico.spec.ts` (4). Las del servidor corren en UTC y en hora de México.
+    No se probó en navegador ni en producción (el entorno local de esta sesión está apagado).
+
 - **21-11 ~20:29 México (claude-code, nube; Cursor/Codex no alcanzables) — Vuelta 11 de pulido: descargas y pantallas que salían vacías o negadas por no recibir la empresa, y «este mes» con el reloj del servidor. Sin migraciones; sin desplegar.**
   - **La causa, una sola:** los servicios buscan con `companyWhere(empresa)` o `requireCompanyId(empresa)`. Sin empresa
     el primero filtra por `companyId: -1` (cero filas) y el segundo responde 403 «Empresa requerida». Es el candado

@@ -33,6 +33,7 @@ import { toast } from "@/components/Toast";
 import TruncatedId from "@/components/ui/TruncatedId";
 import s from "./ContabilidadInvoicesView.module.css";
 import { aFechaLocal, formatoFechaLocal } from "@/lib/fecha-calendario";
+import { diaEnMexico } from "@/lib/dia-pactado";
 
 type InvoiceRow = {
   id: number;
@@ -289,7 +290,7 @@ export default function ContabilidadInvoicesView({
         method: "POST",
         body: JSON.stringify({
           amount,
-          paymentDate: new Date().toISOString().slice(0, 10),
+          paymentDate: diaEnMexico(),
           method: "SPEI",
         }),
       });

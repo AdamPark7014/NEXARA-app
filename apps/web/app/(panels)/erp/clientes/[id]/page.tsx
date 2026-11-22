@@ -73,6 +73,7 @@ import { avisoAlDesactivarProyecto, avisoAlEliminarProyecto } from "@/lib/avisos
 import { nombreSector } from "../sectores";
 import { TiposCliente } from "../_componentes/TiposCliente";
 import styles from "../clientes-core.module.css";
+import { diaEnMexico } from "@/lib/dia-pactado";
 
 const VACIO = {
   name: "",
@@ -169,7 +170,7 @@ export default function ClienteDetallePage() {
   const [projectTitle, setProjectTitle] = useState("");
   const [projectError, setProjectError] = useState<string | null>(null);
   const [projectApiError, setProjectApiError] = useState<string | null>(null);
-  const [projectStart, setProjectStart] = useState(() => new Date().toISOString().slice(0, 10));
+  const [projectStart, setProjectStart] = useState(() => diaEnMexico());
   const [permisos, setPermisos] = useState<ClientPermissions>(NO_CLIENT_PERMISSIONS);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [editando, setEditando] = useState(false);

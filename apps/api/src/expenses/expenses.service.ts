@@ -11,7 +11,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { ACTIVITY_STATUS } from '../activities/activity-status.js';
 import { pdfFechaHora, pdfPeriodo, pdfZona } from '../common/pdf/nexara-pdf-theme.js';
-import { workDateRange } from '../common/time/workday.js';
+import { workDateKey, workDateRange } from '../common/time/workday.js';
 
 const ADMIN_EXPENSE_ACTIVITY_AN = 'SYS-ADMIN-GASTOS';
 
@@ -307,7 +307,7 @@ export class ExpensesService {
       where: { id },
       data: {
         estatusPago: STATUS.APROBADO,
-        contabilidadRef: existing.contabilidadRef || `GAS-${id}-${new Date().toISOString().slice(0, 10)}`,
+        contabilidadRef: existing.contabilidadRef || `GAS-${id}-${workDateKey(new Date())}`,
       },
       include: { usuario: true, actividad: true, createdBy: true },
     });
@@ -349,7 +349,7 @@ export class ExpensesService {
       data: {
         estatusPago: STATUS.PAGADO,
         journalEntryId: journalEntryId ?? undefined,
-        contabilidadRef: contabilidadRef || `GAS-${id}-${new Date().toISOString().slice(0, 10)}`,
+        contabilidadRef: contabilidadRef || `GAS-${id}-${workDateKey(new Date())}`,
       },
       include: { usuario: true, actividad: true, createdBy: true, journalEntry: true },
     });

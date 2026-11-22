@@ -58,6 +58,7 @@ import {
 } from "./compras-datos";
 import s from "./compras.module.css";
 import { errorSeguidoDe } from "@/lib/erp-api";
+import { diaEnMexico } from "@/lib/dia-pactado";
 
 const WholesalePanel = dynamic(() => import("@/components/WholesalePanel"), {
   ssr: false,
@@ -97,7 +98,7 @@ const COSTOS_EXTRA: ReadonlyArray<{ key: keyof typeof emptyLanded; label: string
   { key: "otherLandedCost", label: "Otros" },
 ];
 
-const hoyIso = () => new Date().toISOString().slice(0, 10);
+const hoyIso = () => diaEnMexico();
 
 export default function ProcurementPage() {
   const { user } = useUser();

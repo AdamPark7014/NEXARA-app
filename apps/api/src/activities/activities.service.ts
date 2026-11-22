@@ -57,7 +57,7 @@ import { esActividadNoProgramada } from './aviso-luis.js';
 import { avisoActividadNoProgramada as textoAvisoLuis } from '../chat/avisos-chat.js';
 import fs from 'fs/promises';
 import path from 'path';
-import { workDateRange } from '../common/time/workday.js';
+import { workDateRange, workDayStart } from '../common/time/workday.js';
 
 /** Cap list endpoints when the client omits limit (mobile dashboard was unbounded). */
 const DEFAULT_LIST_TAKE = 200;
@@ -778,9 +778,10 @@ export class ActivitiesService {
       where.responsableId = { in: allowedUserIds };
     }
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    // El día es el de la empresa: con el reloj del servidor (hora universal) «hoy» empezaba a
+    // las 6 de la tarde, y lo terminado en la mañana ya no contaba como de hoy.
     const now = new Date();
+    const startOfToday = workDayStart(now);
 
     const closed = new Set(['Finalizada', 'Finalizado', 'COMPLETADA', 'Cancelada', 'CANCELADA', 'Rechazada', 'No cumplida']);
     const inProgress = new Set(['En Proceso', 'EN_PROCESO', 'EN_CURSO']);
@@ -1393,9 +1394,9 @@ export class ActivitiesService {
       // actividad de varios días el formulario reenvía el inicio que ya tenía (días atrás), y con
       // periodo el inicio lo ordena el periodo que eligió quien la asigna.
       const mismoInicio = prev?.fechaInicio != null && new Date(prev.fechaInicio).getTime() === start.getTime();
-      const startOfYesterday = new Date();
-      startOfYesterday.setHours(0, 0, 0, 0);
-      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      // «Ayer» de la empresa, no del servidor (hora universal): después de las 6 de la tarde la
+      // ventana se recorría y rechazaba un inicio de ayer por la mañana.
+      const startOfYesterday = workDayStart(new Date(workDayStart(new Date()).getTime() - 12 * 3_600_000));
       if (!periodoData.periodoInicio && !mismoInicio && start.getTime() < startOfYesterday.getTime()) {
         throw new BadRequestException('fechaInicio está fuera de la ventana permitida');
       }

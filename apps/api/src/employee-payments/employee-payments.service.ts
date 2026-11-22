@@ -10,7 +10,7 @@ import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { KPI_MAX_DIAS, KpisEquipoService } from '../me/kpis-equipo.service.js';
 import { diasDelRango } from '../me/kpis-equipo.js';
-import { WORKDAY_TIMEZONE, workDateKey } from '../common/time/workday.js';
+import { workDateKey, WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { NOMINA_SETTING_KEY, parsearConfigNomina } from './nomina-calendario.js';
 import { leerFestivos } from '../festivos/festivos-datos.js';
 import { comoLeToca } from '../festivos/festivos-reglas.js';
@@ -739,7 +739,7 @@ export class EmployeePaymentsService {
         status: STATUS.PAGADO,
         paidAt: existing.paidAt || new Date(),
         journalEntryId: journalEntryId ?? undefined,
-        contabilidadRef: contabilidadRef || `PAG-${id}-${new Date().toISOString().slice(0, 10)}`,
+        contabilidadRef: contabilidadRef || `PAG-${id}-${workDateKey(new Date())}`,
       },
       include: { user: true, createdBy: true, journalEntry: true },
     });

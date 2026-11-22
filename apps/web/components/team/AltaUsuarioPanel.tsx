@@ -34,6 +34,7 @@ import {
   type PersonaEquipo,
   type UsuarioCreado,
 } from "@/lib/delegated-users-api";
+import { diaEnMexico } from "@/lib/dia-pactado";
 
 const campo = { display: "grid", gap: 4, fontSize: 13, color: "var(--text-secondary)" } as const;
 const entrada = {
@@ -292,7 +293,7 @@ export default function AltaUsuarioPanel() {
               onClick={() => {
                 setBajaDe(p);
                 setMotivoBaja("RENUNCIA");
-                setFechaBaja(new Date().toISOString().slice(0, 10));
+                setFechaBaja(diaEnMexico());
                 setComentarioBaja("");
                 setYaAutorizado(false);
                 setJustificacionBaja("");

@@ -14,6 +14,7 @@ import {
   CreateFiscalPeriodDto,
   UpdateAccountDto,
 } from './dto/account.dto.js';
+import { workDateKey } from '../common/time/workday.js';
 
 @Controller('accounting/accounts')
 @UseGuards(UrlAccessGuard)
@@ -149,7 +150,7 @@ export class AccountsController {
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader(
           'Content-Disposition',
-          `attachment; filename=reportes-financieros-${new Date().toISOString().slice(0, 10)}.pdf`,
+          `attachment; filename=reportes-financieros-${workDateKey(new Date())}.pdf`,
         );
         res.send(pdf);
       }
@@ -202,7 +203,7 @@ export class AccountsController {
   async catalogoCuentasXml(@CurrentCompanyId() companyId: number | null, @Res() res: Response) {
     const xml = await this.service.exportCatalogoCuentasXml(companyId);
     res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename=catalogo-cuentas-${new Date().toISOString().slice(0, 10)}.xml`);
+    res.setHeader('Content-Disposition', `attachment; filename=catalogo-cuentas-${workDateKey(new Date())}.xml`);
     res.send(xml);
   }
 

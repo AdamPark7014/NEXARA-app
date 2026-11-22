@@ -14,6 +14,7 @@ import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
 import { EmpaqueInvalidoError, convertirCaptura, type Empaque } from '../warehouse/empaque.js';
 import { generatePurchaseOrderPdf, type PurchaseOrderPdfPayload } from './purchase-order-pdf.js';
 import { generateGoodsReceiptPdf, type GoodsReceiptPdfPayload } from './goods-receipt-pdf.js';
+import { workDateKey } from '../common/time/workday.js';
 
 @Injectable()
 export class ProcurementService {
@@ -1239,7 +1240,7 @@ export class ProcurementService {
       {
         supplierId,
         requisitionId: rfq.requisitionId,
-        orderDate: new Date().toISOString().slice(0, 10),
+        orderDate: workDateKey(new Date()),
         companyId,
         notes: `Adjudicado desde RFQ ${rfq.rfqNumber}`,
         items: lines.map((l) => ({

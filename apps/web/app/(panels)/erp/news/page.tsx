@@ -18,6 +18,7 @@ import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog"
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { toast } from "@/components/Toast";
+import { aCampoFechaHora } from "@/lib/campo-fecha";
 import s from "./news.module.css";
 
 type Tab = "comunicados" | "newsletter";
@@ -151,7 +152,7 @@ export default function ComunicacionesInternasPage() {
 
   const openEdit = async (c: Comunicado) => {
     openForm(
-      { titulo: c.titulo, cuerpo: "", audiencia: c.audiencia, prioridad: c.prioridad, estado: c.estado, scheduledAt: c.scheduledAt?.slice(0, 16) ?? "" },
+      { titulo: c.titulo, cuerpo: "", audiencia: c.audiencia, prioridad: c.prioridad, estado: c.estado, scheduledAt: aCampoFechaHora(c.scheduledAt) },
       c,
     );
     try {
@@ -162,7 +163,7 @@ export default function ComunicacionesInternasPage() {
         audiencia: full.audiencia ?? c.audiencia,
         prioridad: full.prioridad ?? c.prioridad,
         estado: full.estado ?? c.estado,
-        scheduledAt: full.scheduledAt?.slice(0, 16) ?? "",
+        scheduledAt: aCampoFechaHora(full.scheduledAt),
       });
     } catch (e) {
       setFormError(`No pudimos cargar el texto completo. ${formatApiError(e, "")}`.trim());

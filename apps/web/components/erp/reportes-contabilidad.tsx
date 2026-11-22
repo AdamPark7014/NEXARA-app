@@ -15,6 +15,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import s from "./reportes-contabilidad.module.css";
 import { formatoFechaLocal } from "@/lib/fecha-calendario";
+import { diaEnMexico } from "@/lib/dia-pactado";
 
 /**
  * Piezas compartidas por `/erp/contabilidad/reportes` y
@@ -76,7 +77,8 @@ export type DetalleReporte = {
   total: number;
 };
 
-export const hoyIso = () => new Date().toISOString().slice(0, 10);
+/** Hoy en México. En hora universal el día cambia a las 6 de la tarde. */
+export const hoyIso = () => diaEnMexico();
 
 /**
  * `2026-09-20` → `20 sep 2026`. Las fechas del API viajan en ISO porque así se
@@ -89,10 +91,7 @@ export function fechaLegible(iso: string | null | undefined): string {
   return formatoFechaLocal(raw, { day: "2-digit", month: "short", year: "numeric" }, raw);
 }
 
-export const inicioDeMesIso = () => {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
-};
+export const inicioDeMesIso = () => `${diaEnMexico().slice(0, 7)}-01`;
 
 /** Query string sin claves vacías: el API no tiene que adivinar qué es «sin filtro». */
 export function queryString(params: Record<string, string | number | boolean | null | undefined>): string {

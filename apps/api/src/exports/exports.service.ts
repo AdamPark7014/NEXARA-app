@@ -2,7 +2,7 @@ import { whereCotizacionesVisibles, type Actor } from '../common/visibilidad/vis
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
-import { workDateRange } from '../common/time/workday.js';
+import { workDateKey, workDateRange } from '../common/time/workday.js';
 
 export type ExportEntity =
   | 'clients'
@@ -86,7 +86,7 @@ export class ExportsService {
       entity === 'users'
         ? { ...dateWhere, companyMemberships: { some: { companyId: tenantId } } }
         : { ...dateWhere, ...companyWhere(tenantId) };
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = workDateKey(new Date());
     let rows: any[] = [];
 
     switch (entity) {

@@ -20,6 +20,7 @@ import styles from './SalesReportsDashboard.module.css';
 import { triggerBlobDownload, triggerFileDownload } from '@/lib/file-download';
 import { buildApiUrl, getSocketBaseUrl } from '@/lib/api-base';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { diaEnMexico } from '@/lib/dia-pactado';
 
 interface SalesReportsDashboardProps {
   period?: 'week' | 'month' | 'year';
@@ -176,7 +177,7 @@ export default function SalesReportsDashboard({
   };
 
   const handleDownloadPdf = () => {
-    const name = `reporte-ventas-${currentPeriod}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    const name = `reporte-ventas-${currentPeriod}-${diaEnMexico()}.pdf`;
     if (pdfData?.length) {
       void triggerBlobDownload(new Blob([new Uint8Array(pdfData)], { type: 'application/pdf' }), name, {
         mimeType: 'application/pdf',

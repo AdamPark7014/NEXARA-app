@@ -77,6 +77,35 @@ export function workDateKey(instante: Date, tz = WORKDAY_TIMEZONE): string {
   return `${p.year}-${dosDigitos(p.month)}-${dosDigitos(p.day)}`;
 }
 
+/**
+ * Día de la empresa (`AAAA-MM-DD`) de una fecha capturada o de un instante.
+ *
+ * `new Date().toISOString().slice(0, 10)` da el día del servidor, que corre en UTC: de las 18:00
+ * de México en adelante ya es «mañana», y con esa fecha se guardaban pólizas, facturas y órdenes.
+ *  - Sin valor, o ilegible: hoy en la empresa.
+ *  - Un día sin hora (`AAAA-MM-DD`, o medianoche UTC exacta, como llegan las columnas de solo
+ *    día): ese día tal cual. Convertirlo lo mandaría al día anterior.
+ *  - Un instante con hora: el día en que cae en la zona de la empresa.
+ */
+export function workDateKeyOf(
+  valor?: Date | string | null,
+  ahora: Date = new Date(),
+  tz = WORKDAY_TIMEZONE,
+): string {
+  if (valor == null || valor === '') return workDateKey(ahora, tz);
+  if (typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(valor.trim())) return valor.trim();
+  const instante = valor instanceof Date ? valor : new Date(valor);
+  if (Number.isNaN(instante.getTime())) return workDateKey(ahora, tz);
+  if (instante.getTime() % 86_400_000 === 0) return instante.toISOString().slice(0, 10);
+  return workDateKey(instante, tz);
+}
+
+/** Suma días a un día `AAAA-MM-DD` por calendario, sin pasar por la hora de ningún reloj. */
+export function addDaysToKey(dia: string, dias: number): string {
+  const [y, m, d] = dia.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + dias)).toISOString().slice(0, 10);
+}
+
 /** Hora (0–23) y día de la semana (0 = domingo) de un instante en la zona. */
 export function workClock(instante: Date, tz = WORKDAY_TIMEZONE): { hour: number; weekday: number } {
   const p = partesEn(instante, tz);

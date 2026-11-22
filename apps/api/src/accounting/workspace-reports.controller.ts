@@ -9,6 +9,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { requirePositiveIntQuery } from '../common/dto/query-params.js';
+import { workDateKey } from '../common/time/workday.js';
 
 /**
  * Reportes de contabilidad (`/erp/contabilidad/reportes`) y comparativo de
@@ -169,7 +170,7 @@ export class AccountingWorkspaceReportsController {
     );
     // Hoy solo CSV. `formato` se acepta para no romper el enlace cuando se sume otro.
     const { from: desde, to: hasta, asOf: corte } = resultado.periodo;
-    const sufijo = corte ?? (desde && hasta ? `${desde}_${hasta}` : new Date().toISOString().slice(0, 10));
+    const sufijo = corte ?? (desde && hasta ? `${desde}_${hasta}` : workDateKey(new Date()));
     const csv = this.service.aCsv(resultado);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=${id}-${sufijo || 'reporte'}.csv`);

@@ -20,6 +20,7 @@ import { toast } from "@/components/Toast";
 import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import { evaluarSemaforoActividad, semaforoDeLaApi, textoChipSemaforo } from "@/lib/actividad-tiempos";
+import { diaEnMexico } from "@/lib/dia-pactado";
 
 type ActivityRow = {
   id: number;
@@ -251,8 +252,8 @@ export default function OpsActivitiesBoard({
     if (!token) return;
     setPdfBusy(true);
     try {
-      const to = new Date().toISOString().slice(0, 10);
-      const from = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+      const to = diaEnMexico();
+      const from = diaEnMexico(new Date(Date.now() - 90 * 86_400_000));
       await downloadActivitiesReportPdf(token, { from, to });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo generar el PDF");

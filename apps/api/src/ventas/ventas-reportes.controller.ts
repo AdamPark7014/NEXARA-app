@@ -9,6 +9,7 @@ import { VentasService } from './ventas.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { OcultarMontosInterceptor } from '../common/visibilidad/ocultar-montos.interceptor.js';
 import { SoloConPreciosGuard } from '../common/visibilidad/solo-con-precios.guard.js';
+import { workDateKey } from '../common/time/workday.js';
 
 const SALES_REPORT_VIEW_ACCESS = [PERMISSIONS.SALES_REPORTS_VIEW, PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
 const SALES_REPORT_EXPORT_ACCESS = [PERMISSIONS.SALES_REPORTS_EXPORT, PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
@@ -206,7 +207,7 @@ export class VentasReportesController {
       metadata: { period: dto.period, includeVendorStats: Boolean(dto.includeVendorStats) },
     });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=reporte-ventas-${dto.period}-${new Date().toISOString().slice(0, 10)}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=reporte-ventas-${dto.period}-${workDateKey(new Date())}.pdf`);
     res.send(pdfBuffer);
   }
 }

@@ -7,6 +7,7 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { requirePositiveIntQuery, requireStringQuery } from '../common/dto/query-params.js';
+import { workDateKey } from '../common/time/workday.js';
 
 @Controller('audit')
 @UseGuards(UrlAccessGuard, RbacGuard)
@@ -61,7 +62,7 @@ export class AuditController {
       to,
     });
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename=audit-export-${new Date().toISOString().slice(0, 10)}.csv`);
+    res.setHeader('Content-Disposition', `attachment; filename=audit-export-${workDateKey(new Date())}.csv`);
     res.send(csv);
   }
 

@@ -25,7 +25,7 @@ import {
   type Parte,
   repartirEnPartesIguales,
 } from './viatico-reparto.js';
-import { workDateRange } from '../common/time/workday.js';
+import { workDateKey, workDateRange } from '../common/time/workday.js';
 
 /** Cap list endpoints when the client omits limit (mobile dashboard was unbounded). */
 const DEFAULT_LIST_TAKE = 200;
@@ -922,7 +922,7 @@ export class ViaticosService {
 
     const nextStep = step + 1;
     if (isTerminalApproved(nextStep, chain)) {
-      const contabilidadRef = `VIAT-${id}-${new Date().toISOString().slice(0, 10)}`;
+      const contabilidadRef = `VIAT-${id}-${workDateKey(new Date())}`;
       const claim = await this.prisma['viatico'].updateMany({
         where: claimWhere,
         data: {
@@ -1016,7 +1016,7 @@ export class ViaticosService {
       data: {
         estatus: 'Pagado',
         journalEntryId: journalEntryId ?? undefined,
-        contabilidadRef: contabilidadRef || `VIAT-${id}-${new Date().toISOString().slice(0, 10)}`,
+        contabilidadRef: contabilidadRef || `VIAT-${id}-${workDateKey(new Date())}`,
       },
       include: { User: { select: { id: true, nombre: true } }, journalEntry: true },
     });
@@ -1332,7 +1332,7 @@ export class ViaticosService {
     });
     if (!viatico) return;
 
-    const contabilidadRef = `VIAT-${id}-${new Date().toISOString().slice(0, 10)}`;
+    const contabilidadRef = `VIAT-${id}-${workDateKey(new Date())}`;
     const claim = await this.prisma['viatico'].updateMany({
       where: { id, estatus: 'Pendiente' },
       data: {

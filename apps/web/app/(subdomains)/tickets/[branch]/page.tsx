@@ -1,6 +1,4 @@
-import { contar } from "@/lib/plural";
-
-﻿"use client";
+"use client";
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
@@ -12,6 +10,8 @@ import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import styles from "../tickets.module.css";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { isCapacitorNative } from "@/lib/capacitor-env";
+import { contar } from "@/lib/plural";
+import { diaEnMexico } from "@/lib/dia-pactado";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
@@ -96,18 +96,14 @@ export default function BranchTicketsPage() {
     progressPercent: number;
     engineers: Array<{ id: number; nombre: string }>;
   }>>([]);
-  const [fromDate, setFromDate] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().slice(0, 10);
-  });
-  const [toDate, setToDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [fromDate, setFromDate] = useState<string>(() => diaEnMexico(new Date(Date.now() - 30 * 86_400_000)));
+  const [toDate, setToDate] = useState<string>(diaEnMexico());
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfModalTitle, setPdfModalTitle] = useState("Reporte de tickets de sucursal");
-  const [pdfFileName, setPdfFileName] = useState(`reporte-sucursal-${new Date().toISOString().slice(0, 10)}.pdf`);
+  const [pdfFileName, setPdfFileName] = useState(`reporte-sucursal-${diaEnMexico()}.pdf`);
   const [draft, setDraft] = useState({
     requestType: "ISSUE" as "ISSUE" | "PREVENTIVE_INVENTORY",
     description: "",
@@ -355,7 +351,7 @@ export default function BranchTicketsPage() {
       if (pdfUrl) URL.revokeObjectURL(pdfUrl);
       setPdfUrl(URL.createObjectURL(blob));
       setPdfModalTitle("Reporte de tickets de sucursal");
-      setPdfFileName(`reporte-sucursal-${new Date().toISOString().slice(0, 10)}.pdf`);
+      setPdfFileName(`reporte-sucursal-${diaEnMexico()}.pdf`);
       setShowPdfModal(true);
     } finally {
       setGeneratingPdf(false);

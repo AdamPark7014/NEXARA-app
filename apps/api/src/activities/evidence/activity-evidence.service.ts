@@ -45,7 +45,7 @@ import PDFDocument from 'pdfkit';
 import { leerRevisores } from '../../me/revision-evidencias.js';
 import fs from 'fs';
 import path from 'path';
-import { parseWorkDate, parseWorkDateEnd } from '../../common/time/workday.js';
+import { parseWorkDate, parseWorkDateEnd, workDayStart } from '../../common/time/workday.js';
 
 type ActivityEvidenceStatus = EvidenceStep;
 
@@ -794,8 +794,9 @@ export class ActivityEvidenceService {
     userId: number,
     at: Date,
   ): Promise<boolean> {
-    const inicioDia = new Date(at);
-    inicioDia.setHours(0, 0, 0, 0);
+    // El día de la empresa, no el del servidor (hora universal): si no, a partir de las 6 de la
+    // tarde «ese mismo día» ya era mañana y el aviso comparaba contra el día equivocado.
+    const inicioDia = workDayStart(at);
     const finDia = new Date(inicioDia.getTime() + 24 * 60 * 60 * 1000);
     const rangoActual = rangoPrioridad(activity.prioridad);
     if (rangoActual === 0) return false;
