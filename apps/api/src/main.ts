@@ -1,7 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { IoAdapter } from '@nestjs/platform-socket.io';
-import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as express from 'express';
 import * as fs from 'fs';
@@ -33,6 +32,7 @@ import { PrismaService } from './prisma/prisma.service';
 import { VisibilidadService } from './common/visibilidad/visibilidad.service.js';
 import { reglasActivas } from './common/visibilidad/visibilidad.js';
 import { isCeoEquivalentEmail, isSuperAdminEmail } from './common/platform-accounts.js';
+import { ValidacionEnEspanolPipe } from './common/validacion-es.js';
 
 const toPositiveInt = (rawValue: string | undefined, fallback: number): number => {
   const parsed = Number(rawValue);
@@ -356,7 +356,7 @@ async function bootstrap() {
   });
 
   app.useGlobalPipes(
-    new ValidationPipe({
+    new ValidacionEnEspanolPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,

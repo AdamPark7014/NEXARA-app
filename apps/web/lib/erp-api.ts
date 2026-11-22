@@ -16,6 +16,34 @@ export const MENSAJE_SERVIDOR_CON_PROBLEMA = "El servidor tuvo un problema. Vuel
 const SOLO_CODIGO_DE_SERVIDOR = /^HTTP 5\d\d$/;
 
 /**
+ * Lo que contesta el marco cuando nadie escribió un mensaje: llega en inglés y no dice qué hacer.
+ * Solo se cambia el texto exacto del marco; un mensaje propio del servidor nunca pasa por aquí.
+ * `null`: el genérico no aporta nada («Bad Request») y gana la frase de quien llamó.
+ */
+const GENERICOS_DEL_MARCO: Array<[RegExp, string | null]> = [
+  [/^(unauthorized|HTTP 401)$/i, "Tu sesión expiró. Vuelve a iniciar sesión."],
+  [/^(forbidden( resource)?|HTTP 403)$/i, "No tienes permiso para esta acción."],
+  [
+    /^((throttlerexception: )?too many requests|HTTP 429)$/i,
+    "Demasiados intentos seguidos. Espera un momento y vuelve a intentarlo.",
+  ],
+  [/^(payload too large|request entity too large|file too large|HTTP 413)$/i, "El archivo pesa más de lo permitido."],
+  [/^(bad gateway|service unavailable|gateway timeout)$/i, MENSAJE_SERVIDOR_CON_PROBLEMA],
+  [/^(bad request|not found|unexpected field)$/i, null],
+  // `ParseIntPipe` y parientes cuando el id de la URL no es un número: es un fallo nuestro, no algo que la persona arregle.
+  [/^validation failed( \(.+\))?$/i, null],
+];
+
+/** La frase en español de un genérico del marco, `null` si no aporta nada, `undefined` si no es uno. */
+function genericoDelMarco(texto: string): string | null | undefined {
+  const limpio = texto.trim();
+  for (const [patron, frase] of GENERICOS_DEL_MARCO) {
+    if (patron.test(limpio)) return frase;
+  }
+  return undefined;
+}
+
+/**
  * Une el texto de un error con la frase que le sigue. El error puede traer ya su
  * punto («…vuelve a intentarlo.») y pegarle otro dejaba «intentarlo.. Se muestra…».
  */
@@ -39,12 +67,16 @@ export function formatApiError(err: unknown, fallback = "Error desconocido"): st
           ? parsed.error
           : "";
     if (SERVIDOR_GENERICO.test(msg.trim())) return MENSAJE_SERVIDOR_CON_PROBLEMA;
+    const generico = genericoDelMarco(msg);
+    if (generico !== undefined) return generico ?? fallback;
     return msg.trim() && !INTERNAL_ROUTE_ERROR.test(msg) ? msg.trim() : fallback;
   } catch {
     /* plain text */
   }
   // HTML de un proxy caído, JSON truncado, un volcado de pila o la ruta interna del API: nada de eso se enseña.
   if (SERVIDOR_GENERICO.test(raw) || SOLO_CODIGO_DE_SERVIDOR.test(raw)) return MENSAJE_SERVIDOR_CON_PROBLEMA;
+  const generico = genericoDelMarco(raw);
+  if (generico !== undefined) return generico ?? fallback;
   if (/^\s*[{[<]/.test(raw) || /\n\s+at\s/.test(raw) || INTERNAL_ROUTE_ERROR.test(raw)) return fallback;
   return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw;
 }

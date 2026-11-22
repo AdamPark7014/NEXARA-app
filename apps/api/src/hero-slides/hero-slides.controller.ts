@@ -77,7 +77,7 @@ export class HeroSlidesController {
       }
 
       if (!filepath) {
-        throw new NotFoundException('Image not found');
+        throw new NotFoundException('Imagen no encontrada');
       }
 
       const ext = path.extname(safeName).toLowerCase();
@@ -94,7 +94,7 @@ export class HeroSlidesController {
       res.setHeader('Cache-Control', 'public, max-age=3600');
       createReadStream(filepath).pipe(res);
     } catch {
-      throw new NotFoundException('Image not found');
+      throw new NotFoundException('Imagen no encontrada');
     }
   }
 

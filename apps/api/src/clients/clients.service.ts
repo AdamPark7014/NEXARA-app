@@ -95,7 +95,7 @@ export class ClientsService {
     });
 
     if (!existingClient) {
-      throw new NotFoundException(`Client with ID ${id} not found`);
+      throw new NotFoundException('Cliente no encontrado');
     }
 
     const { removeImage, ...rest } = updateClientDto as UpdateClientDto & {
@@ -136,7 +136,7 @@ export class ClientsService {
     });
 
     if (!client) {
-      throw new NotFoundException(`Client with ID ${id} not found`);
+      throw new NotFoundException('Cliente no encontrado');
     }
 
     if (client.imageUrl) {
@@ -166,7 +166,7 @@ export class ClientsService {
       const imageUrl = `/clients/image/${filename}`;
       return imageUrl;
     } catch (_error) {
-      throw new InternalServerErrorException('Error saving image');
+      throw new InternalServerErrorException('No se pudo guardar la imagen');
     }
   }
 

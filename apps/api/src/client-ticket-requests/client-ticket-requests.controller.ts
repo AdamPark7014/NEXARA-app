@@ -66,7 +66,7 @@ export class ClientTicketRequestsController {
   ) {
     const activityId = Number(body.activityId);
     if (!activityId || Number.isNaN(activityId)) {
-      throw new BadRequestException('activityId invalido');
+      throw new BadRequestException('Actividad no válida');
     }
     return this.service.assign(id, activityId, companyId);
   }
@@ -83,7 +83,7 @@ export class ClientTicketRequestsController {
   ) {
     if (!body.status) throw new BadRequestException('status requerido');
     const status = this.normalizeStatus(body.status);
-    if (!status) throw new BadRequestException('status invalido');
+    if (!status) throw new BadRequestException('Estado no válido');
     return this.service.updateStatus(id, status, companyId, user?.id ?? null);
   }
 

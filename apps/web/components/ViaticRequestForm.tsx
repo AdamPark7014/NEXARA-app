@@ -125,7 +125,7 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
   const handleSelectFile = (file: File | null) => {
     if (!file) return;
     if (!isSupportedFile(file)) {
-      setError('Solo se permiten imagenes o PDF.');
+      setError('Solo se permiten imágenes o PDF.');
       return;
     }
     if (ticketPreview) URL.revokeObjectURL(ticketPreview.url);

@@ -2,6 +2,7 @@ import { PETICION_APP } from './peticion-de-app.testing.js';
 import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AttendanceService } from './attendance.service.js';
+import { workDateColumn } from '../common/time/workday.js';
 
 /**
  * Duplicados de asistencia bajo concurrencia.
@@ -152,6 +153,10 @@ describe('entrada duplicada', () => {
   it('pero una jornada abierta de AYER se cierra sola y la entrada de hoy pasa', async () => {
     // Antes esto dejaba a la persona sin poder checar hasta que alguien tocaba la base.
     const ayer = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // La columna `date` guarda el día laboral, no un instante. Con «ahora menos 24 h» como fecha,
+    // de las 18:00 a la medianoche (hora de México) ese instante ya caía en el día de hoy y la
+    // prueba fallaba según la hora en que se corriera.
+    const diaDeAyer = workDateColumn(ayer);
     const { service, prisma } = build({
       attendance: {
         findFirst: jest.fn().mockResolvedValue(null),
@@ -161,7 +166,7 @@ describe('entrada duplicada', () => {
       attendanceDay: {
         findFirst: jest
           .fn()
-          .mockResolvedValue({ id: 5, userId: 3, isOpen: true, date: ayer, lastEntryAt: ayer }),
+          .mockResolvedValue({ id: 5, userId: 3, isOpen: true, date: diaDeAyer, lastEntryAt: ayer }),
         upsert: jest.fn().mockResolvedValue({ id: 6, isOpen: true }),
         update: jest.fn().mockResolvedValue({}),
       },

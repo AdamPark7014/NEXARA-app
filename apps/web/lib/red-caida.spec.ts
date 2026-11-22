@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MENSAJE_SIN_CONEXION, esErrorDeRed, esTextoDeRedCaida, traducirFallosDeRed } from "./red-caida";
-import { errorSeguidoDe, formatApiError } from "./erp-api";
+import { MENSAJE_SERVIDOR_CON_PROBLEMA, errorSeguidoDe, formatApiError } from "./erp-api";
 
 describe("red caída", () => {
   let quitar: (() => void) | null = null;
@@ -68,6 +68,51 @@ describe("red caída", () => {
       "El servidor tuvo un problema. Vuelve a intentarlo en un momento.",
     );
     expect(formatApiError(new Error("El código ya se usó"), "No se pudo")).toBe("El código ya se usó");
+  });
+
+  it("los genéricos del marco salen en español, llegue el cuerpo como JSON o como texto", () => {
+    const cuerpo = (message: unknown, statusCode: number, error?: string) =>
+      new Error(JSON.stringify({ statusCode, message, error }));
+    const sesion = "Tu sesión expiró. Vuelve a iniciar sesión.";
+    const permiso = "No tienes permiso para esta acción.";
+    const intentos = "Demasiados intentos seguidos. Espera un momento y vuelve a intentarlo.";
+    const archivo = "El archivo pesa más de lo permitido.";
+
+    expect(formatApiError(cuerpo("Unauthorized", 401), "No se pudo cargar")).toBe(sesion);
+    expect(formatApiError(new Error("HTTP 401"), "No se pudo cargar")).toBe(sesion);
+    expect(formatApiError(cuerpo("Forbidden resource", 403, "Forbidden"), "No se pudo cargar")).toBe(permiso);
+    expect(formatApiError(new Error("Forbidden"), "No se pudo cargar")).toBe(permiso);
+    expect(formatApiError(new Error("HTTP 403"), "No se pudo cargar")).toBe(permiso);
+    expect(formatApiError(cuerpo("ThrottlerException: Too Many Requests", 429), "No se pudo enviar")).toBe(intentos);
+    expect(formatApiError("Too Many Requests", "No se pudo enviar")).toBe(intentos);
+    expect(formatApiError(cuerpo("File too large", 413, "Payload Too Large"), "No se pudo subir")).toBe(archivo);
+    expect(formatApiError(new Error("Request Entity Too Large"), "No se pudo subir")).toBe(archivo);
+    expect(formatApiError(cuerpo("Bad Gateway", 502), "No se pudo cargar")).toBe(MENSAJE_SERVIDOR_CON_PROBLEMA);
+    expect(formatApiError(new Error("Service Unavailable"), "No se pudo cargar")).toBe(MENSAJE_SERVIDOR_CON_PROBLEMA);
+  });
+
+  it("un genérico que no dice nada deja la frase de quien llamó, y un mensaje propio nunca se toca", () => {
+    expect(formatApiError(new Error(JSON.stringify({ statusCode: 400, error: "Bad Request" })), "No se pudo guardar")).toBe(
+      "No se pudo guardar",
+    );
+    expect(formatApiError(new Error(JSON.stringify({ statusCode: 404, message: "Not Found" })), "No se encontró")).toBe(
+      "No se encontró",
+    );
+    expect(formatApiError(new Error("Unexpected field"), "No se pudo subir")).toBe("No se pudo subir");
+    expect(
+      formatApiError(
+        new Error(JSON.stringify({ statusCode: 400, message: "Validation failed (numeric string is expected)", error: "Bad Request" })),
+        "No se pudo abrir el proyecto",
+      ),
+    ).toBe("No se pudo abrir el proyecto");
+    // Solo el texto exacto del marco: lo que el servidor redactó llega tal cual, aunque se parezca.
+    expect(
+      formatApiError(new Error(JSON.stringify({ statusCode: 403, message: "Solo tu jefe directo puede aprobar esto" })), "x"),
+    ).toBe("Solo tu jefe directo puede aprobar esto");
+    expect(
+      formatApiError(new Error(JSON.stringify({ statusCode: 400, message: ["Falta la descripción"], error: "Bad Request" })), "x"),
+    ).toBe("Falta la descripción");
+    expect(formatApiError(new Error("Proyecto no encontrado"), "x")).toBe("Proyecto no encontrado");
   });
 
   it("une el error con la frase siguiente sin dejar dos puntos seguidos", () => {

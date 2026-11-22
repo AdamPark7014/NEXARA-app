@@ -36,7 +36,7 @@ export class WorkProjectsService {
   async create(dto: CreateWorkProjectDto, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     if (!dto.title?.trim()) {
-      throw new BadRequestException('Titulo requerido');
+      throw new BadRequestException('Falta el título');
     }
 
     return this.prisma.workProject.create({
@@ -131,7 +131,7 @@ export class WorkProjectsService {
     const project = await this.findOne(projectId, companyId);
     const amount = this.toDecimal(dto.amount);
     if (!amount) {
-      throw new BadRequestException('Monto invalido');
+      throw new BadRequestException('Monto no válido');
     }
 
     const expense = await this.prisma.workProjectExpense.create({
@@ -153,7 +153,7 @@ export class WorkProjectsService {
     const project = await this.findOne(projectId, companyId);
     const amount = this.toDecimal(dto.amount);
     if (!amount) {
-      throw new BadRequestException('Monto invalido');
+      throw new BadRequestException('Monto no válido');
     }
 
     const payroll = await this.prisma.workProjectPayroll.create({

@@ -1,5 +1,44 @@
 # RELEVO
 
+- **21-11 ~18:15 México (claude-code, nube; Cursor/Codex no alcanzables) — Séptima vuelta de pulido: que el servidor nunca conteste en inglés. Solo textos; sin migraciones; sin desplegar.**
+  - **Validación de formularios (API, `common/validacion-es.ts`):** unas 1,300 reglas de `class-validator` no traen
+    mensaje propio y contestaban con el texto de la librería: «amount must be a positive number», «property stock
+    should not exist». `ValidacionEnEspanolPipe` es el `ValidationPipe` de siempre (mismas opciones en `main.ts`,
+    mismo 400, misma forma `message: string[]`) y solo traduce esos textos por defecto: «El monto debe ser mayor que
+    cero», «Falta la descripción», «La cantidad del renglón 2 debe ser un número entero», «El campo «stock» no se
+    admite aquí». Unos 90 campos comunes llevan su nombre como se dice («el monto», «la fecha de inicio»); el resto
+    sale «el campo «x»». El mensaje propio de un DTO y cualquier texto que no se reconozca pasan intactos. La prueba
+    corre contra la librería real, con las mismas opciones del servidor.
+  - **Mensajes de error (API, 86 en 28 archivos):** 23 estaban en inglés («Project not found», «Engineer already
+    assigned to this project», «Invalid base64 image data», «Image file too large. Max size: 5MB…», «Cannot close
+    project…») y 22 en español sin acentos («Fecha invalida», «Rango invalido», «Credenciales invalidas», «Decision
+    invalida», «Cotizacion no encontrada», «Solo se permiten imagenes o PDF»). Ahora «Proyecto no encontrado», «Esa
+    persona ya está asignada a este proyecto», «La imagen pesa 6.20 MB y el máximo es 5 MB», «Fecha no válida»,
+    «Rango de fechas no válido»… El aviso de presupuesto decía «Costs $X > Budget $Y»; ahora «los costos ($X) superan
+    el presupuesto ($Y) por $Z». Solo cambia el texto: mismos códigos y mismas condiciones. Antes de tocar cada uno se
+    buscó en web, Android, iOS y pruebas: ninguno dependía del texto viejo. No se tocaron los de máquinas (métricas,
+    OIDC, `Idempotency-Key`, API keys) ni los que pone el marco («Unauthorized», «Forbidden resource», «File too
+    large»): iOS reconoce esos por su texto y Android por su código.
+  - **Web:** `formatApiError` traduce también los genéricos del marco, solo cuando llegan con su texto exacto
+    (como JSON o como texto): «Unauthorized» → «Tu sesión expiró. Vuelve a iniciar sesión.», «Forbidden resource» →
+    «No tienes permiso para esta acción.», «Too Many Requests» → «Demasiados intentos seguidos. Espera un momento y
+    vuelve a intentarlo.», «Payload Too Large» / «File too large» → «El archivo pesa más de lo permitido.», «Bad
+    Gateway» y parecidos → «El servidor tuvo un problema…». «Bad Request», «Not Found» y el «Validation failed
+    (numeric string is expected)» de un id mal formado en la URL (585 `ParseIntPipe`) no dicen nada: gana la frase de
+    la pantalla («No se pudo guardar…»). Un mensaje redactado por el servidor nunca se toca. Los lugares que
+    leen el texto crudo para decidir (`esErrorSinAcceso`, `HerramientasChecklist`, proyectos) siguen igual, y la
+    bitácora de contabilidad reconoce el permiso también con la frase nueva. «Solo se permiten imágenes o PDF.» en la
+    solicitud de viáticos.
+  - **iOS:** los datos de demostración (`DemoFixtures+PorRol.swift`) repiten los textos nuevos del servidor.
+  - **Paridad:** Web hecho · API hecho (textos) · Android hecho: muestra el mensaje del servidor, ya en español, y los
+    genéricos del marco ya los traducía por código (`ApiErrors.kt`); solo cambió un comentario · iOS hecho: igual
+    (`NxFriendlyError`), más los datos de demostración.
+  - **Prueba que fallaba según la hora (API, `attendance-duplicados.spec.ts`):** «una jornada abierta de AYER se cierra
+    sola» usaba «ahora menos 24 h» como fecha del día; de las 18:00 a la medianoche de México ese instante ya cae en
+    el día de hoy y la prueba fallaba. Ahora arma el día con `workDateColumn`, como el servicio. El servicio no cambió.
+  - **Verificado:** `npm run typecheck` 0; jest API 6,584 de 6,585 en la corrida completa (la que falló era la prueba de asistencias de arriba; corregida y vuelta a correr sola, 8 de 8); vitest web 2,399 de 2,400 (solo `ComoSeHace.spec.tsx`, ajena y ya conocida); `ios-static-check.py`
+    sin problemas.
+
 - **21-11 ~18:00 México (claude-code, nube; Cursor/Codex no alcanzables) — Sexta vuelta de pulido: tema oscuro legible y teléfono con el dedo. Sin migraciones; sin desplegar.**
   - **Cómo se midió:** un navegador recorrió las 26 pantallas del menú a 390 px, en claro y en oscuro, midiendo lo que se
     sale de la pantalla, los controles de menos de 24 px y el contraste de cada texto contra su fondo real. Nada se

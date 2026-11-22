@@ -169,7 +169,7 @@ export class VentasOportunidadesController {
       const isImage = (file.mimetype || '').startsWith('image/');
       return !isPdf && !isImage;
     });
-    if (invalid) throw new BadRequestException('Solo se permiten imagenes o PDF');
+    if (invalid) throw new BadRequestException('Solo se permiten imágenes o PDF');
 
     const payload = files.map((file) => ({
       url: `/uploads/sales-evidences/${file.filename}`,

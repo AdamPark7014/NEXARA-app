@@ -13,7 +13,7 @@ export function saveBase64Photo(
   filename?: string,
 ): string {
   if (!base64Data || typeof base64Data !== 'string') {
-    throw new BadRequestException('Photo data is invalid');
+    throw new BadRequestException('La foto no es válida');
   }
 
   // Extract the base64 string (remove data:image/...;base64, prefix if present)
@@ -31,13 +31,13 @@ export function saveBase64Photo(
   try {
     buffer = Buffer.from(base64String, 'base64');
   } catch (error) {
-    throw new BadRequestException('Invalid base64 image data');
+    throw new BadRequestException('La imagen no se pudo leer. Vuelve a elegirla.');
   }
 
   // Check file size (e.g., max 5MB for photos)
   const maxSize = 5 * 1024 * 1024; // 5MB
   if (buffer.length > maxSize) {
-    throw new BadRequestException(`Image file too large. Max size: 5MB, got: ${(buffer.length / 1024 / 1024).toFixed(2)}MB`);
+    throw new BadRequestException(`La imagen pesa ${(buffer.length / 1024 / 1024).toFixed(2)} MB y el máximo es 5 MB`);
   }
 
   // Ensure upload directory exists
@@ -53,7 +53,7 @@ export function saveBase64Photo(
     fs.writeFileSync(filePath, buffer);
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new BadRequestException(`Failed to save photo: ${errorMsg}`);
+    throw new BadRequestException(`No se pudo guardar la foto: ${errorMsg}`);
   }
 
   // Return relative URL path (without uploads/ prefix for consistency with existing paths)
@@ -71,7 +71,7 @@ export function saveBase64Pdf(
   filename?: string,
 ): string {
   if (!base64Data || typeof base64Data !== 'string') {
-    throw new BadRequestException('PDF data is invalid');
+    throw new BadRequestException('El PDF no es válido');
   }
 
   let base64String = base64Data;
@@ -89,13 +89,13 @@ export function saveBase64Pdf(
   try {
     buffer = Buffer.from(base64String, 'base64');
   } catch (error) {
-    throw new BadRequestException('Invalid base64 PDF data');
+    throw new BadRequestException('El PDF no se pudo leer. Vuelve a elegirlo.');
   }
 
   // Max 20MB for PDFs
   const maxSize = 20 * 1024 * 1024;
   if (buffer.length > maxSize) {
-    throw new BadRequestException(`PDF file too large. Max size: 20MB, got: ${(buffer.length / 1024 / 1024).toFixed(2)}MB`);
+    throw new BadRequestException(`El PDF pesa ${(buffer.length / 1024 / 1024).toFixed(2)} MB y el máximo es 20 MB`);
   }
 
   const uploadDir = getUploadSubdir(dirname, subdir);
@@ -108,7 +108,7 @@ export function saveBase64Pdf(
     fs.writeFileSync(filePath, buffer);
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new BadRequestException(`Failed to save PDF: ${errorMsg}`);
+    throw new BadRequestException(`No se pudo guardar el PDF: ${errorMsg}`);
   }
 
   return `/${subdir}/${finalFilename}`;

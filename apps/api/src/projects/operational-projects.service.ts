@@ -66,7 +66,7 @@ export class OperationalProjectsService {
     if (tenantId != null) {
       assertCompanyAccess(op, tenantId, 'Project');
     } else if (!op) {
-      throw new NotFoundException('Project not found');
+      throw new NotFoundException('Proyecto no encontrado');
     }
     if (op.salesProjectId && op.salesProject) {
       return { operationalProject: op, salesProject: op.salesProject, created: false };
@@ -183,7 +183,7 @@ export class OperationalProjectsService {
     });
 
     if (!vendor) {
-      throw new NotFoundException('Vendor not found');
+      throw new NotFoundException('Proveedor no encontrado');
     }
 
     // Verify that the client exists
@@ -192,7 +192,7 @@ export class OperationalProjectsService {
     });
 
     if (!client) {
-      throw new NotFoundException('Client not found');
+      throw new NotFoundException('Cliente no encontrado');
     }
 
     const ficha = evaluarCompletitud({
@@ -531,7 +531,7 @@ export class OperationalProjectsService {
     const actual = await this.findById(id, companyId);
 
     if (!esEstadoProyecto(statusDto.status)) {
-      throw new BadRequestException(`Invalid status. Must be one of: ${PROYECTO_ESTADOS.join(', ')}`);
+      throw new BadRequestException(`Estado no válido. Debe ser uno de: ${PROYECTO_ESTADOS.join(', ')}`);
     }
     if (actual?.status && !puedeTransicionar(actual.status, statusDto.status)) {
       throw new BadRequestException(
@@ -666,7 +666,7 @@ export class OperationalProjectsService {
     });
 
     if (existing) {
-      throw new BadRequestException('Engineer already assigned to this project');
+      throw new BadRequestException('Esa persona ya está asignada a este proyecto');
     }
 
     return this.projectEngineerRepo.create({
@@ -698,7 +698,7 @@ export class OperationalProjectsService {
     });
 
     if (!assignment) {
-      throw new NotFoundException('Engineer assignment not found');
+      throw new NotFoundException('Esa asignación ya no existe');
     }
 
     return this.projectEngineerRepo.delete({

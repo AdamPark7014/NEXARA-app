@@ -57,7 +57,7 @@ class PagosEmpleadosRepository(context: Context) {
     ): PagoEmpleadoDto = withContext(Dispatchers.IO) {
         apiSinCola.registrar(
             userId = textoMultipart(personaId.toString()),
-            // Sin comas: el servidor hace `Number(amount)`, y una de millares daría «Monto invalido».
+            // Sin comas: el servidor hace `Number(amount)`, y una de millares daría «Monto no válido».
             amount = textoMultipart(Dinero.formatear(centavos).replace(",", "")),
             concepto = textoMultipart(concepto.trim()),
             periodFrom = textoMultipart(desde),

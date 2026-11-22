@@ -34,7 +34,7 @@ export class OperationalProjectsController {
     if (value === undefined || value === null || value === '') return undefined;
     const parsed = Number(value);
     if (!Number.isInteger(parsed)) {
-      throw new BadRequestException('Validation failed (numeric string is expected)');
+      throw new BadRequestException('El identificador debe ser un número');
     }
     return parsed;
   }

@@ -297,7 +297,7 @@ export class AttendanceService {
     const tenantId = requireCompanyId(companyId);
     const base = date ? this.parseDateInput(date) : new Date();
     if (Number.isNaN(base.getTime())) {
-      throw new BadRequestException('Fecha invalida');
+      throw new BadRequestException('Fecha no válida');
     }
     const { start, end } = workDayBounds(base);
 
@@ -397,7 +397,7 @@ export class AttendanceService {
     const tenantId = requireCompanyId(companyId);
     const base = date ? this.parseDateInput(date) : new Date();
     if (Number.isNaN(base.getTime())) {
-      throw new BadRequestException('Fecha invalida');
+      throw new BadRequestException('Fecha no válida');
     }
     const day = this.getDateOnly(base);
     return this.prisma.attendanceDay.findFirst({
@@ -413,7 +413,7 @@ export class AttendanceService {
     const fromDate = this.parseDateInput(from);
     const toDate = this.parseDateInput(to);
     if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
-      throw new BadRequestException('Rango invalido');
+      throw new BadRequestException('Rango de fechas no válido');
     }
     const start = workDayStart(fromDate);
     const end = workDayEnd(toDate);
@@ -2617,7 +2617,7 @@ export class AttendanceService {
     const toDate = this.parseDateInput(to);
 
     if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
-      throw new BadRequestException('Rango invalido');
+      throw new BadRequestException('Rango de fechas no válido');
     }
 
     // Obtener usuarios accesibles (solo miembros del tenant)

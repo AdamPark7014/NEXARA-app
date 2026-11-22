@@ -203,7 +203,7 @@ export class VehiclesController {
   ) {
     const actividadId = Number(body.actividadId);
     if (!actividadId || Number.isNaN(actividadId)) {
-      throw new BadRequestException('actividadId invalido');
+      throw new BadRequestException('Actividad no válida');
     }
 
     const fechaInicioSolicitada = body.fechaInicioSolicitada ? new Date(body.fechaInicioSolicitada) : null;
@@ -470,7 +470,7 @@ export class VehiclesController {
       throw new BadRequestException('Archivos requeridos');
     }
     if (files.length < 5) {
-      throw new BadRequestException('Debes subir minimo 5 fotos de entrega');
+      throw new BadRequestException('Debes subir al menos 5 fotos de entrega');
     }
 
     const record = await this.vehiclesService.findOne(+id, companyId);

@@ -121,14 +121,14 @@ export class PdfGeneratorService {
       where: { id: opportunityQuoteId },
       include: { opportunity: { include: { client: true } }, cotizacion: { include: { items: true } }, createdBy: true },
     });
-    if (!quote) throw new BadRequestException('Quote or client not found');
+    if (!quote) throw new BadRequestException('No se encontró la cotización o su cliente');
 
     const tenantId = (quote.opportunity as any)?.companyId ?? null;
     const client = await this.prisma.salesClient.findFirst({
       where: { id: clientId, ...companyWhere(tenantId) },
     });
     assertCompanyAccess(client, tenantId, 'Cliente');
-    if (!client) throw new BadRequestException('Quote or client not found');
+    if (!client) throw new BadRequestException('No se encontró la cotización o su cliente');
 
     const template = templateId
       ? await this.prisma.orderTemplate.findFirst({
@@ -188,9 +188,9 @@ export class PdfGeneratorService {
       where: { id: projectId },
       include: { opportunity: { include: { client: true, quotes: { orderBy: { createdAt: 'desc' }, take: 1, include: { cotizacion: { include: { items: true } }, createdBy: true } } } } },
     });
-    if (!project) throw new BadRequestException('Project not found');
+    if (!project) throw new BadRequestException('Proyecto no encontrado');
     const client = (project.opportunity as any)?.client;
-    if (!client) throw new BadRequestException('Client not found');
+    if (!client) throw new BadRequestException('Cliente no encontrado');
     const template = templateId
       ? await this.prisma.orderTemplate.findUnique({ where: { id: templateId } })
       : await this.prisma.orderTemplate.findFirst({

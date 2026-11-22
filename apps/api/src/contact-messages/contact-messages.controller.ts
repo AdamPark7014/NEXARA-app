@@ -38,7 +38,7 @@ export class ContactMessagesController {
   ) {
     const expectedToken = process.env.INBOUND_EMAIL_TOKEN;
     if (!expectedToken || token !== expectedToken) {
-      throw new UnauthorizedException('Token invalido');
+      throw new UnauthorizedException('Token no válido');
     }
     return this.contactMessagesService.ingestInbound(inboundContactMessageDto);
   }

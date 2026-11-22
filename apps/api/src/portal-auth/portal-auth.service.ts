@@ -109,9 +109,9 @@ export class PortalAuthService {
         where: { id: rawId, isActive: true },
         select: { id: true, slug: true },
       });
-      if (!byId) throw new UnauthorizedException('Credenciales invalidas');
+      if (!byId) throw new UnauthorizedException('Credenciales inválidas');
       if (slug && byId.slug?.toLowerCase() !== slug) {
-        throw new UnauthorizedException('Credenciales invalidas');
+        throw new UnauthorizedException('Credenciales inválidas');
       }
       return byId.id;
     }
@@ -120,7 +120,7 @@ export class PortalAuthService {
       where: { slug, isActive: true },
       select: { id: true },
     });
-    if (!bySlug) throw new UnauthorizedException('Credenciales invalidas');
+    if (!bySlug) throw new UnauthorizedException('Credenciales inválidas');
     return bySlug.id;
   }
 
@@ -186,7 +186,7 @@ export class PortalAuthService {
         meta,
       });
       this.fallos.registrar(claveFallos);
-      throw new UnauthorizedException('Credenciales invalidas');
+      throw new UnauthorizedException('Credenciales inválidas');
     }
     const isValid = await bcrypt.compare(password, client.portalPasswordHash);
     if (!isValid) {
@@ -199,7 +199,7 @@ export class PortalAuthService {
         meta,
       });
       this.fallos.registrar(claveFallos);
-      throw new UnauthorizedException('Credenciales invalidas');
+      throw new UnauthorizedException('Credenciales inválidas');
     }
     this.fallos.limpiar(claveFallos);
 
@@ -274,7 +274,7 @@ export class PortalAuthService {
         meta,
       });
       this.fallos.registrar(claveFallos);
-      throw new UnauthorizedException('Credenciales invalidas');
+      throw new UnauthorizedException('Credenciales inválidas');
     }
     const isValid = await bcrypt.compare(password, branch.portalPasswordHash);
     if (!isValid) {
@@ -287,7 +287,7 @@ export class PortalAuthService {
         meta,
       });
       this.fallos.registrar(claveFallos);
-      throw new UnauthorizedException('Credenciales invalidas');
+      throw new UnauthorizedException('Credenciales inválidas');
     }
     this.fallos.limpiar(claveFallos);
 

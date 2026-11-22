@@ -150,9 +150,9 @@ export class UsersService {
       if (peerMembership?.user) {
         const existing = peerMembership.user;
         if (this.isProtectedSuperAdminEmail(existing.email)) {
-          throw new ConflictException('El numero de empleado ya existe (reservado por un usuario protegido no visible en la lista)');
+          throw new ConflictException('El número de empleado ya existe (reservado por un usuario protegido no visible en la lista)');
         }
-        throw new ConflictException(`El numero de empleado ya existe (usuario: ${existing.nombre || existing.email})`);
+        throw new ConflictException(`El número de empleado ya existe (usuario: ${existing.nombre || existing.email})`);
       }
 
       return normalized;
@@ -170,10 +170,10 @@ export class UsersService {
 
     if (existing) {
       if (this.isProtectedSuperAdminEmail(existing.email)) {
-        throw new ConflictException('El numero de empleado ya existe (reservado por un usuario protegido no visible en la lista)');
+        throw new ConflictException('El número de empleado ya existe (reservado por un usuario protegido no visible en la lista)');
       }
 
-      throw new ConflictException(`El numero de empleado ya existe (usuario: ${existing.nombre || existing.email})`);
+      throw new ConflictException(`El número de empleado ya existe (usuario: ${existing.nombre || existing.email})`);
     }
 
     return normalized;

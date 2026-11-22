@@ -516,7 +516,7 @@ export class ClientPortalController {
     if (!request) throw new BadRequestException('Solicitud no encontrada');
     const decision = String(body.decision || '').toUpperCase();
     if (!['APPROVED', 'REJECTED'].includes(decision)) {
-      throw new BadRequestException('Decision invalida');
+      throw new BadRequestException('Decisión no válida');
     }
     const decisionStatus = decision as ClientTicketStatus;
     return this.prisma['clientTicketRequest'].update({
@@ -990,7 +990,7 @@ export class ClientPortalController {
     }
     const decision = String(body?.decision || '').toUpperCase();
     if (!['APPROVED', 'REJECTED'].includes(decision)) {
-      throw new BadRequestException('Decision invalida');
+      throw new BadRequestException('Decisión no válida');
     }
     return this.inventoriesService.updateStatus(id, decision, companyId);
   }

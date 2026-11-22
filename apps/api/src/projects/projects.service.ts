@@ -65,7 +65,7 @@ export class ProjectsService {
     }
 
     if (gallery.length !== 8) {
-      throw new BadRequestException('La galeria debe tener exactamente 8 imagenes');
+      throw new BadRequestException('La galería debe tener exactamente 8 imágenes');
     }
 
     const slug = this.ensureSlug(payload.slug || payload.title);
@@ -193,11 +193,11 @@ export class ProjectsService {
       const totalCount = keep.length + newFiles.length;
 
       if (newFiles.length && totalCount !== 8) {
-        throw new BadRequestException('La galeria debe tener exactamente 8 imagenes');
+        throw new BadRequestException('La galería debe tener exactamente 8 imágenes');
       }
 
       if (!newFiles.length && keep.length !== 8) {
-        throw new BadRequestException('La galeria debe tener exactamente 8 imagenes');
+        throw new BadRequestException('La galería debe tener exactamente 8 imágenes');
       }
 
       const removed = existing.gallery.filter((item) => !keep.includes(item));

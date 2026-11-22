@@ -22,7 +22,7 @@ export class GpsController {
     @Body() createGpsDto: CreateGpsDto,
   ) {
     if (createGpsDto.usuarioId && createGpsDto.usuarioId !== user.id) {
-      throw new ForbiddenException('Solo puedes registrar tu propia ubicacion');
+      throw new ForbiddenException('Solo puedes registrar tu propia ubicación');
     }
     return this.gpsService.create(
       {
@@ -97,7 +97,7 @@ export class GpsController {
     }
 
     if (!location.usuario?.locationConsent) {
-      throw new ForbiddenException('El usuario no comparte su ubicacion');
+      throw new ForbiddenException('El usuario no comparte su ubicación');
     }
 
     return location;

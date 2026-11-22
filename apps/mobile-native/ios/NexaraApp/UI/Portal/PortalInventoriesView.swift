@@ -291,7 +291,7 @@ final class PortalInventoryDetailVM: ObservableObject {
     }
 
     /// `APPROVED` | `REJECTED`. La pantalla anterior mandaba `APPROVE` / `REJECT`
-    /// y el API respondía 400 «Decision invalida»: aprobar nunca funcionó.
+    /// y el API respondía 400 «Decisión no válida»: aprobar nunca funcionó.
     func decide(_ decision: String) {
         guard !saving else { return }
         saving = true

@@ -104,7 +104,7 @@ export class ProjectsController {
       const realUploadDir = await fs.realpath(uploadDir);
 
       if (!realPath.startsWith(realUploadDir)) {
-        throw new NotFoundException('File not found');
+        throw new NotFoundException('Archivo no encontrado');
       }
 
       await fs.access(filepath);
@@ -115,7 +115,7 @@ export class ProjectsController {
       const stream = createReadStream(filepath);
       stream.pipe(res);
     } catch (_error) {
-      throw new NotFoundException('Image not found');
+      throw new NotFoundException('Imagen no encontrada');
     }
   }
 
@@ -181,7 +181,7 @@ export class ProjectsController {
 
     for (const file of files) {
       if (!allowedMimes.includes(file.mimetype) || file.size > maxSize) {
-        throw new BadRequestException('Invalid image file format');
+        throw new BadRequestException('Formato de imagen no válido');
       }
     }
   }

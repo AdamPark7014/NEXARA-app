@@ -216,7 +216,7 @@ export class CotizacionesService {
       candidate = `${base}-${String(counter).padStart(3, '0')}`;
       counter += 1;
       if (counter > 999) {
-        throw new BadRequestException('No se pudo generar un folio unico');
+        throw new BadRequestException('No se pudo generar un folio único');
       }
     }
     return candidate;
@@ -1105,7 +1105,7 @@ export class CotizacionesService {
         include: { items: { orderBy: { id: 'asc' } } },
       });
     });
-    if (!quote) throw new NotFoundException('Cotizacion no encontrada');
+    if (!quote) throw new NotFoundException('Cotización no encontrada');
     return runWithTenantAsync({ ...getTenantStore(), companyId: quote.companyId, bypass: false }, () => trabajo(quote));
   }
 

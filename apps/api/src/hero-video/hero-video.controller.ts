@@ -85,7 +85,7 @@ export class HeroVideoController {
       }
 
       if (!filepath) {
-        throw new NotFoundException('Video not found');
+        throw new NotFoundException('Video no encontrado');
       }
 
       const stat = await fs.stat(filepath);
@@ -118,7 +118,7 @@ export class HeroVideoController {
       res.setHeader('Content-Length', chunkEnd - chunkStart + 1);
       createReadStream(filepath, { start: chunkStart, end: chunkEnd }).pipe(res);
     } catch {
-      throw new NotFoundException('Video not found');
+      throw new NotFoundException('Video no encontrado');
     }
   }
 

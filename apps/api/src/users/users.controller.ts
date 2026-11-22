@@ -56,7 +56,7 @@ const buildAvatarUploadOptions = (dirname: string) => {
     fileFilter: (_req: any, file: any, cb: any) => {
       const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
       if (!allowed.includes(String(file.mimetype || '').toLowerCase())) {
-        cb(new BadRequestException('Solo se permiten imagenes JPG, PNG o WEBP'), false);
+        cb(new BadRequestException('Solo se permiten imágenes JPG, PNG o WEBP'), false);
         return;
       }
       cb(null, true);

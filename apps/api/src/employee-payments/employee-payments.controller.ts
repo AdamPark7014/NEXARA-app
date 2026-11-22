@@ -57,7 +57,7 @@ export class EmployeePaymentsController {
       const isImage = (file.mimetype || '').startsWith('image/') || /\.(png|jpe?g|webp)$/.test(name);
       return !isPdf && !isImage;
     });
-    if (invalid) throw new BadRequestException('Solo se permiten imagenes o PDF');
+    if (invalid) throw new BadRequestException('Solo se permiten imágenes o PDF');
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
@@ -237,7 +237,7 @@ export class EmployeePaymentsController {
   ) {
     await this.gate(user, companyId);
     const parsedUserId = userId ? Number(userId) : undefined;
-    if (userId && Number.isNaN(parsedUserId)) throw new BadRequestException('Empleado invalido');
+    if (userId && Number.isNaN(parsedUserId)) throw new BadRequestException('Empleado no válido');
     return this.service.analytics(user, { from, to, userId: parsedUserId }, companyId);
   }
 
@@ -254,7 +254,7 @@ export class EmployeePaymentsController {
   ) {
     await this.gate(user, companyId);
     const parsedUserId = userId ? Number(userId) : undefined;
-    if (userId && Number.isNaN(parsedUserId)) throw new BadRequestException('Empleado invalido');
+    if (userId && Number.isNaN(parsedUserId)) throw new BadRequestException('Empleado no válido');
     const buffer = await this.service.reportPdf(
       user,
       { from, to, userId: parsedUserId },
@@ -284,7 +284,7 @@ export class EmployeePaymentsController {
     await this.gate(user, companyId);
     const parsedUserId = userId ? Number(userId) : undefined;
     if (userId && Number.isNaN(parsedUserId)) {
-      throw new BadRequestException('Empleado invalido');
+      throw new BadRequestException('Empleado no válido');
     }
     return this.service.findAll(user, { from, to, userId: parsedUserId, status }, query, companyId);
   }

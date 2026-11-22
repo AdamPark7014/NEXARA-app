@@ -510,11 +510,11 @@ extension DemoStore {
     }
 
     private func porRolRegistrarPago(_ campos: [String: String]) -> DemoRespuesta {
-        guard let userId = Int(campos["userId"] ?? ""), userId > 0 else { return porRolError(400, "Empleado invalido") }
+        guard let userId = Int(campos["userId"] ?? ""), userId > 0 else { return porRolError(400, "Empleado no válido") }
         guard let desde = campos["periodFrom"], let hasta = campos["periodTo"], !desde.isEmpty, desde <= hasta else {
-            return porRolError(400, "Rango invalido")
+            return porRolError(400, "Rango de fechas no válido")
         }
-        guard let monto = campos["amount"], (Double(monto) ?? 0) > 0 else { return porRolError(400, "Monto invalido") }
+        guard let monto = campos["amount"], (Double(monto) ?? 0) > 0 else { return porRolError(400, "Monto no válido") }
         let id = porRolSiguienteId()
         let concepto = (campos["concepto"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let pago = dj([

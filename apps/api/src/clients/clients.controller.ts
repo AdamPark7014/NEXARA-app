@@ -60,14 +60,14 @@ export class ClientsController {
       const realPath = await fs.realpath(filepath);
       const realUploadDir = await fs.realpath(uploadDir);
       if (!realPath.startsWith(realUploadDir)) {
-        throw new NotFoundException('File not found');
+        throw new NotFoundException('Archivo no encontrado');
       }
       await fs.access(filepath);
       res.setHeader('Content-Type', 'image/jpeg');
       res.setHeader('Cache-Control', 'public, max-age=3600');
       createReadStream(filepath).pipe(res);
     } catch {
-      throw new NotFoundException('File not found');
+      throw new NotFoundException('Archivo no encontrado');
     }
   }
 

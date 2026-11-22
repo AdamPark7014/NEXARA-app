@@ -2113,7 +2113,7 @@ export class VentasService {
     if (costs.isOverBudget) {
       return {
         valid: false,
-        message: `Exceso de presupuesto: Costs $${costs.totalCost.toFixed(2)} > Budget $${costs.budget.toFixed(2)}. Diferencia: $${(costs.totalCost - costs.budget).toFixed(2)}`,
+        message: `Exceso de presupuesto: los costos ($${costs.totalCost.toFixed(2)}) superan el presupuesto ($${costs.budget.toFixed(2)}) por $${(costs.totalCost - costs.budget).toFixed(2)}`,
       };
     }
 
@@ -2265,7 +2265,7 @@ export class VentasService {
 
     const validation = await this.validateProjectBudget(projectId, user, companyId ?? user?.companyId);
     if (!validation.valid) {
-      throw new BadRequestException(`Cannot close project: ${validation.message}`);
+      throw new BadRequestException(`No se puede cerrar el proyecto: ${validation.message}`);
     }
 
     let order = project.closureOrder;

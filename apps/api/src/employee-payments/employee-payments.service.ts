@@ -533,10 +533,10 @@ export class EmployeePaymentsService {
     const fromDate = this.toDate(filters.from);
     const toDate = this.toDate(filters.to);
     if ((filters.from && !fromDate) || (filters.to && !toDate)) {
-      throw new BadRequestException('Rango invalido');
+      throw new BadRequestException('Rango de fechas no válido');
     }
     if (fromDate && toDate && fromDate > toDate) {
-      throw new BadRequestException('Rango invalido');
+      throw new BadRequestException('Rango de fechas no válido');
     }
 
     const where: Prisma.EmployeePaymentWhereInput = {
@@ -583,16 +583,16 @@ export class EmployeePaymentsService {
   ) {
     const userId = Number(dto.userId);
     if (!userId || Number.isNaN(userId)) {
-      throw new BadRequestException('Empleado invalido');
+      throw new BadRequestException('Empleado no válido');
     }
     const periodFrom = this.toDate(dto.periodFrom);
     const periodTo = this.toDate(dto.periodTo);
     if (!periodFrom || !periodTo || periodFrom > periodTo) {
-      throw new BadRequestException('Rango invalido');
+      throw new BadRequestException('Rango de fechas no válido');
     }
     const amount = this.toDecimal(dto.amount);
     if (!amount || Number(amount) <= 0) {
-      throw new BadRequestException('Monto invalido');
+      throw new BadRequestException('Monto no válido');
     }
     const totalMinutes =
       dto.totalMinutes && !Number.isNaN(dto.totalMinutes) ? Math.max(0, Math.round(dto.totalMinutes)) : 0;
@@ -652,21 +652,21 @@ export class EmployeePaymentsService {
     const data: Prisma.EmployeePaymentUpdateInput = {};
     if (dto.userId !== undefined) {
       const userId = Number(dto.userId);
-      if (!userId || Number.isNaN(userId)) throw new BadRequestException('Empleado invalido');
+      if (!userId || Number.isNaN(userId)) throw new BadRequestException('Empleado no válido');
       data.user = { connect: { id: userId } };
     }
     if (dto.periodFrom !== undefined || dto.periodTo !== undefined) {
       const periodFrom = this.toDate(dto.periodFrom ?? existing.periodFrom.toISOString().slice(0, 10));
       const periodTo = this.toDate(dto.periodTo ?? existing.periodTo.toISOString().slice(0, 10));
       if (!periodFrom || !periodTo || periodFrom > periodTo) {
-        throw new BadRequestException('Rango invalido');
+        throw new BadRequestException('Rango de fechas no válido');
       }
       data.periodFrom = periodFrom;
       data.periodTo = periodTo;
     }
     if (dto.amount !== undefined) {
       const amount = this.toDecimal(dto.amount);
-      if (!amount || Number(amount) <= 0) throw new BadRequestException('Monto invalido');
+      if (!amount || Number(amount) <= 0) throw new BadRequestException('Monto no válido');
       data.amount = amount;
     }
     if (dto.totalMinutes !== undefined) {
