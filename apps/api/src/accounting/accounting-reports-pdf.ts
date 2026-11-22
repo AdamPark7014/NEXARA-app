@@ -3,13 +3,14 @@ import {
   PDF_CONTENT_START_Y,
   PDF_MODULE_ACCENTS,
   drawKpiCards,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawSummaryBox,
   drawTableHeader,
   drawTableRow,
   loadNexaraLogo,
+  pdfFecha,
   pdfMoney,
   pdfTruncate,
   type PdfTableColumn,
@@ -66,16 +67,13 @@ export type FinancialReportPayload = {
   };
 };
 
-const formatDate = (date: string | Date | null | undefined): string => {
-  if (!date) return '-';
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
-};
+const formatDate = (date: string | Date | null | undefined): string => pdfFecha(date);
 
 export const generateFinancialReportsPdf = (payload: FinancialReportPayload): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    // NO usar bufferPages: true - causa que se creen páginas fantasma
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    // `bufferPages` deja volver a cada hoja al final para ponerle el pie con su número. El pie se pinta
+    // dentro del margen y en un renglón (`drawNexaraFooter`): fuera de él PDFKit abría hojas en blanco.
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
     const chunks: Buffer[] = [];
 
     doc.on('data', (chunk) => chunks.push(chunk));
@@ -99,12 +97,11 @@ export const generateFinancialReportsPdf = (payload: FinancialReportPayload): Pr
         accent,
         logo,
         meta: [
-          { label: 'Periodo', value: `${from} - ${to}` },
+          { label: 'Periodo', value: `${from} al ${to}` },
           { label: 'Corte', value: asOf },
           { label: 'Generado', value: formatDate(new Date()) },
         ],
       });
-      drawNexaraFooter(doc, footerNote);
       doc.y = PDF_CONTENT_START_Y;
     };
 
@@ -140,7 +137,6 @@ export const generateFinancialReportsPdf = (payload: FinancialReportPayload): Pr
     // PÁGINA 1: BALANCE GENERAL
     // ═══════════════════════════════════════════════════════════════════════
     const balancePage = () => drawPage('Balance general', 'Posición financiera al corte');
-    doc.font('Helvetica');
     balancePage();
 
     drawSectionTitle(doc, 'Resumen ejecutivo');
@@ -265,6 +261,7 @@ export const generateFinancialReportsPdf = (payload: FinancialReportPayload): Pr
       );
     });
 
+    drawNexaraFooterOnEveryPage(doc, footerNote);
     doc.end();
   });
 };

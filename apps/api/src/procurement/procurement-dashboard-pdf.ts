@@ -4,17 +4,25 @@ import {
   PDF_CONTENT_START_Y,
   PDF_MODULE_ACCENTS,
   drawKpiCards,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawTableHeader,
   drawTableRow,
+  fuente,
   loadNexaraLogo,
+  pdfFecha,
   pdfMoney,
   pdfTruncate,
   type PdfTableColumn,
   type PdfTableContext,
 } from '../common/pdf/nexara-pdf-theme';
+import {
+  ETIQUETA_ESTATUS_OC,
+  ETIQUETA_ESTATUS_REQUISICION,
+  ETIQUETA_PRIORIDAD_COMPRA,
+  etiquetaDe,
+} from '../common/excel/etiquetas';
 
 export type ProcurementDashboardPayload = {
   fromDate?: string;
@@ -46,20 +54,16 @@ export type ProcurementDashboardPayload = {
   }>;
 };
 
-const formatDate = (date: string | Date | null | undefined): string => {
-  if (!date) return '-';
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
-};
+const formatDate = (date: string | Date | null | undefined): string => pdfFecha(date);
 
-const capitalize = (s: string | null | undefined) => {
-  if (!s) return '-';
-  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-};
+/** Los mismos nombres que enseña la pantalla de Compras: el reporte imprimía el valor interno («Sent», «Draft»). */
+export const estatusDeOrdenDeCompra = (valor: string | null | undefined) => etiquetaDe(ETIQUETA_ESTATUS_OC, valor);
+export const estatusDeRequisicion = (valor: string | null | undefined) => etiquetaDe(ETIQUETA_ESTATUS_REQUISICION, valor);
+export const prioridadDeRequisicion = (valor: string | null | undefined) => etiquetaDe(ETIQUETA_PRIORIDAD_COMPRA, valor);
 
 export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPayload): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
     const chunks: Buffer[] = [];
 
     doc.on('data', (chunk) => chunks.push(chunk));
@@ -82,11 +86,10 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
         accent,
         logo,
         meta: [
-          { label: 'Periodo', value: `${from} - ${to}` },
+          { label: 'Periodo', value: `${from} al ${to}` },
           { label: 'Generado', value: formatDate(new Date()) },
         ],
       });
-      drawNexaraFooter(doc, footerNote);
       doc.y = PDF_CONTENT_START_Y;
     };
 
@@ -102,7 +105,7 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
       doc.save();
       doc.rect(margin, y - 4, contentWidth, 24).fill(PDF_COLORS.softGray);
       doc.restore();
-      doc.fillColor(PDF_COLORS.muted).fontSize(9).font('Helvetica-Oblique')
+      doc.fillColor(PDF_COLORS.muted).fontSize(9).font(fuente(doc, 'texto'))
         .text(message, margin + 10, y + 2, { width: contentWidth - 20, align: 'center' });
       doc.y = y + 24;
     };
@@ -110,7 +113,6 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
     // ═══════════════════════════════════════════════════════════════════════
     // PÁGINA 1
     // ═══════════════════════════════════════════════════════════════════════
-    doc.font('Helvetica');
     drawPage();
 
     drawSectionTitle(doc, 'Resumen ejecutivo');
@@ -127,15 +129,15 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
 
     // ── Órdenes de compra (siempre visible como sección principal del reporte)
     ensureSectionSpace(90);
-    drawSectionTitle(doc, 'Ordenes de compra');
+    drawSectionTitle(doc, 'Órdenes de compra');
 
     const ocCols: PdfTableColumn[] = [
       { label: '#', width: 36 },
       { label: 'Proveedor', width: 160 },
-      { label: 'Fecha OC', width: 80 },
-      { label: 'F. Entrega', width: 80 },
+      { label: 'Fecha', width: 70 },
+      { label: 'Entrega', width: 70 },
       { label: 'Monto', width: 95, align: 'right' },
-      { label: 'Estatus', width: 64 },
+      { label: 'Estatus', width: 84 },
     ];
     const ocCtx: PdfTableContext = { columns: ocCols, onNewPage: drawPage };
 
@@ -148,11 +150,11 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
           doc,
           [
             `#${order.id}`,
-            pdfTruncate(order.supplierName, 28),
+            pdfTruncate(order.supplierName, 60),
             formatDate(order.orderDate),
             formatDate(order.expectedDate),
             pdfMoney(order.totalAmount),
-            capitalize(order.status),
+            estatusDeOrdenDeCompra(order.status),
           ],
           i,
           ocCtx,
@@ -160,18 +162,18 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
         );
       });
     } else {
-      drawEmptyRow('No hay ordenes de compra registradas en el periodo seleccionado.');
+      drawEmptyRow('No hay órdenes de compra registradas en el periodo seleccionado.');
     }
 
     // ── Top proveedores ─────────────────────────────────────────────────────
     if (payload.topSuppliers?.length > 0) {
       ensureSectionSpace(110);
-      drawSectionTitle(doc, 'Top proveedores (por evaluacion)');
+      drawSectionTitle(doc, 'Proveedores mejor evaluados');
 
       const supplierCols: PdfTableColumn[] = [
         { label: 'Proveedor', width: 290 },
         { label: 'Evaluaciones', width: 100 },
-        { label: 'Calificacion', width: 125 },
+        { label: 'Calificación', width: 125 },
       ];
       const supplierCtx: PdfTableContext = { columns: supplierCols, onNewPage: drawPage };
 
@@ -199,7 +201,7 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
 
       const reqCols: PdfTableColumn[] = [
         { label: '#', width: 36 },
-        { label: 'Titulo', width: 200 },
+        { label: 'Título', width: 200 },
         { label: 'Prioridad', width: 80 },
         { label: 'Estatus', width: 100 },
         { label: 'Fecha', width: 99 },
@@ -214,9 +216,9 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
           doc,
           [
             `#${req.id}`,
-            pdfTruncate(req.title, 38),
-            capitalize(req.priority),
-            capitalize(req.status),
+            pdfTruncate(req.title, 80),
+            prioridadDeRequisicion(req.priority),
+            estatusDeRequisicion(req.status),
             formatDate(req.createdAt),
           ],
           i,
@@ -226,6 +228,7 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
       });
     }
 
+    drawNexaraFooterOnEveryPage(doc, footerNote);
     doc.end();
   });
 };

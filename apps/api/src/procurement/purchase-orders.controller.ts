@@ -8,6 +8,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { generateProcurementDashboardPdf } from './procurement-dashboard-pdf.js';
 import { CreateSupplierDto } from './dto/supplier.dto.js';
+import { workDateKey } from '../common/time/workday.js';
 
 @Controller('procurement/purchase-orders')
 @UseGuards(RbacGuard)
@@ -64,12 +65,13 @@ export class PurchaseOrdersController {
       const data = await this.svc.getProcurementDashboardForPdf(fromDate, toDate, companyId);
       const payload = {
         ...data,
-        fromDate: fromDate ?? data.fromDate ?? new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10),
-        toDate: toDate ?? data.toDate ?? new Date().toISOString().slice(0, 10),
+        // El día se toma en la hora de la empresa: en UTC, después de las 6 de la tarde ya era «mañana».
+        fromDate: fromDate ?? data.fromDate ?? workDateKey(new Date(Date.now() - 30 * 86400000)),
+        toDate: toDate ?? data.toDate ?? workDateKey(new Date()),
       };
       const pdf = await generateProcurementDashboardPdf(payload);
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=reporte-compras-${new Date().toISOString().slice(0, 10)}.pdf`);
+      res.setHeader('Content-Disposition', `attachment; filename=reporte-compras-${workDateKey(new Date())}.pdf`);
       res.send(pdf);
     } catch (error) {
       res.status(500).json({ error: 'Error al generar PDF' });

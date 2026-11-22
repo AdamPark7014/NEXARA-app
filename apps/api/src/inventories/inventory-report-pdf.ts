@@ -7,15 +7,24 @@ import {
   PDF_MODULE_ACCENTS,
   drawInfoCard,
   drawKpiCards,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawTableHeader,
   drawTableRow,
+  fuente,
   loadNexaraLogo,
+  pdfCambio,
+  pdfFechaHora,
   type PdfTableContext,
 } from '../common/pdf/nexara-pdf-theme';
 import { getUploadSubdir } from '../common/upload-paths';
+import {
+  ETIQUETA_COMPARATIVA_INVENTARIO,
+  ETIQUETA_ESTATUS_EQUIPO,
+  ETIQUETA_ESTATUS_INVENTARIO,
+  etiquetaDe,
+} from '../common/excel/etiquetas';
 
 type InventoryReportInput = {
   snapshot: any;
@@ -68,7 +77,7 @@ const resolveImageBuffer = async (url?: string | null): Promise<Buffer | null> =
 
 export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportInput): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
     const chunks: Buffer[] = [];
 
     doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
@@ -88,12 +97,10 @@ export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportI
           logo,
           meta: [
             { label: 'Folio', value: `INV-${snapshot.id}` },
-            { label: 'Estado', value: toLabel(snapshot.status) },
+            { label: 'Estado', value: etiquetaDe(ETIQUETA_ESTATUS_INVENTARIO, snapshot.status) },
             {
               label: 'Actualizado',
-              value: snapshot.updatedAt
-                ? new Date(snapshot.updatedAt).toLocaleString('es-MX')
-                : '-',
+              value: pdfFechaHora(snapshot.updatedAt),
             },
           ],
         });
@@ -129,10 +136,10 @@ export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportI
         { label: 'No. sucursal', value: toLabel(snapshot.branch?.branchNumber) },
       ]);
       const metaH = drawInfoCard(doc, margin + leftWidth + 20, infoY, rightWidth, [
-        { label: 'Estado', value: toLabel(snapshot.status) },
+        { label: 'Estado', value: etiquetaDe(ETIQUETA_ESTATUS_INVENTARIO, snapshot.status) },
         { label: 'Folio', value: `INV-${snapshot.id}` },
         {
-          label: 'Items',
+          label: 'Equipos',
           value: String(items?.length ?? 0),
         },
       ]);
@@ -141,10 +148,10 @@ export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportI
       drawSectionTitle(doc, 'Detalle de equipos');
 
       const columns = [
-        { label: 'Sección / Equipo', width: 150 },
+        { label: 'Sección / equipo', width: 150 },
         { label: 'Estado', width: 70 },
         { label: 'Comparativa', width: 80 },
-        { label: 'Serie (antes→después)', width: 130 },
+        { label: 'Serie', width: 130 },
         { label: 'Modelo', width: contentWidth - 150 - 70 - 80 - 130 },
       ];
 
@@ -161,14 +168,14 @@ export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportI
       const list = items ?? [];
       list.forEach((item, index) => {
         const sectionEquip = `${toLabel(item.sectionName)} · ${toLabel(item.equipmentName)}`;
-        const serial = `${toLabel(item.serialBefore)} → ${toLabel(item.serialAfter)}`;
-        const model = `${toLabel(item.modelBefore)} → ${toLabel(item.modelAfter)}`;
+        const serial = pdfCambio(item.serialBefore, item.serialAfter);
+        const model = pdfCambio(item.modelBefore, item.modelAfter);
         drawTableRow(
           doc,
           [
             sectionEquip,
-            toLabel(item.itemStatus),
-            toLabel(item.compareState),
+            etiquetaDe(ETIQUETA_ESTATUS_EQUIPO, item.itemStatus),
+            etiquetaDe(ETIQUETA_COMPARATIVA_INVENTARIO, item.compareState),
             serial,
             model,
           ],
@@ -181,8 +188,8 @@ export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportI
         doc
           .fillColor(PDF_COLORS.muted)
           .fontSize(10)
-          .font('Helvetica')
-          .text('Sin equipos registrados en este snapshot.', margin, doc.y);
+          .font(fuente(doc, 'texto'))
+          .text('Sin equipos registrados en este inventario.', margin, doc.y);
         doc.moveDown();
       }
 
@@ -201,11 +208,11 @@ export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportI
 
         for (const item of list) {
           const photoEntries = [
-            { label: 'Panorámica ANTES', value: item.beforePanoramicPhotoUrl },
-            { label: 'Serie/modelo ANTES', value: item.beforeCloseupPhotoUrl },
-            { label: 'Panorámica DESPUÉS', value: item.afterPanoramicPhotoUrl },
-            { label: 'Serie/modelo DESPUÉS', value: item.afterCloseupPhotoUrl },
-            { label: 'Sticker mantenimiento', value: item.maintenanceStickerPhotoUrl },
+            { label: 'Antes · panorámica', value: item.beforePanoramicPhotoUrl },
+            { label: 'Antes · serie y modelo', value: item.beforeCloseupPhotoUrl },
+            { label: 'Después · panorámica', value: item.afterPanoramicPhotoUrl },
+            { label: 'Después · serie y modelo', value: item.afterCloseupPhotoUrl },
+            { label: 'Etiqueta de mantenimiento', value: item.maintenanceStickerPhotoUrl },
           ].filter((e) => cleanUrl(e.value));
 
           if (photoEntries.length === 0) continue;
@@ -219,7 +226,7 @@ export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportI
           doc
             .fillColor(PDF_COLORS.navy)
             .fontSize(10)
-            .font('Helvetica-Bold')
+            .font(fuente(doc, 'semi'))
             .text(
               `${toLabel(item.sectionName)} · ${toLabel(item.equipmentName)}`,
               margin,
@@ -232,14 +239,14 @@ export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportI
             doc
               .fillColor(PDF_COLORS.text)
               .fontSize(8)
-              .font('Helvetica')
+              .font(fuente(doc, 'texto'))
               .text(`Trabajo: ${item.maintenanceActions}`, { width: contentWidth });
           }
           if (item.maintenanceComments) {
             doc
               .fillColor(PDF_COLORS.muted)
               .fontSize(8)
-              .font('Helvetica')
+              .font(fuente(doc, 'texto'))
               .text(`Comentarios: ${item.maintenanceComments}`, { width: contentWidth });
           }
 
@@ -266,7 +273,7 @@ export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportI
             doc
               .fontSize(8)
               .fillColor(PDF_COLORS.muted)
-              .font('Helvetica')
+              .font(fuente(doc, 'texto'))
               .text(entry.label, x, y, { width: cardWidth, ellipsis: true });
 
             doc.save();
@@ -306,7 +313,7 @@ export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportI
         }
       }
 
-      drawNexaraFooter(doc, 'NEXARA · Reporte de inventario — información confidencial.');
+      drawNexaraFooterOnEveryPage(doc, 'NEXARA · Reporte de inventario — información confidencial.');
       doc.end();
     })().catch(reject);
   });

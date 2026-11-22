@@ -3,7 +3,7 @@ import {
   PDF_MODULE_ACCENTS,
   drawInfoCard,
   drawKpiCards,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawSummaryBox,
@@ -56,7 +56,7 @@ const formatDisplayDate = (iso?: string | null) => {
 
 export const generateGoodsReceiptPdf = (payload: GoodsReceiptPdfPayload): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -93,7 +93,7 @@ export const generateGoodsReceiptPdf = (payload: GoodsReceiptPdfPayload): Promis
     const kpiH = drawKpiCards(doc, doc.y, [
       { label: 'Partidas', value: String(payload.items.length), accent: ACCENT },
       { label: 'Cant. recibida', value: qtyFmt(qtyReceived), accent: ACCENT },
-      { label: 'Landed cost', value: pdfMoney(totalLanded), accent: ACCENT },
+      { label: 'Costos adicionales', value: pdfMoney(totalLanded), accent: ACCENT },
     ]);
     doc.y += kpiH + 14;
 
@@ -119,11 +119,11 @@ export const generateGoodsReceiptPdf = (payload: GoodsReceiptPdfPayload): Promis
 
     const columns = [
       { label: 'SKU', width: 70 },
-      { label: 'Descripción', width: contentWidth - 70 - 55 - 55 - 70 - 75 },
+      { label: 'Descripción', width: contentWidth - 70 - 55 - 64 - 66 - 86 },
       { label: 'Recibido', width: 55, align: 'right' as const },
-      { label: 'Rechazado', width: 55, align: 'right' as const },
-      { label: 'Lote', width: 70 },
-      { label: 'Landed', width: 75, align: 'right' as const },
+      { label: 'Rechazado', width: 64, align: 'right' as const },
+      { label: 'Lote', width: 66 },
+      { label: 'Costo adicional', width: 86, align: 'right' as const },
     ];
 
     const tableCtx: PdfTableContext = {
@@ -172,11 +172,11 @@ export const generateGoodsReceiptPdf = (payload: GoodsReceiptPdfPayload): Promis
         ['Seguro', pdfMoney(payload.insuranceCost)],
         ['Aduana', pdfMoney(payload.customsCost)],
         ['Otros', pdfMoney(payload.otherLandedCost)],
-        ['Total landed', pdfMoney(totalLanded)],
+        ['Total', pdfMoney(totalLanded)],
       ], { highlightIndex: 4 });
     }
 
-    drawNexaraFooter(doc, `NEXARA · Recepción ${payload.receiptNumber} · Documento de almacén`);
+    drawNexaraFooterOnEveryPage(doc, `NEXARA · Recepción ${payload.receiptNumber} · Documento de almacén`);
     doc.end();
   });
 };

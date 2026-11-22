@@ -5,12 +5,13 @@ import {
   PDF_MODULE_ACCENTS,
   drawInfoCard,
   drawKpiCards,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawSummaryBox,
   drawTableHeader,
   drawTableRow,
+  fuente,
   loadNexaraLogo,
   pdfMoney,
   type PdfTableContext,
@@ -43,7 +44,7 @@ const ACCENT = PDF_MODULE_ACCENTS.erp;
 
 export function generateExpensesReportPdf(payload: ExpensesReportPayload): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -101,11 +102,11 @@ export function generateExpensesReportPdf(payload: ExpensesReportPayload): Promi
     const columns = [
       { label: 'ID', width: 34 },
       { label: 'Fecha', width: 62 },
-      { label: 'Concepto', width: 140 },
+      { label: 'Concepto', width: 132 },
       { label: 'Categoría', width: 70 },
       { label: 'Solicitante', width: 90 },
-      { label: 'Monto', width: 62, align: 'right' as const },
-      { label: 'Estatus', width: 57 },
+      { label: 'Monto', width: 66, align: 'right' as const },
+      { label: 'Estatus', width: 61 },
     ];
     const ctx: PdfTableContext = {
       columns,
@@ -119,7 +120,7 @@ export function generateExpensesReportPdf(payload: ExpensesReportPayload): Promi
     doc.y += 30;
 
     if (!payload.rows.length) {
-      doc.fillColor(PDF_COLORS.muted).fontSize(9).font('Helvetica').text('Sin gastos en el periodo.', margin + 6, doc.y);
+      doc.fillColor(PDF_COLORS.muted).fontSize(9).font(fuente(doc, 'texto')).text('Sin gastos en el periodo.', margin + 6, doc.y);
       doc.y += 18;
     }
 
@@ -148,7 +149,8 @@ export function generateExpensesReportPdf(payload: ExpensesReportPayload): Promi
       ['Pagado', pdfMoney(payload.totalPagado, payload.currency)],
       ['Pendiente por pagar', pdfMoney(Math.max(0, payload.totalAprobado - payload.totalPagado), payload.currency)],
     ];
-    if (doc.y + 90 > doc.page.height - 60) {
+    // La caja mide 98 y arranca 8 abajo: con 90 de margen se salía de la hoja en el caso justo.
+    if (doc.y + 116 > doc.page.height - 60) {
       doc.addPage();
       header();
       doc.y = PDF_CONTENT_START_Y;
@@ -156,7 +158,7 @@ export function generateExpensesReportPdf(payload: ExpensesReportPayload): Promi
     drawSummaryBox(doc, margin + contentWidth - summaryWidth, doc.y + 8, summaryWidth, 'Resumen financiero', summaryRows, {
       highlightIndex: summaryRows.length - 1,
     });
-    drawNexaraFooter(doc, 'NEXARA · Control de gastos — documento generado automáticamente, información confidencial.');
+    drawNexaraFooterOnEveryPage(doc, 'NEXARA · Control de gastos — documento generado automáticamente, información confidencial.');
     doc.end();
   });
 }

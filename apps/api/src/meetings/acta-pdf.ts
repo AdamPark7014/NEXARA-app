@@ -148,12 +148,12 @@ export const generarActaPdf = (r: ActaPdfPayload): Promise<Buffer> =>
     }
 
     if (r.agenda?.trim()) {
-      asegurar(60, 'Agenda');
+      asegurar(60);
       drawSectionTitle(doc, 'Agenda');
       parrafo(r.agenda.trim(), 'Agenda');
     }
 
-    asegurar(60, 'Minuta');
+    asegurar(60);
     drawSectionTitle(doc, 'Minuta');
     if (r.notas?.trim()) {
       parrafo(r.notas.trim(), 'Minuta');
@@ -161,7 +161,7 @@ export const generarActaPdf = (r: ActaPdfPayload): Promise<Buffer> =>
       doc.fillColor(PDF_COLORS.muted).font(fuente(doc, 'texto')).fontSize(10).text('Sin minuta guardada.', margin, doc.y);
     }
 
-    asegurar(90, 'Acuerdos, lecciones y riesgos');
+    asegurar(90);
     drawSectionTitle(doc, `Acuerdos, lecciones y riesgos · ${r.acuerdos.length}`);
     if (r.acuerdos.length) {
       const columnas = [

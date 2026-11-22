@@ -4,6 +4,10 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import fs from 'fs';
 import path from 'path';
 import { companyWhere, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
+import { pdfFecha } from '../common/pdf/nexara-pdf-theme.js';
+
+/** «21 de noviembre de 2026»: la fecha de la propuesta es el día de la empresa, no el del servidor (UTC). */
+const FECHA_LARGA: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'long', year: 'numeric' };
 
 function resolveNexaraLogoPath(): string | null {
   const candidates = [
@@ -145,8 +149,8 @@ export class PdfGeneratorService {
     const cot = quote.cotizacion as any;
     const data: QuotePdfData = {
       quoteNumber: cot?.quoteNumber || `COT-${quote.id}`,
-      date: new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }),
-      validity: cot?.validUntil ? new Date(cot.validUntil).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }) : undefined,
+      date: pdfFecha(new Date(), FECHA_LARGA),
+      validity: cot?.validUntil ? pdfFecha(cot.validUntil, FECHA_LARGA) : undefined,
       currency: cot?.currency || 'MXN',
       companyName: template?.companyName || 'NEXARA',
       companyAddress: (template as any)?.companyAddress || undefined,
@@ -207,7 +211,7 @@ export class PdfGeneratorService {
     const cot = quote?.cotizacion as any;
     const data: QuotePdfData = {
       quoteNumber: `ORD-${project.id}`,
-      date: new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }),
+      date: pdfFecha(new Date(), FECHA_LARGA),
       currency: cot?.currency || 'MXN',
       companyName: template?.companyName || 'NEXARA',
       companyAddress: (template as any)?.companyAddress || undefined,

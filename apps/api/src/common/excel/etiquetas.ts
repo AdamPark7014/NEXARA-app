@@ -312,6 +312,121 @@ export const ETIQUETA_ESTATUS_KB: Record<string, string> = {
   ARCHIVED: 'Archivado',
 };
 
+// ─────────────────────────────────── Compras, contratos y proyectos (los PDF imprimían el valor interno)
+
+/** `compras-datos.ts` · `PO_STATUS`. */
+export const ETIQUETA_ESTATUS_OC: Record<string, string> = {
+  DRAFT: 'Por aprobar',
+  PENDING: 'Pendiente',
+  SENT: 'Enviada',
+  CONFIRMED: 'Confirmada',
+  PARTIALLY_RECEIVED: 'Recibida en parte',
+  RECEIVED: 'Recibida',
+  INVOICED: 'Facturada',
+  CANCELLED: 'Cancelada',
+};
+
+/** `compras-datos.ts` · `REQ_STATUS`, con los valores del enum que la pantalla no lista. */
+export const ETIQUETA_ESTATUS_REQUISICION: Record<string, string> = {
+  DRAFT: 'Borrador',
+  SUBMITTED: 'Por aprobar',
+  PENDING: 'Por aprobar',
+  APPROVED: 'Aprobada',
+  REJECTED: 'Rechazada',
+  ORDERED: 'Con orden de compra',
+  CANCELLED: 'Cancelada',
+};
+
+/** `compras-datos.ts` · `PRIORITY_LABEL` (incluye los valores viejos HIGH/MEDIUM/LOW). */
+export const ETIQUETA_PRIORIDAD_COMPRA: Record<string, string> = {
+  NORMAL: 'Normal',
+  URGENT: 'Urgente',
+  CRITICAL: 'Crítica',
+  HIGH: 'Alta',
+  MEDIUM: 'Media',
+  LOW: 'Baja',
+};
+
+/** Enum `MaintenanceContractStatus`. */
+export const ETIQUETA_ESTATUS_CONTRATO: Record<string, string> = {
+  DRAFT: 'Borrador',
+  ACTIVE: 'Vigente',
+  PAUSED: 'En pausa',
+  EXPIRED: 'Vencido',
+  CANCELLED: 'Cancelado',
+};
+
+/** Enum `MaintenanceContractVisitStatus`, más los valores que el reporte recibía de pantallas viejas. */
+export const ETIQUETA_ESTATUS_VISITA: Record<string, string> = {
+  SCHEDULED: 'Programada',
+  PENDING: 'Pendiente',
+  GENERATED: 'Con orden de servicio',
+  COMPLETED: 'Realizada',
+  SKIPPED: 'Omitida',
+  CANCELLED: 'Cancelada',
+};
+
+/** `tickets/mis-servicios` · `FREQ_LABEL`. */
+export const ETIQUETA_FRECUENCIA: Record<string, string> = {
+  WEEKLY: 'Semanal',
+  BIWEEKLY: 'Quincenal',
+  MONTHLY: 'Mensual',
+  BIMONTHLY: 'Bimestral',
+  QUARTERLY: 'Trimestral',
+  SEMIANNUAL: 'Semestral',
+  ANNUAL: 'Anual',
+};
+
+/** Enum `SalesProjectStatus` (proyecto comercial). */
+export const ETIQUETA_ESTATUS_PROYECTO_COMERCIAL: Record<string, string> = {
+  PLANNED: 'Planeado',
+  IN_PROGRESS: 'En curso',
+  ON_HOLD: 'En pausa',
+  CLOSED: 'Cerrado',
+};
+
+/** Estado del inventario de una visita (`inventorySnapshot.status`). */
+export const ETIQUETA_ESTATUS_INVENTARIO: Record<string, string> = {
+  DRAFT: 'Borrador',
+  PENDING: 'Pendiente',
+  IN_PROGRESS: 'En proceso',
+  COMPLETED: 'Terminado',
+  APPROVED: 'Aprobado',
+  CANCELLED: 'Cancelado',
+};
+
+/** Estado de un equipo del inventario (`itemStatus`), como lo enseña la app. */
+export const ETIQUETA_ESTATUS_EQUIPO: Record<string, string> = {
+  ACTIVE: 'Activo',
+  INACTIVE: 'Inactivo',
+  DAMAGED: 'Dañado',
+  MISSING: 'Faltante',
+  REPLACED: 'Reemplazado',
+  RETIRED: 'Retirado',
+};
+
+/** El equipo contra el inventario anterior (`compareState`): `PortalRules.kt` · `inventoryCompareStateLabel`. */
+export const ETIQUETA_COMPARATIVA_INVENTARIO: Record<string, string> = {
+  UNCHANGED: 'Sin cambios',
+  UPDATED: 'Actualizado',
+  NEW: 'Nuevo',
+  REMOVED: 'Retirado',
+};
+
+/**
+ * El texto en español de un valor interno. Lo que no está en la lista no sale crudo
+ * (`PARTIALLY_RECEIVED`): se escribe legible («Partially received») y un vacío es «-».
+ */
+export function etiquetaDe(mapa: Record<string, string>, valor: unknown): string {
+  const texto = String(valor ?? '').trim();
+  if (!texto) return '-';
+  const conocido = mapa[texto] ?? mapa[texto.toUpperCase()];
+  if (conocido) return conocido;
+  if (!/^[A-Z0-9_]+$/.test(texto)) return texto;
+  const llano = texto.replace(/_/g, ' ').toLowerCase();
+  return llano.charAt(0).toUpperCase() + llano.slice(1);
+}
+
 /** Traduce una lista de claves (p. ej. las alertas del contraste) a texto separado por «; ». */
 export function listaEtiquetada(valores: unknown, mapa: Record<string, string>): string {
   if (!Array.isArray(valores)) return '';

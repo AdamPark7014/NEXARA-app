@@ -1,19 +1,20 @@
 import PDFDocument from 'pdfkit';
 import {
   PDF_COLORS,
-  PDF_CONTENT_START_Y,
   PDF_MODULE_ACCENTS,
   drawInfoCard,
   drawKpiCards,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawTableHeader,
   drawTableRow,
+  fuente,
   loadNexaraLogo,
   pdfText,
   type PdfTableContext,
 } from '../common/pdf/nexara-pdf-theme';
+import { ETIQUETA_ESTATUS_ACTIVIDAD, ETIQUETA_PRIORIDAD, etiquetaDe } from '../common/excel/etiquetas';
 
 export type ActivitiesReportRow = {
   an: string;
@@ -43,7 +44,7 @@ const ACCENT = PDF_MODULE_ACCENTS.ops;
 
 export function generateActivitiesReportPdf(payload: ActivitiesReportPayload): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40, layout: 'landscape' });
+    const doc = new PDFDocument({ size: 'A4', margin: 40, layout: 'landscape', bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -56,7 +57,7 @@ export function generateActivitiesReportPdf(payload: ActivitiesReportPayload): P
     const header = () =>
       drawNexaraHeader(doc, {
         docTitle: payload.title || 'Reporte de actividades',
-        docSubtitle: 'Órdenes de trabajo · operaciones de campo',
+        docSubtitle: 'Actividades asignadas en el periodo',
         accent: ACCENT,
         logo,
         meta: [
@@ -70,8 +71,8 @@ export function generateActivitiesReportPdf(payload: ActivitiesReportPayload): P
 
     drawSectionTitle(doc, 'Resumen operativo');
     const kpiHeight = drawKpiCards(doc, doc.y, [
-      { label: 'Total OT', value: String(payload.total), accent: ACCENT },
-      { label: 'Abiertas / pend.', value: String(payload.abiertas), accent: '#B7791F' },
+      { label: 'Actividades', value: String(payload.total), accent: ACCENT },
+      { label: 'Por atender', value: String(payload.abiertas), accent: '#B7791F' },
       { label: 'En proceso', value: String(payload.enProceso), accent: PDF_COLORS.blue },
       { label: 'Finalizadas', value: String(payload.finalizadas), accent: '#2F855A' },
     ]);
@@ -86,25 +87,35 @@ export function generateActivitiesReportPdf(payload: ActivitiesReportPayload): P
           }))
         : [{ label: '—', value: 'Sin datos en el periodo' }];
 
+    // El mismo estatus escrito de dos formas («En Proceso», «EN_PROCESO») es un solo renglón.
+    const juntar = (items: { name: string; count: number }[], mapa: Record<string, string>) => {
+      const suma = new Map<string, number>();
+      for (const it of items) {
+        const nombre = etiquetaDe(mapa, it.name);
+        suma.set(nombre, (suma.get(nombre) ?? 0) + it.count);
+      }
+      return [...suma.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+    };
+
     const gap = 14;
     const cardWidth = (contentWidth - gap) / 2;
     const breakdownY = doc.y;
-    const h1 = drawInfoCard(doc, margin, breakdownY, cardWidth, toLines(payload.byStatus), {
+    const h1 = drawInfoCard(doc, margin, breakdownY, cardWidth, toLines(juntar(payload.byStatus, ETIQUETA_ESTATUS_ACTIVIDAD)), {
       title: 'Por estatus',
       labelWidth: 36,
     });
-    const h2 = drawInfoCard(doc, margin + cardWidth + gap, breakdownY, cardWidth, toLines(payload.byPriority), {
+    const h2 = drawInfoCard(doc, margin + cardWidth + gap, breakdownY, cardWidth, toLines(juntar(payload.byPriority, ETIQUETA_PRIORIDAD)), {
       title: 'Por prioridad',
       labelWidth: 36,
     });
     doc.y = breakdownY + Math.max(h1, h2) + 16;
 
-    drawSectionTitle(doc, 'Detalle de OT');
+    drawSectionTitle(doc, 'Detalle de actividades');
 
     const columns = [
-      { label: 'AN', width: 70 },
+      { label: 'Folio', width: 70 },
       { label: 'Fecha', width: 70 },
-      { label: 'Título', width: 200 },
+      { label: 'Título', width: 232 },
       { label: 'Cliente', width: 120 },
       { label: 'Responsable', width: 110 },
       { label: 'Estatus', width: 90 },
@@ -115,7 +126,7 @@ export function generateActivitiesReportPdf(payload: ActivitiesReportPayload): P
       headerAccent: PDF_COLORS.navy,
       onNewPage: () => {
         header();
-        drawSectionTitle(doc, 'Detalle de OT (continuación)');
+        drawSectionTitle(doc, 'Detalle de actividades (continuación)');
       },
     };
 
@@ -126,7 +137,7 @@ export function generateActivitiesReportPdf(payload: ActivitiesReportPayload): P
       doc
         .fillColor(PDF_COLORS.muted)
         .fontSize(9)
-        .font('Helvetica')
+        .font(fuente(doc, 'texto'))
         .text('Sin actividades en el periodo.', margin + 6, doc.y);
       doc.y += 18;
     }
@@ -140,23 +151,18 @@ export function generateActivitiesReportPdf(payload: ActivitiesReportPayload): P
           pdfText(row.titulo),
           pdfText(row.cliente),
           pdfText(row.responsable),
-          pdfText(row.estatus),
-          pdfText(row.prioridad),
+          etiquetaDe(ETIQUETA_ESTATUS_ACTIVIDAD, row.estatus),
+          etiquetaDe(ETIQUETA_PRIORIDAD, row.prioridad),
         ],
         index,
         ctx,
       );
     });
 
-    if (doc.y + 40 > doc.page.height - 50) {
-      doc.addPage();
-      header();
-      doc.y = PDF_CONTENT_START_Y;
-    }
-
-    drawNexaraFooter(
+    // El pie va en cada hoja: ya no se abre una hoja en blanco solo para ponerlo.
+    drawNexaraFooterOnEveryPage(
       doc,
-      'NEXARA · Reporte de actividades OPS — documento generado automáticamente, información confidencial.',
+      'NEXARA · Reporte de actividades — documento generado automáticamente, información confidencial.',
     );
 
     doc.end();

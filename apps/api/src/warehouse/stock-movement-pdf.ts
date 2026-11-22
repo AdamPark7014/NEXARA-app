@@ -1,14 +1,18 @@
 import PDFDocument from 'pdfkit';
 import {
+  PDF_COLORS,
   PDF_MODULE_ACCENTS,
   drawInfoCard,
   drawKpiCards,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawTableHeader,
   drawTableRow,
+  fuente,
   loadNexaraLogo,
+  pdfCambio,
+  pdfFechaHora,
   pdfMoney,
   pdfText,
   type PdfTableContext,
@@ -62,28 +66,20 @@ export const stockMovementTypeLabel = (type: string) => TYPE_LABELS[type] ?? typ
 const qtyFmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { maximumFractionDigits: 4 }).format(n || 0);
 
-const formatDateTime = (iso?: string | null) => {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return String(iso);
-  return d.toLocaleString('es-MX', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+/** La hora del movimiento en la hora de la empresa: en UTC una salida de las 7:30 p. m. salía impresa a la 1:30 a. m. del día siguiente. */
+const formatDateTime = (iso?: string | null) => (iso ? pdfFechaHora(iso) : '—');
 
 const warehouseRoute = (row: StockMovementPdfRow) => {
-  const from = row.fromWarehouse?.trim() || '—';
-  const to = row.toWarehouse?.trim() || '—';
-  return `${from} → ${to}`;
+  // Una entrada solo tiene destino y una salida solo origen: se escribe el almacén que hay, sin «— ›».
+  const from = row.fromWarehouse?.trim();
+  const to = row.toWarehouse?.trim();
+  if (from && to) return pdfCambio(from, to);
+  return from || to || '—';
 };
 
 export const generateStockMovementsPdf = (payload: StockMovementsPdfPayload): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 36, layout: 'landscape' });
+    const doc = new PDFDocument({ size: 'A4', margin: 36, layout: 'landscape', bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -179,8 +175,8 @@ export const generateStockMovementsPdf = (payload: StockMovementsPdfPayload): Pr
     doc.y += 28;
 
     if (!payload.rows.length) {
-      doc.fillColor('#5B6B7A').fontSize(10).font('Helvetica')
-        .text('Sin movimientos en el periodo o filtros seleccionados.', margin, doc.y + 8);
+      doc.fillColor(PDF_COLORS.muted).fontSize(10).font(fuente(doc, 'texto'))
+        .text('Sin movimientos con el periodo y los filtros elegidos.', margin + 6, doc.y + 4);
     } else {
       payload.rows.forEach((row, index) => {
         drawTableRow(
@@ -204,7 +200,7 @@ export const generateStockMovementsPdf = (payload: StockMovementsPdfPayload): Pr
       });
     }
 
-    drawNexaraFooter(doc, 'NEXARA · Kardex de inventario · Documento confidencial');
+    drawNexaraFooterOnEveryPage(doc, 'NEXARA · Kardex de inventario · Documento confidencial');
     doc.end();
   });
 };
@@ -215,7 +211,7 @@ export const generateStockMovementSlipPdf = (row: StockMovementPdfRow & {
   notes?: string | null;
 }): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -258,12 +254,37 @@ export const generateStockMovementSlipPdf = (row: StockMovementPdfRow & {
 
     if (row.notes) {
       drawSectionTitle(doc, 'Notas');
-      doc.fillColor('#1F2A37').fontSize(10).font('Helvetica').text(row.notes, margin, doc.y, {
+      doc.fillColor(PDF_COLORS.text).fontSize(10).font(fuente(doc, 'texto')).text(row.notes, margin, doc.y, {
         width: contentWidth,
       });
     }
 
-    drawNexaraFooter(doc, `NEXARA · ${row.companyName} · ${row.movementNumber}`);
+    // Un comprobante de almacén se firma: quién entrega y quién recibe, con espacio para nombre y firma.
+    const firmaY = Math.max(doc.y + 70, 420);
+    if (firmaY + 40 < doc.page.height - 70) {
+      const anchoFirma = (contentWidth - 40) / 2;
+      [
+        { rotulo: 'Entrega', nombre: pdfText(row.createdByName) },
+        { rotulo: 'Recibe', nombre: 'Nombre y firma' },
+      ].forEach((firma, i) => {
+        const x = margin + i * (anchoFirma + 40);
+        doc.save();
+        doc.moveTo(x, firmaY).lineTo(x + anchoFirma, firmaY).lineWidth(0.8).strokeColor(PDF_COLORS.line).stroke();
+        doc.restore();
+        doc.fillColor(PDF_COLORS.navy).fontSize(10).font(fuente(doc, 'semi')).text(firma.rotulo, x, firmaY + 6, {
+          width: anchoFirma,
+          align: 'center',
+        });
+        doc.fillColor(PDF_COLORS.muted).fontSize(9).font(fuente(doc, 'texto')).text(firma.nombre, x, firmaY + 20, {
+          width: anchoFirma,
+          align: 'center',
+          height: 12,
+          ellipsis: true,
+        });
+      });
+    }
+
+    drawNexaraFooterOnEveryPage(doc, `NEXARA · ${row.companyName} · ${row.movementNumber}`);
     doc.end();
   });
 };

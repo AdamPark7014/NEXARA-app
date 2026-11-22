@@ -5,16 +5,18 @@ import {
   PDF_MODULE_ACCENTS,
   drawInfoCard,
   drawKpiCards,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawSummaryBox,
   drawTableHeader,
   drawTableRow,
+  fuente,
   loadNexaraLogo,
   pdfMoney,
   type PdfTableContext,
 } from '../common/pdf/nexara-pdf-theme';
+import { ETIQUETA_CATEGORIA_VIATICO, ETIQUETA_ESTATUS_VIATICO, etiquetaDe } from '../common/excel/etiquetas';
 
 export type ViaticsReportRow = {
   id: number;
@@ -47,7 +49,7 @@ const ACCENT = PDF_MODULE_ACCENTS.viatics;
 
 export function generateViaticsReportPdf(payload: ViaticsReportPayload): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -103,7 +105,9 @@ export function generateViaticsReportPdf(payload: ViaticsReportPayload): Promise
       title: 'Por persona',
       labelWidth: 40,
     });
-    const h3 = drawInfoCard(doc, margin + (cardWidth + gap) * 2, breakdownY, cardWidth, toLines(payload.byCategory), {
+    // La categoría llega como se guarda («COMBUSTIBLE», «ALIMENTACION»): se escribe como en pantalla.
+    const porCategoria = payload.byCategory.map((it) => ({ ...it, name: etiquetaDe(ETIQUETA_CATEGORIA_VIATICO, it.name) }));
+    const h3 = drawInfoCard(doc, margin + (cardWidth + gap) * 2, breakdownY, cardWidth, toLines(porCategoria), {
       title: 'Por categoría',
       labelWidth: 40,
     });
@@ -115,11 +119,11 @@ export function generateViaticsReportPdf(payload: ViaticsReportPayload): Promise
     const columns = [
       { label: 'ID', width: 34 },
       { label: 'Fecha', width: 62 },
-      { label: 'Solicitante', width: 105 },
-      { label: 'Proyecto / Motivo', width: 130 },
-      { label: 'Categoría', width: 70 },
-      { label: 'Monto', width: 62, align: 'right' as const },
-      { label: 'Estatus', width: 52 },
+      { label: 'Solicitante', width: 96 },
+      { label: 'Proyecto / motivo', width: 117 },
+      { label: 'Categoría', width: 68 },
+      { label: 'Monto', width: 66, align: 'right' as const },
+      { label: 'Estatus', width: 72 },
     ];
     const ctx: PdfTableContext = {
       columns,
@@ -134,7 +138,7 @@ export function generateViaticsReportPdf(payload: ViaticsReportPayload): Promise
     doc.y += 30;
 
     if (!payload.rows.length) {
-      doc.fillColor(PDF_COLORS.muted).fontSize(9).font('Helvetica').text('Sin solicitudes en el periodo.', margin + 6, doc.y);
+      doc.fillColor(PDF_COLORS.muted).fontSize(9).font(fuente(doc, 'texto')).text('Sin solicitudes en el periodo.', margin + 6, doc.y);
       doc.y += 18;
     }
 
@@ -147,9 +151,9 @@ export function generateViaticsReportPdf(payload: ViaticsReportPayload): Promise
           row.fecha,
           row.solicitante,
           proyectoMotivo || '-',
-          row.categoria,
+          etiquetaDe(ETIQUETA_CATEGORIA_VIATICO, row.categoria),
           pdfMoney(row.monto, payload.currency),
-          row.estatus,
+          etiquetaDe(ETIQUETA_ESTATUS_VIATICO, row.estatus),
         ],
         index,
         ctx,
@@ -176,7 +180,7 @@ export function generateViaticsReportPdf(payload: ViaticsReportPayload): Promise
       highlightIndex: summaryRows.length - 1,
     });
 
-    drawNexaraFooter(doc, 'NEXARA · Control de viáticos — documento generado automáticamente, información confidencial.');
+    drawNexaraFooterOnEveryPage(doc, 'NEXARA · Control de viáticos — documento generado automáticamente, información confidencial.');
 
     doc.end();
   });

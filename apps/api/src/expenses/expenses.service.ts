@@ -10,6 +10,7 @@ import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { ACTIVITY_STATUS } from '../activities/activity-status.js';
+import { pdfFechaHora, pdfPeriodo, pdfZona } from '../common/pdf/nexara-pdf-theme.js';
 
 const ADMIN_EXPENSE_ACTIVITY_AN = 'SYS-ADMIN-GASTOS';
 
@@ -24,6 +25,10 @@ export const EXPENSE_CATEGORIES = [
   'Impuestos',
   'Otro',
 ] as const;
+
+/** `AAAA-MM-DD` del día de un gasto: en la hora de la empresa si es un instante, tal cual si es un día de calendario. */
+const diaDe = (fecha?: Date | null): string =>
+  fecha && !Number.isNaN(fecha.getTime()) ? fecha.toLocaleDateString('en-CA', { timeZone: pdfZona(fecha) }) : '';
 
 const STATUS = {
   PENDIENTE: 'Pendiente',
@@ -487,7 +492,9 @@ export class ExpensesService {
       byPerson: [...byPersonMap.values()].sort((a, b) => b.total - a.total),
       rows: rows.slice(0, 200).map((r) => ({
         id: r.id,
-        fecha: (r.fechaGasto || r.fechaSolicitud)?.toISOString?.().slice(0, 10) || '',
+        // El día en que se hizo el gasto, en la hora de la empresa: un gasto de las 7 de la tarde
+        // no es del día siguiente (el corte en UTC lo ponía ahí).
+        fecha: diaDe(r.fechaGasto || r.fechaSolicitud),
         concepto: r.concepto || r.razonGasto || '—',
         categoria: r.categoria || '—',
         solicitante: r.usuario?.nombre || `Usuario #${r.usuarioId}`,
@@ -502,8 +509,8 @@ export class ExpensesService {
     const analytics = await this.analytics(filters, departmentId);
     return generateExpensesReportPdf({
       title: 'Control de gastos administrativos',
-      periodLabel: analytics.periodLabel,
-      generatedAt: new Date().toLocaleString('es-MX'),
+      periodLabel: pdfPeriodo(filters.from, filters.to),
+      generatedAt: pdfFechaHora(new Date()),
       preparedBy: preparedBy || null,
       currency: 'MXN',
       totalSolicitado: analytics.totalSolicitado,
@@ -511,7 +518,7 @@ export class ExpensesService {
       totalPagado: analytics.totalPagado,
       byCategory: analytics.byCategory,
       byPerson: analytics.byPerson,
-      rows: analytics.rows,
+      rows: analytics.rows.map((r) => ({ ...r, fecha: pdfPeriodo(r.fecha, r.fecha, '—') })),
     });
   }
 

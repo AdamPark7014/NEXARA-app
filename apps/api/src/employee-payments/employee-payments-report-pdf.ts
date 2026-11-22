@@ -5,12 +5,13 @@ import {
   PDF_MODULE_ACCENTS,
   drawInfoCard,
   drawKpiCards,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawSummaryBox,
   drawTableHeader,
   drawTableRow,
+  fuente,
   loadNexaraLogo,
   pdfMoney,
   type PdfTableContext,
@@ -40,7 +41,7 @@ const ACCENT = PDF_MODULE_ACCENTS.erp;
 
 export function generateEmployeePaymentsReportPdf(payload: EmployeePaymentsReportPayload): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -72,7 +73,7 @@ export function generateEmployeePaymentsReportPdf(payload: EmployeePaymentsRepor
     ]);
     doc.y += kpiHeight + 18;
 
-    drawSectionTitle(doc, 'Top empleados');
+    drawSectionTitle(doc, 'Pagado por empleado');
     const toLines = (items: { name: string; total: number; count: number }[]) =>
       items.length
         ? items.slice(0, 8).map((it) => ({
@@ -80,20 +81,17 @@ export function generateEmployeePaymentsReportPdf(payload: EmployeePaymentsRepor
             value: `${it.name} — ${pdfMoney(it.total, payload.currency)}`,
           }))
         : [{ label: '—', value: 'Sin datos en el periodo' }];
-    const cardH = drawInfoCard(doc, margin, doc.y, contentWidth, toLines(payload.byEmployee), {
-      title: 'Por empleado',
-      labelWidth: 48,
-    });
+    const cardH = drawInfoCard(doc, margin, doc.y, contentWidth, toLines(payload.byEmployee), { labelWidth: 48 });
     doc.y += cardH + 16;
 
     drawSectionTitle(doc, 'Detalle de pagos');
     const columns = [
       { label: 'ID', width: 34 },
       { label: 'Empleado', width: 120 },
-      { label: 'Concepto', width: 130 },
-      { label: 'Periodo', width: 110 },
+      { label: 'Concepto', width: 111 },
+      { label: 'Periodo', width: 124 },
       { label: 'Monto', width: 70, align: 'right' as const },
-      { label: 'Estatus', width: 51 },
+      { label: 'Estatus', width: 56 },
     ];
     const ctx: PdfTableContext = {
       columns,
@@ -107,7 +105,7 @@ export function generateEmployeePaymentsReportPdf(payload: EmployeePaymentsRepor
     doc.y += 30;
 
     if (!payload.rows.length) {
-      doc.fillColor(PDF_COLORS.muted).fontSize(9).font('Helvetica').text('Sin pagos en el periodo.', margin + 6, doc.y);
+      doc.fillColor(PDF_COLORS.muted).fontSize(9).font(fuente(doc, 'texto')).text('Sin pagos en el periodo.', margin + 6, doc.y);
       doc.y += 18;
     }
 
@@ -127,7 +125,8 @@ export function generateEmployeePaymentsReportPdf(payload: EmployeePaymentsRepor
       ['En borrador', pdfMoney(payload.totalBorrador, payload.currency)],
       ['Registros', String(payload.count)],
     ];
-    if (doc.y + 80 > doc.page.height - 60) {
+    // La caja mide 82 y arranca 8 abajo.
+    if (doc.y + 100 > doc.page.height - 60) {
       doc.addPage();
       header();
       doc.y = PDF_CONTENT_START_Y;
@@ -135,7 +134,7 @@ export function generateEmployeePaymentsReportPdf(payload: EmployeePaymentsRepor
     drawSummaryBox(doc, margin + contentWidth - summaryWidth, doc.y + 8, summaryWidth, 'Resumen financiero', summaryRows, {
       highlightIndex: 0,
     });
-    drawNexaraFooter(doc, 'NEXARA · Pagos a empleados — documento generado automáticamente, información confidencial.');
+    drawNexaraFooterOnEveryPage(doc, 'NEXARA · Pagos a empleados — documento generado automáticamente, información confidencial.');
     doc.end();
   });
 }

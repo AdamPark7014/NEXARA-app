@@ -8,14 +8,16 @@ import {
   type PdfTableContext,
   drawInfoCard,
   drawKpiCards,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawTableHeader,
   drawTableRow,
+  fuente,
   loadNexaraLogo,
   pdfText,
 } from '../common/pdf/nexara-pdf-theme';
+import { ETIQUETA_ESTATUS_ACTIVIDAD, ETIQUETA_PRIORIDAD, ETIQUETA_TIPO_TICKET, etiquetaDe } from '../common/excel/etiquetas';
 
 export type ClientReportActivity = {
   anNumber: string;
@@ -69,7 +71,7 @@ const formatTicketType = (value?: string | null) => {
   if (!normalized) return '-';
   if (normalized === 'PREVENTIVE_INVENTORY') return 'Mantenimiento e inventario';
   if (normalized === 'ISSUE') return 'Ticket por problema';
-  return value || '-';
+  return etiquetaDe(ETIQUETA_TIPO_TICKET, value);
 };
 
 const loadImage = (filePath: string) => {
@@ -127,7 +129,7 @@ const getMapsUrl = (lat?: number | null, lng?: number | null) =>
 
 export const generateClientReportPdf = async (payload: ClientReportPayload): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -153,7 +155,6 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
           { label: 'Finalizados', value: String(payload.closedTickets) },
         ],
       });
-      drawNexaraFooter(doc);
       doc.y = PDF_CONTENT_START_Y;
     };
 
@@ -187,8 +188,9 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
     doc.y = kpiY + kpiHeight + 16;
 
     drawSectionTitle(doc, 'Detalle de tickets');
-    const header = ['AN', 'Sucursal', 'Estatus', 'Prioridad', 'Eficiencia', 'Atendió', 'Inicio', 'Cierre', 'Dur.'];
-    const baseWidths = [44, 92, 56, 56, 56, 78, 64, 64, 50];
+    const header = ['Folio', 'Sucursal', 'Estatus', 'Prioridad', 'Eficiencia', 'Atendió', 'Inicio', 'Cierre', 'Duración'];
+    // El folio («AN-1200») cabe en un renglón: con 44 se partía en «AN-120 / 0».
+    const baseWidths = [52, 82, 56, 50, 56, 74, 66, 66, 58];
     const totalBaseWidth = baseWidths.reduce((acc, value) => acc + value, 0);
     const scale = contentWidth / totalBaseWidth;
     const widths = baseWidths.map((value) => Math.max(40, Math.floor(value * scale)));
@@ -208,8 +210,8 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
       drawTableRow(doc, [
         activity.anNumber || '-',
         activity.branchName || '-',
-        activity.estatus || '-',
-        activity.prioridad || '-',
+        etiquetaDe(ETIQUETA_ESTATUS_ACTIVIDAD, activity.estatus),
+        etiquetaDe(ETIQUETA_PRIORIDAD, activity.prioridad),
         activity.eficiencia || '-',
         activity.responsableName || '-',
         formatDateTime(activity.startedAt || activity.assignedAt),
@@ -218,29 +220,38 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
       ], index, tableCtx, { boldColumns: [0] });
     });
 
-    ensurePageSpace(120, 'Detalle completo por ticket');
+    ensurePageSpace(120);
     drawSectionTitle(doc, 'Detalle completo por ticket');
     payload.activities.forEach((activity) => {
       ensurePageSpace(130, 'Detalle completo por ticket');
       const height = drawInfoCard(doc, margin, doc.y, contentWidth, [
-        { label: 'Ticket', value: `${activity.anNumber || '-'} · ${activity.titulo || 'Sin titulo'}` },
-        { label: 'Flujo', value: formatTicketType(activity.ticketType) },
-        { label: 'Estado', value: `${activity.estatus || '-'} · Prioridad: ${activity.prioridad || '-'}` },
+        { label: 'Ticket', value: `${activity.anNumber || '-'} · ${activity.titulo || 'Sin título'}` },
+        { label: 'Tipo', value: formatTicketType(activity.ticketType) },
+        { label: 'Estatus', value: `${etiquetaDe(ETIQUETA_ESTATUS_ACTIVIDAD, activity.estatus)} · Prioridad: ${etiquetaDe(ETIQUETA_PRIORIDAD, activity.prioridad)}` },
         {
           label: 'Sucursal',
           value: `${activity.branchName || '-'}${activity.branchCity ? ` · ${activity.branchCity}` : ''}${activity.branchState ? `, ${activity.branchState}` : ''}`,
         },
         {
           label: 'Atendió',
-          value: `${activity.responsableName || '-'} · Inicio: ${formatDateTime(activity.startedAt || activity.assignedAt)} · Cierre: ${formatDateTime(activity.finishedAt)}`,
+          value: `${activity.responsableName || '-'} · Inicio: ${formatDateTime(activity.startedAt || activity.assignedAt)}${activity.finishedAt ? ` · Cierre: ${formatDateTime(activity.finishedAt)}` : ''}`,
         },
-        { label: 'Resultado', value: `Duración: ${formatDuration(activity.durationMin)} · Eficiencia: ${activity.eficiencia || '-'}` },
+        {
+          label: 'Resultado',
+          value: activity.finishedAt
+            ? `Duración: ${formatDuration(activity.durationMin)} · Eficiencia: ${activity.eficiencia || '-'}`
+            : 'Aún en atención',
+        },
       ], { title: activity.anNumber || 'Ticket', labelWidth: 68 });
       doc.y += height + 10;
     });
 
-    ensurePageSpace(160, 'Evidencias por ticket');
-    drawSectionTitle(doc, 'Evidencias por ticket');
+    // Sin fotos no hay sección: antes el título quedaba solo, con la hoja en blanco debajo.
+    const hayEvidencias = payload.activities.some((activity) => (activity.evidences || []).length > 0);
+    if (hayEvidencias) {
+      ensurePageSpace(200);
+      drawSectionTitle(doc, 'Evidencias por ticket');
+    }
     const tileWidth = 160;
     const tileHeight = 120;
     const tileGap = 10;
@@ -251,7 +262,7 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
       const evidences = activity.evidences || [];
       if (!evidences.length) return;
       ensurePageSpace(160, 'Evidencias por ticket');
-      doc.fillColor(PDF_COLORS.navy).font('Helvetica-Bold').fontSize(10)
+      doc.fillColor(PDF_COLORS.navy).font(fuente(doc, 'semi')).fontSize(10)
         .text(`${activity.anNumber} · ${activity.titulo || ''}`, margin, doc.y, { width: contentWidth });
       doc.moveDown(0.3);
       let x = margin;
@@ -261,7 +272,7 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
       evidences.forEach((evidence) => {
         if (y + tileHeight + captionHeight > doc.page.height - 60) {
           addPage('Evidencias por ticket');
-          doc.fillColor(PDF_COLORS.navy).font('Helvetica-Bold').fontSize(10)
+          doc.fillColor(PDF_COLORS.navy).font(fuente(doc, 'semi')).fontSize(10)
             .text(`${activity.anNumber} · ${activity.titulo || ''}`, margin, doc.y, { width: contentWidth });
           doc.moveDown(0.3);
           x = margin;
@@ -276,24 +287,24 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
             doc.rect(x, y, tileWidth, tileHeight).stroke(PDF_COLORS.line);
           } catch {
             doc.rect(x, y, tileWidth, tileHeight).stroke(PDF_COLORS.muted);
-            doc.fillColor(PDF_COLORS.muted).font('Helvetica').fontSize(8)
+            doc.fillColor(PDF_COLORS.muted).font(fuente(doc, 'texto')).fontSize(8)
               .text('No se pudo cargar', x + 6, y + 54, { width: tileWidth - 12, align: 'center' });
           }
         } else {
           doc.rect(x, y, tileWidth, tileHeight).fill(PDF_COLORS.softGray);
-          doc.fillColor(PDF_COLORS.muted).font('Helvetica').fontSize(8)
+          doc.fillColor(PDF_COLORS.muted).font(fuente(doc, 'texto')).fontSize(8)
             .text(isPdf ? 'PDF adjunto' : 'Sin evidencia', x + 6, y + 54, {
               width: tileWidth - 12,
               align: 'center',
             });
         }
-        doc.fillColor(PDF_COLORS.text).font('Helvetica').fontSize(7)
+        doc.fillColor(PDF_COLORS.text).font(fuente(doc, 'texto')).fontSize(7)
           .text(pdfText(evidence.tipoEvidencia), x, y + tileHeight + 4, { width: tileWidth });
         const mapsUrl = evidence.tipoEvidencia === 'Foto llegada'
           ? getMapsUrl(evidence.latitud, evidence.longitud)
           : null;
         if (mapsUrl) {
-          doc.fillColor(accent).font('Helvetica').fontSize(7).text('Ver llegada', x, y + tileHeight + 14, {
+          doc.fillColor(accent).font(fuente(doc, 'texto')).fontSize(7).text('Ver llegada', x, y + tileHeight + 14, {
             width: tileWidth,
             link: mapsUrl,
             underline: true,
@@ -312,6 +323,7 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
       doc.y = y + 8;
     });
 
+    drawNexaraFooterOnEveryPage(doc);
     doc.end();
   });
 };

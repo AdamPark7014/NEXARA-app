@@ -4,17 +4,20 @@ import {
   PDF_CONTENT_START_Y,
   PDF_MODULE_ACCENTS,
   drawInfoCard,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawSummaryBox,
   drawTableHeader,
   drawTableRow,
+  fuente,
   loadNexaraLogo,
+  pdfFecha,
   pdfMoney,
   pdfText,
   type PdfTableContext,
 } from '../common/pdf/nexara-pdf-theme';
+import { ETIQUETA_ESTATUS_CONTRATO, ETIQUETA_ESTATUS_VISITA, etiquetaDe } from '../common/excel/etiquetas';
 
 export type ContractPdfPayload = {
   contractNumber: string;
@@ -37,15 +40,12 @@ export type ContractPdfPayload = {
 
 const ACCENT = PDF_MODULE_ACCENTS.maintenance;
 
-const fmtDate = (s?: string | null) =>
-  s
-    ? new Date(s).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })
-    : '-';
+const fmtDate = (s?: string | null) => pdfFecha(s, { day: '2-digit', month: 'long', year: 'numeric' });
 
 export async function generateContractPdf(payload: ContractPdfPayload): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({ size: 'A4', margin: 40 });
+      const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
       const chunks: Buffer[] = [];
       doc.on('data', (c) => chunks.push(c));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -64,7 +64,7 @@ export async function generateContractPdf(payload: ContractPdfPayload): Promise<
           meta: [
             { label: 'No. contrato', value: pdfText(payload.contractNumber) },
             { label: 'Inicio', value: fmtDate(payload.startDate) },
-            { label: 'Estatus', value: pdfText(payload.status) },
+            { label: 'Estatus', value: etiquetaDe(ETIQUETA_ESTATUS_CONTRATO, payload.status) },
           ],
         });
 
@@ -85,8 +85,8 @@ export async function generateContractPdf(payload: ContractPdfPayload): Promise<
       const contractHeight = drawInfoCard(doc, margin + leftWidth + 20, infoY, rightWidth, [
         { label: 'Objeto', value: pdfText(payload.title) },
         { label: 'Alcance', value: pdfText(payload.scope) },
-        { label: 'Empresa', value: pdfText(payload.companyName || 'NEXARA') },
-        { label: 'RFC emp.', value: pdfText(payload.companyRfc) },
+        { label: 'Prestador', value: pdfText(payload.companyName || 'NEXARA') },
+        { label: 'RFC del prestador', value: pdfText(payload.companyRfc) },
       ]);
 
       doc.y = infoY + Math.max(clientHeight, contractHeight) + 16;
@@ -132,7 +132,7 @@ export async function generateContractPdf(payload: ContractPdfPayload): Promise<
             [
               fmtDate(visit.scheduledDate),
               pdfText(visit.description || 'Visita preventiva'),
-              pdfText(visit.status),
+              etiquetaDe(ETIQUETA_ESTATUS_VISITA, visit.status),
             ],
             index,
             tableCtx,
@@ -163,20 +163,24 @@ export async function generateContractPdf(payload: ContractPdfPayload): Promise<
             'Frecuencia',
             payload.frequencyMonths ? (payload.frequencyMonths === 1 ? 'Cada mes' : `Cada ${payload.frequencyMonths} meses`) : 'A demanda',
           ],
-          ['Vigencia', `${fmtDate(payload.startDate)} — ${fmtDate(payload.endDate)}`],
+          [
+            'Vigencia',
+            payload.endDate ? `${fmtDate(payload.startDate)} al ${fmtDate(payload.endDate)}` : `Desde el ${fmtDate(payload.startDate)}`,
+          ],
         ],
         { highlightIndex: 0 },
       );
-      doc.y = summaryBoxY + summaryHeight + 28;
+      doc.y = summaryBoxY + summaryHeight + 16;
 
-      if (doc.y + 60 > doc.page.height - 60) {
+      // El título, el espacio para firmar y los dos renglones van juntos en la misma hoja.
+      if (doc.y + 96 > doc.page.height - 60) {
         doc.addPage();
         header();
         doc.y = PDF_CONTENT_START_Y;
       }
 
       drawSectionTitle(doc, 'Firmas');
-      const sigY = doc.y + 24;
+      const sigY = doc.y + 44;
       const colWidth = (contentWidth - 40) / 2;
 
       doc
@@ -187,8 +191,8 @@ export async function generateContractPdf(payload: ContractPdfPayload): Promise<
       doc
         .fillColor(PDF_COLORS.muted)
         .fontSize(10)
-        .font('Helvetica')
-        .text('Cliente', margin, sigY + 8, { width: colWidth, align: 'center' });
+        .font(fuente(doc, 'texto'))
+        .text(pdfText(payload.clientName) === '-' ? 'Cliente' : `${pdfText(payload.clientName)} · Cliente`, margin, sigY + 8, { width: colWidth, align: 'center' });
 
       const rightX = margin + colWidth + 40;
       doc
@@ -199,10 +203,10 @@ export async function generateContractPdf(payload: ContractPdfPayload): Promise<
       doc
         .fillColor(PDF_COLORS.muted)
         .fontSize(10)
-        .font('Helvetica')
-        .text('NEXARA', rightX, sigY + 8, { width: colWidth, align: 'center' });
+        .font(fuente(doc, 'texto'))
+        .text(`${pdfText(payload.companyName || 'NEXARA')} · Prestador`, rightX, sigY + 8, { width: colWidth, align: 'center' });
 
-      drawNexaraFooter(doc, 'NEXARA · Contrato de mantenimiento — información confidencial.');
+      drawNexaraFooterOnEveryPage(doc, 'NEXARA · Contrato de mantenimiento — información confidencial.');
       doc.end();
     } catch (err) {
       reject(err);

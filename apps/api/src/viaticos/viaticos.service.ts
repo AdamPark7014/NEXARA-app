@@ -13,6 +13,7 @@ import {
 } from '../common/rbac/hierarchical-approval.js';
 import { ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
 import { generateViaticsReportPdf } from './viatics-report-pdf.js';
+import { pdfFecha, pdfFechaHora, pdfPeriodo } from '../common/pdf/nexara-pdf-theme.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { assertCompanyAccess, resolveRequiredCompanyId, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
@@ -1298,15 +1299,13 @@ export class ViaticosService {
       take: 200,
     });
 
-    const periodLabel =
-      filters.from || filters.to
-        ? `Periodo: ${filters.from || '…'} → ${filters.to || '…'}`
-        : 'Periodo: todos los registros';
+    // El encabezado ya rotula «Periodo:»; aquí solo van las fechas, escritas como se leen.
+    const periodLabel = pdfPeriodo(filters.from, filters.to);
 
     return generateViaticsReportPdf({
       title: 'Control de viáticos',
       periodLabel,
-      generatedAt: new Date().toLocaleString('es-MX'),
+      generatedAt: pdfFechaHora(new Date()),
       preparedBy,
       currency: 'MXN',
       totalSolicitado: analytics.totals.totalSolicitado,
@@ -1317,9 +1316,7 @@ export class ViaticosService {
       byCategory: analytics.byCategory,
       rows: rows.map((r) => ({
         id: r.id,
-        fecha: r.fechaSolicitud
-          ? new Date(r.fechaSolicitud).toLocaleDateString('es-MX')
-          : '—',
+        fecha: r.fechaSolicitud ? pdfFecha(r.fechaSolicitud) : '—',
         solicitante: r.User?.nombre || '—',
         proyecto: r.project?.name || '—',
         categoria: r.categoria || 'OTROS',

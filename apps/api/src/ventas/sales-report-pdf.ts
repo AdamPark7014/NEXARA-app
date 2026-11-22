@@ -4,16 +4,22 @@ import {
   PDF_CONTENT_START_Y,
   PDF_MODULE_ACCENTS,
   drawKpiCards,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawTableHeader,
   drawTableRow,
+  fuente,
   loadNexaraLogo,
   pdfMoney,
   type PdfTableColumn,
   type PdfTableContext,
 } from '../common/pdf/nexara-pdf-theme';
+import {
+  ETIQUETA_ESTATUS_PROYECTO_COMERCIAL,
+  ETIQUETA_ETAPA_OPORTUNIDAD,
+  etiquetaDe,
+} from '../common/excel/etiquetas';
 
 /**
  * Logo del reporte: solo HTTPS a un dominio de NEXARA, sin redirecciones y con tope de tamaño. Antes
@@ -81,7 +87,7 @@ export const generateSalesReportPdf = async (payload: SalesReportPayload): Promi
   }
 
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
     const chunks: Buffer[] = [];
 
     doc.on('data', (chunk) => chunks.push(chunk));
@@ -91,11 +97,11 @@ export const generateSalesReportPdf = async (payload: SalesReportPayload): Promi
     const accent = PDF_MODULE_ACCENTS.crm;
     const margin = doc.page.margins.left;
     const contentWidth = doc.page.width - margin * 2;
-    const footerNote = 'NEXARA · Reporte Comercial — información confidencial.';
+    const footerNote = 'NEXARA · Reporte comercial — información confidencial.';
 
     const drawPage = () => {
       drawNexaraHeader(doc, {
-        docTitle: 'Reporte Comercial',
+        docTitle: 'Reporte comercial',
         docSubtitle: 'Indicadores de ventas y crecimiento',
         accent,
         logo: logoBuffer,
@@ -104,7 +110,6 @@ export const generateSalesReportPdf = async (payload: SalesReportPayload): Promi
           { label: 'Generado', value: formatDateTime(payload.generatedAt) },
         ],
       });
-      drawNexaraFooter(doc, footerNote);
       doc.y = PDF_CONTENT_START_Y;
     };
 
@@ -120,14 +125,13 @@ export const generateSalesReportPdf = async (payload: SalesReportPayload): Promi
       doc.save();
       doc.rect(margin, y - 4, contentWidth, 24).fill(PDF_COLORS.softGray);
       doc.restore();
-      doc.fillColor(PDF_COLORS.muted).fontSize(9).font('Helvetica-Oblique').text(message, margin + 10, y + 2, {
+      doc.fillColor(PDF_COLORS.muted).fontSize(9).font(fuente(doc, 'texto')).text(message, margin + 10, y + 2, {
         width: contentWidth - 20,
         align: 'center',
       });
       doc.y = y + 24;
     };
 
-    doc.font('Helvetica');
     drawPage();
 
     drawSectionTitle(doc, 'Resumen');
@@ -137,7 +141,7 @@ export const generateSalesReportPdf = async (payload: SalesReportPayload): Promi
       { label: 'Valor esperado', value: pdfMoney(payload.totals.expectedValue), accent },
     ]);
     drawKpiCards(doc, kpiY + kpiRowHeight + 12, [
-      { label: 'Margen proyectos', value: pdfMoney(payload.totals.totalMargin), accent },
+      { label: 'Margen de proyectos', value: pdfMoney(payload.totals.totalMargin), accent },
       { label: 'Cotizaciones generadas', value: String(payload.totals.quotes), accent },
     ]);
     doc.y = kpiY + kpiRowHeight * 2 + 12 + 18;
@@ -152,19 +156,19 @@ export const generateSalesReportPdf = async (payload: SalesReportPayload): Promi
     drawTableHeader(doc, doc.y, stageColumns);
     doc.y += 28;
     if (payload.byStage.length === 0) {
-      drawEmptyRow('No hay datos de pipeline por etapa para este periodo.');
+      drawEmptyRow('No hay oportunidades en el pipeline para este periodo.');
     } else {
       payload.byStage.forEach((row, index) => {
-        drawTableRow(doc, [row.stage, String(row.count), pdfMoney(row.value)], index, stageCtx, {
+        drawTableRow(doc, [etiquetaDe(ETIQUETA_ETAPA_OPORTUNIDAD, row.stage), String(row.count), pdfMoney(row.value)], index, stageCtx, {
           boldColumns: [2],
         });
       });
     }
 
     ensureSectionSpace(110);
-    drawSectionTitle(doc, 'Top oportunidades');
+    drawSectionTitle(doc, 'Oportunidades de mayor valor');
     const oppColumns: PdfTableColumn[] = [
-      { label: 'Proyecto', width: contentWidth * 0.5 },
+      { label: 'Oportunidad', width: contentWidth * 0.5 },
       { label: 'Etapa', width: contentWidth * 0.2 },
       { label: 'Valor', width: contentWidth * 0.3, align: 'right' },
     ];
@@ -176,7 +180,7 @@ export const generateSalesReportPdf = async (payload: SalesReportPayload): Promi
     } else {
       payload.topOpportunities.forEach((row, index) => {
         const label = row.clientName ? `${row.title} (${row.clientName})` : row.title;
-        drawTableRow(doc, [label, row.stage, pdfMoney(row.value)], index, oppCtx, { boldColumns: [2] });
+        drawTableRow(doc, [label, etiquetaDe(ETIQUETA_ETAPA_OPORTUNIDAD, row.stage), pdfMoney(row.value)], index, oppCtx, { boldColumns: [2] });
       });
     }
 
@@ -210,10 +214,11 @@ export const generateSalesReportPdf = async (payload: SalesReportPayload): Promi
       drawEmptyRow('Sin datos de margen por estado.');
     } else {
       payload.marginByStatus.forEach((item, index) => {
-        drawTableRow(doc, [item.status, pdfMoney(item.margin)], index, marginCtx, { boldColumns: [1] });
+        drawTableRow(doc, [etiquetaDe(ETIQUETA_ESTATUS_PROYECTO_COMERCIAL, item.status), pdfMoney(item.margin)], index, marginCtx, { boldColumns: [1] });
       });
     }
 
+    drawNexaraFooterOnEveryPage(doc, footerNote);
     doc.end();
   });
 };

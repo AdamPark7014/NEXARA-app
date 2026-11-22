@@ -12,6 +12,8 @@ import {
   stockMovementTypeLabel,
   type StockMovementPdfRow,
 } from './stock-movement-pdf.js';
+import { pdfPeriodo } from '../common/pdf/nexara-pdf-theme.js';
+import { workDateKey } from '../common/time/workday.js';
 import { EmpaqueInvalidoError, convertirCaptura, type Empaque } from './empaque.js';
 import {
   normalizarFotosMovimiento,
@@ -1002,8 +1004,9 @@ export class WarehouseService {
     const filterLines: Array<{ label: string; value: string }> = [];
     if (filters?.type) filterLines.push({ label: 'Tipo', value: stockMovementTypeLabel(filters.type) });
     if (warehouse) filterLines.push({ label: 'Almacén', value: [warehouse.code, warehouse.name].filter(Boolean).join(' — ') });
-    if (filters?.from) filterLines.push({ label: 'Desde', value: filters.from.slice(0, 10) });
-    if (filters?.to) filterLines.push({ label: 'Hasta', value: filters.to.slice(0, 10) });
+    if (filters?.from || filters?.to) {
+      filterLines.push({ label: 'Periodo', value: pdfPeriodo(filters?.from, filters?.to) });
+    }
 
     const title = product
       ? `Historial · ${product.sku}`
@@ -1024,7 +1027,7 @@ export class WarehouseService {
       rows: movements.map((m) => this.mapMovementToPdfRow(m)),
     });
 
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = workDateKey(new Date());
     const fileHint = product?.sku
       ? `historial-${product.sku}`
       : filters?.type

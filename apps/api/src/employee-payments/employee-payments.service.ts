@@ -43,6 +43,7 @@ import {
   resolveRequiredCompanyId,
 } from '../common/tenant/tenant-scope.js';
 import { calculatePrenominaAmount } from './prenomina-amount.js';
+import { pdfFechaHora, pdfPeriodo } from '../common/pdf/nexara-pdf-theme.js';
 
 const STATUS = {
   BORRADOR: 'Borrador',
@@ -832,15 +833,19 @@ export class EmployeePaymentsService {
     const analytics = await this.analytics(user, filters, companyId);
     return generateEmployeePaymentsReportPdf({
       title: 'Pagos a empleados',
-      periodLabel: analytics.periodLabel,
-      generatedAt: new Date().toLocaleString('es-MX'),
+      periodLabel: pdfPeriodo(filters.from, filters.to),
+      generatedAt: pdfFechaHora(new Date()),
       preparedBy: preparedBy || null,
       currency: 'MXN',
       totalPagado: analytics.totalPagado,
       totalBorrador: analytics.totalBorrador,
       count: analytics.count,
       byEmployee: analytics.byEmployee,
-      rows: analytics.rows,
+      // «2026-11-16 → 2026-11-22» se imprime como se lee: «16/11/2026 al 22/11/2026».
+      rows: analytics.rows.map((r) => {
+        const [desde, hasta] = r.periodo.split(' → ');
+        return { ...r, periodo: pdfPeriodo(desde, hasta, '—') };
+      }),
     });
   }
 }

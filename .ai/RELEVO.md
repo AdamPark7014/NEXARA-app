@@ -1,5 +1,48 @@
 # RELEVO
 
+- **21-11 ~19:45 México (claude-code, nube; Cursor/Codex no alcanzables) — Novena vuelta de pulido: los PDF que salen de la plataforma. Sin migraciones; sin desplegar.**
+  - **Cómo se revisó:** los 15 documentos que usan el tema común (`common/pdf/nexara-pdf-theme.ts`) se generaron con
+    datos de demostración, se pasaron a imagen y se leyeron hoja por hoja, antes y después. La cotización al cliente
+    (generador propio) quedó idéntica pixel por pixel: no se tocó su diseño.
+  - **Fallas de raíz, en el tema (las heredaban todos):** las piezas (`drawInfoCard`, `drawKpiCards`,
+    `drawSummaryBox`, `drawTableHeader`) dejaban el cursor donde terminó su último texto y cada documento sumaba
+    espacio «a ojo»: quedaba una franja en blanco bajo el encabezado de cada tabla y huecos disparejos. Ahora dejan el
+    cursor donde empezaron. Los renglones del encabezado se encimaban cuando uno no cabía; el título de una sección se
+    quedaba solo al final de la hoja (ahora salta con su contenido); una palabra más ancha que su columna se partía a
+    la mitad («APROBA / DO») y ahora se achica; el recuadro de resumen medía cada renglón con alto fijo y encimaba los
+    largos; `pdfTruncate` cortaba con «...» y ahora con «…».
+  - **Pie y hojas:** el pie salía solo en la última hoja y sin número. `drawNexaraFooterOnEveryPage` lo pinta en todas
+    y agrega «Página N de M» cuando hay más de una. El reporte de actividades abría una hoja en blanco solo para el
+    pie. Once títulos de sección se imprimían dos veces al saltar de hoja (acta, reporte al cliente, reporte de
+    actividad, hoja de servicio).
+  - **Fechas y horas:** el servidor corre en UTC y los documentos imprimían esa hora: un movimiento de almacén de las
+    19:30 salía a la 01:30 del día siguiente, y «Generado» igual. `pdfFecha`, `pdfFechaHora` y `pdfPeriodo` usan la
+    zona de la empresa (`WORKDAY_TIMEZONE`); una fecha guardada sin hora (medianoche UTC) se imprime tal cual, sin
+    recorrerse un día. Los periodos se leen «01/11/2026 al 21/11/2026» (antes «Periodo: Periodo: 2026-11-01 → …»).
+    El reporte comercial empieza semana, mes y año a la medianoche de la empresa. La «→» no existe en las fuentes
+    incrustadas y se imprimía como un bloque negro: `pdfCambio` usa «›».
+  - **Textos:** estatus, prioridades, categorías y tipos salían con el valor interno (`APPROVED`, `IN_PROGRESS`,
+    `CORRECTIVO`). Pasan por `etiquetaDe` y los mapas de `common/excel/etiquetas.ts`, los mismos de los Excel, para
+    que el PDF diga lo que dice la pantalla. «Landed cost» → «Costos adicionales», «Total OT» → «Actividades»,
+    «Top empleados» → «Pagado por empleado», «Email» → «Correo». «Pipeline» y «Leads» se quedan: así se llaman en la
+    web.
+  - **Documento por documento:** la orden de venta se guardaba **vacía** (0 bytes: el generador devolvía el búfer
+    antes de que pdfkit terminara de escribir); ahora es una promesa que se resuelve al cerrar el documento. El
+    comprobante de almacén trae dónde firman quien entrega y quien recibe. En el contrato de mantenimiento las firmas
+    ya no se van solas a otra hoja. El reporte al cliente ya no deja la sección «Evidencias por ticket» vacía y dice
+    «Aún en atención» si el ticket no ha cerrado. En el reporte de actividad y la hoja de servicio el logo del
+    cliente tapaba los rótulos de la primera tarjeta: se movió arriba a la derecha (**no se vio con un logo real**:
+    conviene abrir uno tras el despliegue).
+  - **No cambió:** qué datos trae cada reporte, sus filtros, permisos ni rutas. Tampoco los generadores con diseño
+    propio (orden de compra, evidencias de actividad, cotización), que siguen con Helvetica.
+  - **Pendiente visto y no hecho:** los filtros de fecha de viáticos, gastos y actividades cortan el día en UTC para
+    registros con hora (uno de las 19:00 cae en el día siguiente); las tarjetas «Desglose» parten «nombre — monto» en
+    columnas angostas; los Excel de esta vuelta no se revisaron (`control-nomina-excel.ts:338` dice «NOMINA»).
+  - **Paridad:** API hecho · Web, Android e iOS no aplica: los documentos los arma el servidor y las apps solo los
+    descargan.
+  - **Verificado:** `npm run typecheck` 0; jest API 525 suites, 6628 pruebas en verde (`common/pdf/nexara-pdf-theme.spec.ts` 15 pruebas y
+    `common/pdf/reportes-pdf.spec.ts` 12, nuevas); web sin cambios desde la vuelta anterior.
+
 - **21-11 ~19:14 México (claude-code, nube; Cursor/Codex no alcanzables) — Octava vuelta de pulido: los correos que manda la plataforma. Sin migraciones; sin desplegar.**
   - **Qué había:** ocho correos armados en cinco servicios. Seis traían su propia copia del mismo HTML y dos no traían
     ninguno: la cotización le llegaba al cliente como cuatro renglones sin formato, con asunto «Cotizacion» y la

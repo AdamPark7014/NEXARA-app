@@ -69,6 +69,8 @@ import { clientesParecidos } from './clientes-parecidos.js';
 import { padronParaComparar } from './clientes-parecidos.service.js';
 import { checkUrlAccess } from '../common/rbac/url-matrix.js';
 import type { RoleKey } from '../common/rbac/roles.v2.js';
+import { workDayStart, workMonthStart, workYearStart } from '../common/time/workday.js';
+import { pdfFecha } from '../common/pdf/nexara-pdf-theme.js';
 
 @Injectable()
 export class VentasService {
@@ -1873,9 +1875,11 @@ export class VentasService {
       .map(([month, data]) => ({ month, opportunities: data.count, value: data.value, wonValue: data.wonValue }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
+    // Cada extremo en su día: un instante, en la hora de la empresa (en UTC, un reporte pedido después
+    // de las 6 de la tarde terminaba «mañana»); un día de calendario, tal cual.
     const rangeLabel = parsedRange
-      ? `${parsedRange.start.toLocaleDateString('es-MX')} - ${parsedRange.end.toLocaleDateString('es-MX')}`
-      : 'Ultimo periodo';
+      ? `${pdfFecha(parsedRange.start)} al ${pdfFecha(parsedRange.end)}`
+      : 'Último periodo';
 
     return {
       range: parsedRange,
@@ -2293,7 +2297,7 @@ export class VentasService {
       orderPdfBuffer = await this.pdfGeneratorService.generateOrderPdf(projectId);
     } catch {
       const { generateSalesOrderPdf } = await import('./sales-order-pdf.js');
-      orderPdfBuffer = generateSalesOrderPdf({
+      orderPdfBuffer = await generateSalesOrderPdf({
         orderId: order!.orderId,
         orderDate: new Date(),
         projectName: project.name,
@@ -3596,19 +3600,15 @@ export class VentasService {
   }
 
   async generateDynamicReportPdf(period: 'week' | 'month' | 'year', user?: any, includeVendorStats = false, logoUrl?: string) {
+    // La semana, el mes y el año empiezan a la medianoche de la empresa, no a la del servidor (UTC):
+    // con `setHours(0)` el mes arrastraba las últimas seis horas del anterior.
     const end = new Date();
-    const start = new Date(end);
-
-    if (period === 'week') {
-      start.setDate(end.getDate() - 6);
-      start.setHours(0, 0, 0, 0);
-    } else if (period === 'month') {
-      start.setDate(1);
-      start.setHours(0, 0, 0, 0);
-    } else {
-      start.setMonth(0, 1);
-      start.setHours(0, 0, 0, 0);
-    }
+    const start =
+      period === 'week'
+        ? workDayStart(new Date(workDayStart(end).getTime() - 6 * 24 * 3_600_000 + 12 * 3_600_000))
+        : period === 'month'
+          ? workMonthStart(end)
+          : workYearStart(end);
 
     const summary = await this.buildReportSummary(
       {

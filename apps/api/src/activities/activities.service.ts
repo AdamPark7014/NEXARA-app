@@ -24,6 +24,7 @@ import { UpdateActivityDto } from './dto/update-activity.dto.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { generateTicketReportPdf } from './ticket-report-pdf.js';
 import { generateActivitiesReportPdf } from './activities-report-pdf.js';
+import { pdfFecha, pdfFechaHora, pdfPeriodo } from '../common/pdf/nexara-pdf-theme.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { ACTIVITY_STATUS, isFinishedStatus } from './activity-status.js';
 import { esNoCumplida } from './incumplimiento.js';
@@ -1148,20 +1149,15 @@ export class ActivitiesService {
       else abiertas += 1;
     }
 
-    const fmt = (d?: Date | null) =>
-      d
-        ? d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' })
-        : '—';
+    // El día en la hora de la empresa: una actividad asignada a las 7 de la tarde no es del día siguiente.
+    const fmt = (d?: Date | null) => (d ? pdfFecha(d) : '—');
 
-    const periodLabel =
-      filters.from || filters.to
-        ? `${filters.from || 'inicio'} → ${filters.to || 'hoy'}`
-        : 'Sin filtro de fechas';
+    const periodLabel = pdfPeriodo(filters.from, filters.to, 'Sin filtro de fechas');
 
     return generateActivitiesReportPdf({
-      title: 'Reporte de actividades OPS',
+      title: 'Reporte de actividades',
       periodLabel,
-      generatedAt: new Date().toLocaleString('es-MX'),
+      generatedAt: pdfFechaHora(new Date()),
       preparedBy: preparedBy || null,
       total: rows.length,
       abiertas,

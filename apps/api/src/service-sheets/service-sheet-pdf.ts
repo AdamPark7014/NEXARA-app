@@ -7,15 +7,17 @@ import {
   PDF_MODULE_ACCENTS,
   type PdfTableContext,
   drawInfoCard,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawSummaryBox,
   drawTableHeader,
   drawTableRow,
+  fuente,
   loadNexaraLogo,
   pdfText,
 } from '../common/pdf/nexara-pdf-theme';
+import { ETIQUETA_TIPO_TICKET, etiquetaDe } from '../common/excel/etiquetas';
 
 export type ServiceSheetPayload = {
   anNumber: string;
@@ -82,7 +84,7 @@ const resolveLogoPath = (logoUrl?: string | null) => {
 
 export const generateServiceSheetPdf = async (payload: ServiceSheetPayload): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -102,12 +104,11 @@ export const generateServiceSheetPdf = async (payload: ServiceSheetPayload): Pro
         accent,
         logo,
         meta: [
-          { label: 'Ticket', value: payload.anNumber },
+          { label: 'Folio', value: payload.anNumber },
           { label: 'Cliente', value: pdfText(payload.clientName) },
-          { label: 'Tipo', value: pdfText(payload.ticketType) },
+          { label: 'Tipo', value: etiquetaDe(ETIQUETA_TIPO_TICKET, payload.ticketType) },
         ],
       });
-      drawNexaraFooter(doc);
       doc.y = PDF_CONTENT_START_Y;
     };
 
@@ -140,7 +141,9 @@ export const generateServiceSheetPdf = async (payload: ServiceSheetPayload): Pro
     ], { labelWidth: 58 });
     if (clientLogo) {
       try {
-        doc.image(clientLogo, margin + 8, infoY + serviceHeight - 38, { fit: [72, 26] });
+        // Arriba a la derecha, entre la banda y las tarjetas. Antes iba dentro de la primera tarjeta,
+        // encima de los rótulos «Ciudad/Estado» y «Dirección».
+        doc.image(clientLogo, margin + contentWidth - 96, PDF_CONTENT_START_Y - 14, { fit: [96, 30], align: 'right', valign: 'center' });
       } catch {
         // Keep rendering when a client logo is corrupt.
       }
@@ -148,8 +151,9 @@ export const generateServiceSheetPdf = async (payload: ServiceSheetPayload): Pro
     doc.y = infoY + Math.max(serviceHeight, scheduleHeight) + 16;
 
     drawSectionTitle(doc, 'Trabajo realizado');
-    doc.fillColor(PDF_COLORS.text).font('Helvetica').fontSize(10)
+    doc.fillColor(PDF_COLORS.text).font(fuente(doc, 'texto')).fontSize(10)
       .text(pdfText(payload.workSummary), margin, doc.y, { width: contentWidth });
+    doc.y += 8;
 
     drawSectionTitle(doc, 'Equipos atendidos');
     const equipment = payload.equipmentList || [];
@@ -171,7 +175,7 @@ export const generateServiceSheetPdf = async (payload: ServiceSheetPayload): Pro
     drawTableHeader(doc, doc.y, columns, tableCtx.headerAccent);
     doc.y += 28;
     if (!equipment.length) {
-      doc.fillColor(PDF_COLORS.text).font('Helvetica').fontSize(10)
+      doc.fillColor(PDF_COLORS.text).font(fuente(doc, 'texto')).fontSize(10)
         .text('Sin equipos registrados.', margin, doc.y);
       doc.moveDown(0.6);
     } else {
@@ -186,12 +190,14 @@ export const generateServiceSheetPdf = async (payload: ServiceSheetPayload): Pro
       });
     }
 
-    ensurePageSpace(100, 'Observaciones');
+    doc.y += 6;
+    ensurePageSpace(100);
     drawSectionTitle(doc, 'Observaciones');
-    doc.fillColor(PDF_COLORS.text).font('Helvetica').fontSize(10)
+    doc.fillColor(PDF_COLORS.text).font(fuente(doc, 'texto')).fontSize(10)
       .text(pdfText(payload.observations), margin, doc.y, { width: contentWidth });
+    doc.y += 8;
 
-    ensurePageSpace(120, 'Firma digital');
+    ensurePageSpace(120);
     drawSectionTitle(doc, 'Firma digital');
     const signatureY = doc.y;
     const signatureHeight = drawInfoCard(doc, margin, signatureY, contentWidth, [
@@ -201,18 +207,19 @@ export const generateServiceSheetPdf = async (payload: ServiceSheetPayload): Pro
     ], { title: 'Conformidad del servicio', labelWidth: 80 });
     doc.y = signatureY + signatureHeight + 12;
 
-    ensurePageSpace(150, 'Encuesta de calidad');
+    ensurePageSpace(150);
     drawSectionTitle(doc, 'Encuesta de calidad');
     const survey = payload.survey || {};
     const yesNo = (value?: boolean | null) => value === true ? 'Sí' : value === false ? 'No' : '-';
     const surveyHeight = drawSummaryBox(doc, margin, doc.y, contentWidth, 'Evaluación del servicio', [
-      ['Ingeniero se identificó', yesNo(survey.engineerIdentified)],
-      ['Atención fue amable', yesNo(survey.friendlyAttention)],
+      ['El ingeniero se identificó', yesNo(survey.engineerIdentified)],
+      ['La atención fue amable', yesNo(survey.friendlyAttention)],
       ['Satisfecho con la solución', yesNo(survey.solutionSatisfied)],
       ['Observaciones adicionales', pdfText(survey.notes)],
     ]);
     doc.y += surveyHeight + 8;
 
+    drawNexaraFooterOnEveryPage(doc);
     doc.end();
   });
 };

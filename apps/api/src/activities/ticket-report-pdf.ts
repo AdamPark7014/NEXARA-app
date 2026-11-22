@@ -8,15 +8,25 @@ import {
   type PdfTableContext,
   drawInfoCard,
   drawKpiCards,
-  drawNexaraFooter,
+  drawNexaraFooterOnEveryPage,
   drawNexaraHeader,
   drawSectionTitle,
   drawSummaryBox,
   drawTableHeader,
   drawTableRow,
+  fuente,
   loadNexaraLogo,
+  pdfCambio,
+  pdfPeriodo,
   pdfText,
 } from '../common/pdf/nexara-pdf-theme';
+import {
+  ETIQUETA_COMPARATIVA_INVENTARIO,
+  ETIQUETA_ESTATUS_EQUIPO,
+  ETIQUETA_ESTATUS_INVENTARIO,
+  ETIQUETA_TIPO_TICKET,
+  etiquetaDe,
+} from '../common/excel/etiquetas';
 import { cacheKeyFor, getStaticMapImage, isUsableCoordinate } from '../common/maps/static-map-cache.js';
 import { dibujarMapaOsm, type LienzoPdf } from '../common/maps/osm-teselas.js';
 
@@ -194,7 +204,7 @@ const resolveSignatureImage = (value?: string | null) => {
 
 export const generateTicketReportPdf = async (payload: TicketReportPayload): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -212,18 +222,17 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
 
     const drawHeader = () => {
       drawNexaraHeader(doc, {
-        docTitle: 'Reporte de actividad / OT',
+        docTitle: 'Reporte de actividad',
         docSubtitle: flowLabel,
         accent,
         logo,
         meta: [
-          { label: 'Ticket', value: payload.anNumber },
+          { label: 'Folio', value: payload.anNumber },
           { label: 'Cliente', value: pdfText(payload.clientName) },
-          { label: 'Tipo', value: pdfText(payload.ticketType) },
+          { label: 'Tipo', value: etiquetaDe(ETIQUETA_TIPO_TICKET, payload.ticketType) },
           { label: 'Prioridad', value: pdfText(payload.prioridad) },
         ],
       });
-      drawNexaraFooter(doc);
       doc.y = PDF_CONTENT_START_Y;
     };
 
@@ -258,7 +267,9 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
     ], { labelWidth: 64 });
     if (clientLogo) {
       try {
-        doc.image(clientLogo, margin + 8, infoY + branchHeight - 42, { fit: [72, 30] });
+        // Arriba a la derecha, entre la banda y las tarjetas. Antes iba dentro de la primera tarjeta,
+        // encima de los rótulos «Ciudad/Estado» y «Dirección».
+        doc.image(clientLogo, margin + contentWidth - 96, PDF_CONTENT_START_Y - 14, { fit: [96, 30], align: 'right', valign: 'center' });
       } catch {
         // Keep rendering when a client logo is corrupt.
       }
@@ -277,11 +288,11 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
     doc.y += kpiHeight + 16;
 
     if (payload.inventorySnapshot) {
-      ensurePageSpace(140, 'Inventario comparativo');
+      ensurePageSpace(140);
       drawSectionTitle(doc, 'Inventario comparativo');
       const inventory = payload.inventorySnapshot;
       const summaryHeight = drawSummaryBox(doc, margin, doc.y, contentWidth, 'Resumen de inventario', [
-        ['Estatus inventario', pdfText(inventory.status)],
+        ['Estatus del inventario', etiquetaDe(ETIQUETA_ESTATUS_INVENTARIO, inventory.status)],
         ['Equipos previos', String(inventory.previousCount ?? 0)],
         ['Equipos actuales', String(inventory.currentCount ?? 0)],
         ['Diferencia', String(inventory.deltaCount ?? 0)],
@@ -310,38 +321,40 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
         doc.y += 28;
         items.slice(0, maxRows).forEach((item, index) => {
           drawTableRow(doc, [
-            `${index + 1}. ${item.groupName || 'GENERAL'}\n${item.sectionName || '-'} · ${item.equipmentName || 'Equipo sin nombre'}`,
-            `Serie: ${item.serialBefore || '-'} → ${item.serialAfter || '-'}\nModelo: ${item.modelBefore || '-'} → ${item.modelAfter || '-'}`,
-            `${item.itemStatus || '-'}\n${item.compareState || '-'}`,
+            `${index + 1}. ${item.groupName || 'General'}\n${item.sectionName || '-'} · ${item.equipmentName || 'Equipo sin nombre'}`,
+            `Serie: ${pdfCambio(item.serialBefore, item.serialAfter)}\nModelo: ${pdfCambio(item.modelBefore, item.modelAfter)}`,
+            `${etiquetaDe(ETIQUETA_ESTATUS_EQUIPO, item.itemStatus)}\n${etiquetaDe(ETIQUETA_COMPARATIVA_INVENTARIO, item.compareState)}`,
             pdfText(item.maintenanceComments),
           ], index, tableCtx, { boldColumns: [0] });
         });
         if (items.length > maxRows) {
-          doc.fillColor(PDF_COLORS.muted).font('Helvetica').fontSize(8.5)
+          doc.fillColor(PDF_COLORS.muted).font(fuente(doc, 'texto')).fontSize(8.5)
             .text(`... y ${items.length - maxRows} equipos adicionales en el reporte de inventario detallado.`);
         }
         doc.moveDown(0.5);
       }
     }
 
-    ensurePageSpace(190, 'Resumen operativo');
+    ensurePageSpace(190);
     drawSectionTitle(doc, 'Resumen operativo');
     const serviceHeight = drawInfoCard(doc, margin, doc.y, contentWidth, [
       { label: 'Empresa', value: payload.clientCompany || payload.clientName || '-' },
       { label: 'Teléfono', value: pdfText(payload.clientPhone) },
-      { label: 'Fecha serv.', value: pdfText(payload.serviceDate) },
+      { label: 'Fecha del servicio', value: pdfPeriodo(payload.serviceDate, payload.serviceDate, '-') },
       { label: 'Horas', value: pdfText(payload.hoursWorked) },
       { label: 'Materiales', value: pdfText(payload.materialsUsed) },
     ]);
     doc.y += serviceHeight + 12;
     drawSectionTitle(doc, 'Trabajo realizado');
-    doc.fillColor(PDF_COLORS.text).font('Helvetica').fontSize(10)
+    doc.fillColor(PDF_COLORS.text).font(fuente(doc, 'texto')).fontSize(10)
       .text(pdfText(payload.workSummary), margin, doc.y, { width: contentWidth });
+    doc.y += 8;
     drawSectionTitle(doc, 'Observaciones');
-    doc.fillColor(PDF_COLORS.text).font('Helvetica').fontSize(10)
+    doc.fillColor(PDF_COLORS.text).font(fuente(doc, 'texto')).fontSize(10)
       .text(pdfText(payload.observations), margin, doc.y, { width: contentWidth });
+    doc.y += 8;
 
-    ensurePageSpace(180, 'Conformidad del gerente');
+    ensurePageSpace(180);
     drawSectionTitle(doc, 'Conformidad del gerente');
     const signatureY = doc.y;
     const detailsHeight = drawInfoCard(doc, margin, signatureY, 220, [
@@ -364,29 +377,35 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
           valign: 'center',
         });
       } catch {
-        doc.fillColor(PDF_COLORS.muted).font('Helvetica').fontSize(9)
+        doc.fillColor(PDF_COLORS.muted).font(fuente(doc, 'texto')).fontSize(9)
           .text('Firma registrada, pero no se pudo renderizar.', signatureX + 18, signatureY + 38, {
             width: signatureWidth - 36,
             align: 'center',
           });
       }
     } else {
-      doc.fillColor(PDF_COLORS.muted).font('Helvetica').fontSize(9)
+      doc.fillColor(PDF_COLORS.muted).font(fuente(doc, 'texto')).fontSize(9)
         .text('Sin firma digital adjunta', signatureX + 18, signatureY + 38, {
           width: signatureWidth - 36,
           align: 'center',
         });
     }
-    doc.fillColor(PDF_COLORS.muted).font('Helvetica').fontSize(8.5)
+    doc.fillColor(PDF_COLORS.muted).font(fuente(doc, 'texto')).fontSize(8.5)
       .text('Firma del gerente / representante', signatureX, signatureY + signatureHeight - 16, {
         width: signatureWidth,
         align: 'center',
       });
     doc.y = signatureY + Math.max(detailsHeight, signatureHeight) + 14;
 
-    drawSectionTitle(doc, 'Evidencias');
     const evidenceWidth = 220;
     const evidenceHeight = 164;
+    // El título pasa de hoja junto con la primera foto: antes se quedaba solo al pie cuando la foto no cabía.
+    if (payload.evidences.length) ensurePageSpace(evidenceHeight + 90);
+    drawSectionTitle(doc, 'Evidencias');
+    if (!payload.evidences.length) {
+      doc.fillColor(PDF_COLORS.muted).font(fuente(doc, 'texto')).fontSize(9)
+        .text('Sin evidencias adjuntas.', margin, doc.y, { width: contentWidth });
+    }
     let x = margin;
     let y = doc.y + 10;
     const arrivalCoordinates = payload.evidences.find((evidence) =>
@@ -430,7 +449,7 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
             doc.image(mapBuffer, x, y, { fit: [evidenceWidth, evidenceHeight], align: 'center', valign: 'center' });
           } else if (!conTeselas) {
             doc.rect(x, y, evidenceWidth, evidenceHeight).fill(PDF_COLORS.softGray);
-            doc.fillColor(PDF_COLORS.muted).font('Helvetica').fontSize(9)
+            doc.fillColor(PDF_COLORS.muted).font(fuente(doc, 'texto')).fontSize(9)
               .text('Mapa no disponible', x + 8, y + 60, { width: evidenceWidth - 16, align: 'center' });
           }
         } else if (evidencePath && !isPdf) {
@@ -438,18 +457,18 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
             doc.image(evidencePath, x, y, { fit: [evidenceWidth, evidenceHeight], align: 'center', valign: 'center' });
           } catch {
             doc.rect(x, y, evidenceWidth, evidenceHeight).stroke(PDF_COLORS.muted);
-            doc.fillColor(PDF_COLORS.muted).font('Helvetica').fontSize(9)
+            doc.fillColor(PDF_COLORS.muted).font(fuente(doc, 'texto')).fontSize(9)
               .text('No se pudo cargar', x + 8, y + 60, { width: evidenceWidth - 16, align: 'center' });
           }
         } else {
           doc.rect(x, y, evidenceWidth, evidenceHeight).fill(PDF_COLORS.softGray);
-          doc.fillColor(PDF_COLORS.muted).font('Helvetica').fontSize(9)
+          doc.fillColor(PDF_COLORS.muted).font(fuente(doc, 'texto')).fontSize(9)
             .text(isPdf ? 'PDF adjunto' : 'Sin evidencia', x + 8, y + 60, {
               width: evidenceWidth - 16,
               align: 'center',
             });
         }
-        doc.fillColor(PDF_COLORS.text).font('Helvetica').fontSize(8.5)
+        doc.fillColor(PDF_COLORS.text).font(fuente(doc, 'texto')).fontSize(8.5)
           .text(mapForPdf ? 'Mapa de llegada' : evidence.tipoEvidencia, x, y + evidenceHeight + 6, {
             width: evidenceWidth,
           });
@@ -459,7 +478,7 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
             ? getMapsUrl(evidence.latitud, evidence.longitud)
             : null;
         if (mapsUrl) {
-          doc.fillColor(accent).font('Helvetica').fontSize(7)
+          doc.fillColor(accent).font(fuente(doc, 'texto')).fontSize(7)
             .text('Ver ubicación de llegada', x, y + evidenceHeight + 20, {
               width: evidenceWidth,
               link: mapsUrl,
@@ -472,6 +491,7 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
           y += evidenceHeight + (mapsUrl ? 40 : 30);
         }
       }
+      drawNexaraFooterOnEveryPage(doc);
       doc.end();
     };
 
