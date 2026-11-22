@@ -55,7 +55,9 @@ const TIPO_TEXTO: Record<string, string> = {
   OTRO: "Otro",
 };
 
-export function textoTipo(tipo: string): string {
+// Sin `export`: una página de Next solo puede exportar lo suyo (default, metadata…); con otro
+// nombre la compilación de producción falla («is not a valid Page export field»).
+function textoTipo(tipo: string): string {
   if (TIPO_TEXTO[tipo]) return TIPO_TEXTO[tipo];
   const limpio = tipo.toLowerCase().replace(/_/g, " ");
   return limpio.charAt(0).toUpperCase() + limpio.slice(1);

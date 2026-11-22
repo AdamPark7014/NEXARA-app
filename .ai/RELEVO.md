@@ -9,8 +9,12 @@
     compilador de Next en la capa de servidor: la versión de `main` da ese error; la corregida compila como componente
     de cliente. **Cualquier despliegue de `main` entre `d99aa9a` y este commit habría fallado al construir la web.**
     Ya está corregido y hay dos candados en `lib/hoy-en-mexico.spec.ts`: nada de código antes de `"use client"` y
-    ningún archivo con BOM. La compilación completa de producción (`next build`) no se
-    corrió antes de este commit; se corre enseguida y su resultado va en el siguiente apunte.
+    ningún archivo con BOM.     **Segundo error, encontrado al correr la compilación completa (`next build`) sobre `e7ed958`:**
+    `app/(panels)/erp/hr/incidencias/page.tsx` exportaba un ayudante (`textoTipo`, desde `d2a8aa5`, vuelta 3) y Next
+    lo rechaza («is not a valid Page export field»). Se le quitó el `export` (solo se usa ahí) y hay un tercer
+    candado: páginas y layouts solo exportan lo que Next permite. **Con esa corrección `next build` termina bien
+    (289 páginas estáticas generadas). `e7ed958` por sí solo todavía no compila: el bueno es el commit siguiente.**
+    Lección: antes de decir que `main` se puede desplegar, correr `cd apps/web && node ../../scripts/next-build-resilient.js`.
   - **La causa del resto, una sola:** el servidor corre en hora universal y `toISOString()` también la da en el
     navegador. Para ambos el día cambia a las 18:00 de México.
   - **Servidor (`workDateKey`, y nuevos `workDateKeyOf` y `addDaysToKey` en `common/time/workday.ts`):** de las 6 de

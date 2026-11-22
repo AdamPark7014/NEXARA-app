@@ -61,6 +61,52 @@ describe("la directiva de cliente va primero", () => {
   });
 });
 
+/**
+ * Una página, un layout o sus hermanos solo pueden exportar lo que Next conoce. Un ayudante
+ * exportado desde `page.tsx` pasa los tipos y las pruebas, y tumba la compilación de producción
+ * («"textoTipo" is not a valid Page export field»). Los ayudantes van en `lib/` o sin `export`.
+ */
+describe("las páginas solo exportan lo que Next permite", () => {
+  const PERMITIDOS = new Set([
+    "default",
+    "metadata",
+    "generateMetadata",
+    "generateStaticParams",
+    "viewport",
+    "generateViewport",
+    "dynamic",
+    "dynamicParams",
+    "revalidate",
+    "fetchCache",
+    "runtime",
+    "preferredRegion",
+    "maxDuration",
+  ]);
+  const ENTRADA = /(^|\/)(page|layout|template|loading|error|not-found|default|global-error)\.tsx?$/;
+
+  it("ninguna página o layout exporta un ayudante", () => {
+    const culpables = fuentes()
+      .filter((f) => f.ruta.startsWith("app") && ENTRADA.test(f.ruta.replace(/\\/g, "/")))
+      .flatMap((f) => {
+        const nombres = [
+          ...Array.from(
+            f.texto.matchAll(/^export\s+(?:async\s+)?(?:function\*?|const|let|var|class)\s+([A-Za-z0-9_$]+)/gm),
+            (m) => m[1],
+          ),
+          ...Array.from(f.texto.matchAll(/^export\s*\{([^}]*)\}/gm)).flatMap((m) =>
+            m[1]
+              .split(",")
+              .map((parte) => parte.trim().split(/\s+as\s+/).pop() ?? "")
+              .filter(Boolean),
+          ),
+        ];
+        return nombres.filter((n) => !PERMITIDOS.has(n)).map((n) => `${f.ruta}: ${n}`);
+      });
+
+    expect(culpables).toEqual([]);
+  });
+});
+
 const RAIZ = join(__dirname, "..");
 
 function archivos(dir: string): string[] {
