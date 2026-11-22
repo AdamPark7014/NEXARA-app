@@ -6,7 +6,7 @@ import { DanosVehiculoService } from './danos-vehiculo.service';
  * motivo. Cobrarle a una persona lo aprueba dirección.
  */
 
-function build(over: { hallazgo?: any; claudeDisponible?: boolean; control?: any } = {}) {
+function build(over: { hallazgo?: any; claudeDisponible?: boolean; control?: any; previas?: any[] } = {}) {
   const hallazgo = {
     id: 11,
     estatus: 'PROPUESTO',
@@ -25,6 +25,7 @@ function build(over: { hallazgo?: any; claudeDisponible?: boolean; control?: any
       update: jest.fn().mockImplementation(({ data }: any) => Promise.resolve({ ...hallazgo, ...data })),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      findMany: jest.fn().mockResolvedValue(over.previas ?? []),
     },
     vehicleIncident: {
       create: jest.fn().mockImplementation(({ data }: any) => Promise.resolve({ id: 50, ...data })),
@@ -123,6 +124,37 @@ describe('comparación con IA', () => {
     const { service, claude } = build({ control: { fotosDevolucion: { fotos: [{ slot: 'km-gasolina', url: '/uploads/vehicles/k.jpg' }] } } });
     expect(await service.analizar(1)).toEqual({ estatus: 'LISTO', hallazgos: 0 });
     expect(claude.json).not.toHaveBeenCalled();
+  });
+
+  it('cada llamada lleva lo aprendido de las revisiones de Liz para esta unidad', async () => {
+    const { service, prisma, claude } = build({
+      previas: [
+        {
+          zona: 'vuelta-1',
+          descripcion: 'faro izquierdo estrellado',
+          estatus: 'DESCARTADO',
+          motivoDescarte: 'YA_ESTABA',
+          notaRevision: null,
+          vehicleAssetId: 3,
+          incidencia: null,
+        },
+      ],
+    });
+    (service as any).fotoParaIa = jest.fn().mockResolvedValue({ mediaType: 'image/jpeg', data: 'x' });
+    claude.json.mockResolvedValue({ datos: { hallazgos: [] } });
+    expect(await service.analizar(1)).toEqual({ estatus: 'LISTO', hallazgos: 0 });
+    const consulta = prisma.vehicleDamageFinding.findMany.mock.calls[0][0];
+    expect(consulta.where).toMatchObject({ companyId: 7, controlId: { not: 1 } });
+    expect(claude.json.mock.calls[0][0].usuario).toMatch(/^Daños que esta unidad ya tenía[\s\S]*Frente: faro izquierdo estrellado[\s\S]*Par 1: Frente/);
+  });
+
+  it('si no se pueden leer las revisiones, compara igual sin contexto', async () => {
+    const { service, prisma, claude } = build();
+    prisma.vehicleDamageFinding.findMany.mockRejectedValue(new Error('db'));
+    (service as any).fotoParaIa = jest.fn().mockResolvedValue({ mediaType: 'image/jpeg', data: 'x' });
+    claude.json.mockResolvedValue({ datos: { hallazgos: [] } });
+    await service.analizar(1);
+    expect(claude.json.mock.calls[0][0].usuario).toMatch(/^Par 1: Frente/);
   });
 
   it('solo lee fotos de la carpeta de vehículos', () => {

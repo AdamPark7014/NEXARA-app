@@ -22,6 +22,8 @@ import {
   limpiarHallazgos,
   paresParaComparar,
   textoDelLote,
+  contextoAprendido,
+  type RevisionPrevia,
   type FotoComparable,
   type HallazgoLimpio,
 } from './danos-ia.js';
@@ -95,6 +97,50 @@ export class DanosVehiculoService {
    * Compara salida y devolución de un uso y guarda los daños que la IA propone. Se puede volver a
    * correr: reemplaza lo propuesto que nadie ha revisado y deja lo confirmado o descartado.
    */
+  /**
+   * Lo aprendido de las revisiones de Liz para esta comparación: daños que la unidad ya tenía y errores
+   * recientes de la IA. Si la lectura falla, se compara sin contexto (nunca bloquea el análisis).
+   */
+  async contextoDeRevisiones(companyId: number, controlId: number, vehicleAssetId: number | null): Promise<string | null> {
+    try {
+      const filas = await this.prisma.vehicleDamageFinding.findMany({
+        where: {
+          companyId,
+          controlId: { not: controlId },
+          estatus: { in: ['CONFIRMADO', 'DESCARTADO'] },
+          OR: [
+            ...(vehicleAssetId != null ? [{ vehicleAssetId }] : []),
+            { motivoDescarte: { in: ['REFLEJO_O_SUCIEDAD', 'NO_ES_DANO', 'OTRO'] } },
+          ],
+        },
+        orderBy: [{ revisadoEn: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
+        take: 60,
+        select: {
+          zona: true,
+          descripcion: true,
+          estatus: true,
+          motivoDescarte: true,
+          notaRevision: true,
+          vehicleAssetId: true,
+          incidencia: { select: { estatus: true } },
+        },
+      });
+      const previas: RevisionPrevia[] = (filas ?? []).map((f: any) => ({
+        zona: f.zona,
+        descripcion: f.descripcion,
+        estatus: f.estatus,
+        motivoDescarte: f.motivoDescarte ?? null,
+        notaRevision: f.notaRevision ?? null,
+        vehicleAssetId: f.vehicleAssetId ?? null,
+        incidenciaEstatus: f.incidencia?.estatus ?? null,
+      }));
+      return contextoAprendido(previas, vehicleAssetId);
+    } catch (e) {
+      this.logger.warn(`Sin contexto de revisiones para el uso ${controlId}: ${(e as Error)?.message ?? e}`);
+      return null;
+    }
+  }
+
   async analizar(controlId: number): Promise<{ estatus: string; hallazgos: number }> {
     const c = await this.prisma.vehicleControl.findUnique({
       where: { id: controlId },
@@ -127,6 +173,7 @@ export class DanosVehiculoService {
 
     await marcar('PENDIENTE');
     try {
+      const contexto = await this.contextoDeRevisiones(c.companyId, c.id, c.vehicleId ?? null);
       const hallazgos: HallazgoLimpio[] = [];
       for (const lote of enLotes(pares)) {
         const imagenes = [];
@@ -137,7 +184,7 @@ export class DanosVehiculoService {
           proceso: 'vehiculo-danos',
           companyId: c.companyId,
           sistema: [PROMPT_DANOS],
-          usuario: textoDelLote(lote),
+          usuario: textoDelLote(lote, contexto),
           imagenes,
           esquema: ESQUEMA_DANOS,
           modelo: MODELO_DANOS,

@@ -40,6 +40,13 @@ export const SLOT_KM_GASOLINA: SlotFotoGuiada = "km-gasolina";
 export const CAMPO_VIDEO_VUELTA = "video-vuelta";
 export const DURACION_VUELTA_SEG = { min: 10, max: 20 } as const;
 
+/**
+ * Cómo se graba la vuelta (web, Android e iOS): 720p, unos 2.5 Mbps y sin audio. Una vuelta de 20 s
+ * pesa unos 6 MB y sube en menos de un minuto aun con señal floja (el proxy puede cortar una subida
+ * que tarda más); sin audio no se graban conversaciones.
+ */
+export const PERFIL_VIDEO_VUELTA = { altoPx: 720, bitsPorSegundo: 2_500_000, audio: false } as const;
+
 export const ETIQUETA_SLOT_GUIADO: Record<SlotGuiado, string> = Object.fromEntries([
   ...VISTAS_VUELTA.map((v) => [v.slot, v.etiqueta]),
   ...FOTOS_GUIADAS.map((f) => [f.slot, f.etiqueta]),

@@ -57,6 +57,13 @@ class CapturaGuiadaRulesTest {
     }
 
     @Test
+    fun `la vuelta se graba a 720p sin audio y 20 s pesan menos de 8 MB`() {
+        assertEquals(720, CapturaGuiadaRules.VIDEO_ALTO_PX)
+        assertFalse(CapturaGuiadaRules.VIDEO_CON_AUDIO)
+        assertTrue(CapturaGuiadaRules.pesoEstimadoBytes(21.0) < 8L * 1024 * 1024)
+    }
+
+    @Test
     fun `la vuelta debe durar de 10 a 20 s con un segundo de gracia`() {
         assertTrue(CapturaGuiadaRules.duracionValida(9.0))
         assertTrue(CapturaGuiadaRules.duracionValida(21.0))

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CAMPO_VIDEO_VUELTA,
   PASOS_CAPTURA,
+  PERFIL_VIDEO_VUELTA,
   SLOTS_GUIADA,
   construirCapturaGuiadaForm,
   duracionVueltaValida,
@@ -66,6 +67,11 @@ describe("construirCapturaGuiadaForm", () => {
     const sinHora = completa();
     sinHora.meta["km-gasolina"] = undefined;
     expect(() => construirCapturaGuiadaForm(sinHora)).toThrow(/Kilometraje y gasolina/);
+  });
+
+  it("la vuelta se graba a 720p, sin audio, y 20 s pesan menos de 8 MB", () => {
+    expect(PERFIL_VIDEO_VUELTA).toMatchObject({ altoPx: 720, audio: false });
+    expect((21 * PERFIL_VIDEO_VUELTA.bitsPorSegundo) / 8).toBeLessThan(8 * 1024 * 1024);
   });
 
   it("la vuelta debe durar de 10 a 20 s (con un segundo de gracia)", () => {

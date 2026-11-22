@@ -62,6 +62,13 @@ enum CapturaGuiadaRules {
     /// para las 12 fotos.
     static let videoMaxBytes = 60 * 1024 * 1024
 
+    /// Cómo se graba la vuelta (igual en web y Android): 720p, unos 2.5 Mbps y sin audio. Una vuelta
+    /// de 20 s pesa unos 6 MB y sube en menos de un minuto aun con señal floja (el proxy puede cortar
+    /// una subida que tarda más); sin audio no se graban conversaciones.
+    static let videoAltoPx = 720
+    static let videoBitsPorSegundo = 2_500_000
+    static let videoConAudio = false
+
     /// Los 5 pasos tal como los da la API cuando no contesta (`GET vehicles/captura-guiada`).
     static let pasos: [Paso] = [
         Paso(

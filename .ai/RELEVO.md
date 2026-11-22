@@ -783,6 +783,19 @@
     actividades y sin tocar. Android e iOS no se pueden compilar en la nube: los compila el CI al subir. iOS no
     tiene objetivo de pruebas unitarias; `scripts/ios-static-check.py` sin problemas.
 
+- **21-11 ~22:50 México (claude-code, nube) — Vehículos: la IA aprende de las revisiones de Liz y perfil de grabación del video. Sin migraciones, sin pantallas.**
+  - `danos-ia.ts` `contextoAprendido` + `danos-vehiculo.service.ts` `contextoDeRevisiones`: cada comparación lleva, como
+    texto, los daños que esa unidad ya tenía (confirmados con la incidencia sin cerrar, o descartados «ya estaba al
+    salir») y hasta 8 errores recientes que Liz descartó (reflejo/suciedad, «no es daño», «otro» con nota). Si la lectura
+    falla, compara sin contexto. Solo corre con el interruptor prendido.
+  - Perfil de grabación de la vuelta en web, Android e iOS: 720p, ~2.5 Mbps, sin audio (~6 MB por 20 s).
+  - Revisado el camino de subida: `app.nexara.com.mx/api` y `api.` van de Traefik directo a la API, sin middleware ni
+    Next en medio; la API acepta hasta 256 MB por petición y 80 MB por archivo. Falta ver en el servidor la config
+    estática de Traefik (`/opt/traefik`, no está en el repo): en v3 el `readTimeout` por omisión es de 60 s.
+  - «Devuelve la unidad» al cerrar la actividad ya lo cubre `avisos-retraso` (motivo ACTIVIDAD_CERRADA, cada 10 min de 8 a 21 h).
+  - Verificación: jest de vehículos 156/156, tsc API y web 0, vitest del archivo 11/11, reglas de Kotlin 25/25 (proyecto
+    Gradle aparte), `ios-static-check` sin problemas.
+
 - **21-11 ~16:55 México (claude-code, nube) — Vehículos: capa de datos de web, Android e iOS para la captura guiada. Sin pantallas, sin migraciones.**
   - Las pantallas esperan el visto bueno de Adam a la maqueta https://claude.ai/artifact/7qbmJfGA3WopSJPr86bAjS. Esto deja
     lista la conexión con las rutas de 8c207c1 para que las pantallas solo consuman.

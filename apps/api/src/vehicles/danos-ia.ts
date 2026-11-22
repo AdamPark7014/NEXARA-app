@@ -101,12 +101,104 @@ export const ESQUEMA_DANOS: Record<string, unknown> = {
   },
 };
 
-/** El texto que acompaña un lote: qué vista es cada par y en qué orden van las fotos. */
-export function textoDelLote(pares: ReadonlyArray<ParFotos>): string {
+/**
+ * El texto que acompaña un lote: qué vista es cada par y en qué orden van las fotos. [contexto] es lo
+ * aprendido de las revisiones de Liz (`contextoAprendido`); va antes de los pares.
+ */
+export function textoDelLote(pares: ReadonlyArray<ParFotos>, contexto?: string | null): string {
   const lineas = pares.map(
     (p, i) => `Par ${i + 1}: ${p.etiqueta}. Foto ${i * 2 + 1} = salida, foto ${i * 2 + 2} = devolución.`,
   );
-  return `${lineas.join('\n')}\n\nCompara cada par y dime los daños nuevos.`;
+  const previo = contexto?.trim() ? `${contexto.trim()}\n\n` : '';
+  return `${previo}${lineas.join('\n')}\n\nCompara cada par y dime los daños nuevos.`;
+}
+
+/* ── Lo que la IA aprende de las revisiones de Liz ─────────────────────── */
+
+/** Una revisión anterior de Liz, tal como se lee de `vehicle_damage_findings`. */
+export type RevisionPrevia = {
+  zona: string;
+  descripcion: string;
+  estatus: string;
+  motivoDescarte: string | null;
+  notaRevision: string | null;
+  vehicleAssetId: number | null;
+  /** Estatus de la incidencia que abrió al confirmarse (`CERRADA` = ya se reparó). */
+  incidenciaEstatus: string | null;
+};
+
+export const TOPE_CONOCIDOS = 12;
+export const TOPE_ERRORES = 8;
+
+const ETIQUETA_MOTIVO: Record<string, string> = {
+  YA_ESTABA: 'ya estaba al salir',
+  REFLEJO_O_SUCIEDAD: 'reflejo, sombra o suciedad',
+  NO_ES_DANO: 'no es un daño',
+  OTRO: 'otro motivo',
+};
+
+/** Una línea, sin saltos ni comillas angulares, y corta: es texto que escribió una persona. */
+function renglon(texto: string | null | undefined, max = 160): string {
+  return String(texto ?? '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/[«»"]/g, "'")
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, max);
+}
+
+/**
+ * Lo que la IA debe saber antes de comparar, sacado de lo que Liz ya decidió:
+ *
+ * - daños conocidos de ESTA unidad (confirmados con la incidencia sin cerrar, o descartados porque «ya
+ *   estaba al salir»): no se vuelven a proponer en cada devolución;
+ * - errores recientes de la IA en cualquier unidad (reflejos, suciedad, «no es daño»): no repetirlos.
+ *
+ * Las revisiones llegan de la más reciente a la más vieja. `null` = no hay nada que enseñar.
+ */
+export function contextoAprendido(previas: ReadonlyArray<RevisionPrevia>, vehicleAssetId: number | null): string | null {
+  const conocidos: string[] = [];
+  const errores: string[] = [];
+  const vistos = new Set<string>();
+  for (const r of previas) {
+    const descripcion = renglon(r.descripcion);
+    if (!descripcion) continue;
+    const llave = `${r.zona}|${descripcion.toLowerCase()}`;
+    if (vistos.has(llave)) continue;
+    const mismaUnidad = vehicleAssetId != null && r.vehicleAssetId === vehicleAssetId;
+    const vista = etiquetaZona(r.zona);
+    if (mismaUnidad && r.estatus === 'CONFIRMADO' && r.incidenciaEstatus !== 'CERRADA') {
+      if (conocidos.length < TOPE_CONOCIDOS) {
+        conocidos.push(`- ${vista}: ${descripcion} (ya registrado)`);
+        vistos.add(llave);
+      }
+    } else if (mismaUnidad && r.estatus === 'DESCARTADO' && r.motivoDescarte === 'YA_ESTABA') {
+      if (conocidos.length < TOPE_CONOCIDOS) {
+        conocidos.push(`- ${vista}: ${descripcion} (ya estaba al salir)`);
+        vistos.add(llave);
+      }
+    } else if (
+      r.estatus === 'DESCARTADO' &&
+      (r.motivoDescarte === 'REFLEJO_O_SUCIEDAD' || r.motivoDescarte === 'NO_ES_DANO' || (r.motivoDescarte === 'OTRO' && renglon(r.notaRevision)))
+    ) {
+      if (errores.length < TOPE_ERRORES) {
+        const nota = renglon(r.notaRevision, 120);
+        const motivo = ETIQUETA_MOTIVO[r.motivoDescarte ?? ''] ?? 'descartado';
+        errores.push(`- ${vista}: '${descripcion}' → ${motivo}${nota ? ` (nota: ${nota})` : ''}`);
+        vistos.add(llave);
+      }
+    }
+  }
+  const partes: string[] = [];
+  if (conocidos.length) {
+    partes.push(`Daños que esta unidad ya tenía; no los reportes como nuevos:\n${conocidos.join('\n')}`);
+  }
+  if (errores.length) {
+    partes.push(
+      `Reportes que la persona que revisa descartó en otras devoluciones; no repitas ese tipo de error:\n${errores.join('\n')}`,
+    );
+  }
+  return partes.length ? partes.join('\n\n') : null;
 }
 
 export type HallazgoLimpio = {

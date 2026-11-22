@@ -62,6 +62,18 @@ object CapturaGuiadaRules {
      */
     const val VIDEO_MAX_BYTES: Long = 60L * 1024 * 1024
 
+    /**
+     * Cómo se graba la vuelta (igual en web e iOS): 720p, unos 2.5 Mbps y sin audio. Una vuelta de
+     * 20 s pesa unos 6 MB y sube en menos de un minuto aun con señal floja (el proxy puede cortar una
+     * subida que tarda más); sin audio no se graban conversaciones.
+     */
+    const val VIDEO_ALTO_PX = 720
+    const val VIDEO_BITS_POR_SEGUNDO = 2_500_000
+    const val VIDEO_CON_AUDIO = false
+
+    /** Lo que pesaría una vuelta de [duracionSeg] con el perfil de arriba, en bytes. */
+    fun pesoEstimadoBytes(duracionSeg: Double): Long = (duracionSeg * VIDEO_BITS_POR_SEGUNDO / 8).toLong()
+
     /** Los 5 pasos tal como los da la API cuando no contesta (`GET vehicles/captura-guiada`). */
     val PASOS: List<Paso> = listOf(
         Paso(
