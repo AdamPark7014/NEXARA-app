@@ -1,5 +1,9 @@
 # RELEVO
 
+- **22-11 ~15:45 México (cursor) — Rebase limpio sobre origin/main: candado (vigilar + sincronizar/estado-jornada), CCTV/asistencia, sin stub bridge. Push `0dd6e939a`.**
+  - Error: rebasear WIP duplicado entero. Arreglo: `--onto origin/main` desde post-WIP; fusionar ambos comportamientos del candado; saltar commits solo-RELEVO; borrar `asistencia-confiable.hora-cierre-bridge.txt`.
+  - Verificado local: `jornada-candado.spec` 8; `estado-jornada.spec` 5. Pendiente: `deploy/update.sh --force-all` en Hetzner.
+
 - **21-11 ~23:03 México (claude-code, nube) — Vuelta 22 de pulido: una lista que no cargó ya no se enseña como lista vacía (almacén, compras, editor de cotización) y el catálogo llega entero al formulario de movimientos. Web y API; sin migraciones; sin desplegar.**
   - **El defecto:** las listas que alimentan un formulario se pedían con `.catch(() => undefined)`. Si la carga
     fallaba, el formulario decía lo mismo que cuando de verdad no hay nada: «Primero crea un almacén», «No hay
