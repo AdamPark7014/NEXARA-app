@@ -23,6 +23,7 @@ import { getHrSubmoduleConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { DashGrid, DashCol, DashPanel, StatStrip, DashPill } from "@/components/dashboard/DashKit";
+import { formatoFechaLocal } from "@/lib/fecha-calendario";
 
 interface EngineerRow {
   engineerId: number;
@@ -352,7 +353,7 @@ export default function HrKpisPage() {
                       <li key={l.id} style={{ fontSize: 13, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
                         <strong>{l.user.nombre}</strong> · {LEAVE_TYPE_LABEL[l.type] ?? "Otro permiso"} · {days(l.days)}
                         <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                          Desde el {new Date(l.startDate).toLocaleDateString("es-MX", { day: "numeric", month: "long" })}
+                          Desde el {formatoFechaLocal(l.startDate, { day: "numeric", month: "long" })}
                         </div>
                       </li>
                     ))}

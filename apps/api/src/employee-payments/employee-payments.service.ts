@@ -10,7 +10,7 @@ import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { KPI_MAX_DIAS, KpisEquipoService } from '../me/kpis-equipo.service.js';
 import { diasDelRango } from '../me/kpis-equipo.js';
-import { workDateKey, WORKDAY_TIMEZONE } from '../common/time/workday.js';
+import { workDateKey, workDateKeyOf, WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { NOMINA_SETTING_KEY, parsearConfigNomina } from './nomina-calendario.js';
 import { leerFestivos } from '../festivos/festivos-datos.js';
 import { comoLeToca } from '../festivos/festivos-reglas.js';
@@ -334,7 +334,8 @@ export class EmployeePaymentsService {
           periodo: rango,
           hoy,
           incluyeHoy,
-          fechaIngreso: u?.fechaIngreso ? workDateKey(u.fechaIngreso) : null,
+          // Día de calendario: se lee tal cual, sin pasarlo por la hora de México (caía un día antes).
+          fechaIngreso: u?.fechaIngreso ? workDateKeyOf(u.fechaIngreso) : null,
           diasSinExigir: festivos.filter((f) => !comoLeToca(f, { userId: p.persona.id }).trabaja).map((f) => f.fecha),
         });
       }),

@@ -26,6 +26,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { getHrSectionConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { formatoFechaLocal } from "@/lib/fecha-calendario";
 
 type HrEmpleado = {
   id: number;
@@ -147,9 +148,9 @@ function tenureLabel(months: number): string {
   return rest ? `${y} y ${rest} ${rest === 1 ? "mes" : "meses"}` : y;
 }
 
+/** Ingreso, permisos y evaluaciones son días de calendario: se pintan tal cual, sin pasar por la hora local. */
 function shortDate(value: string): string {
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+  return formatoFechaLocal(value, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 const HTTP_FALLBACK: Record<number, string> = {

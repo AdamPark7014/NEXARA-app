@@ -23,6 +23,7 @@ import { resolveAssetUrl } from "@/lib/evidence-display";
 import ExpedienteEmpleado from "@/components/hr/ExpedienteEmpleado";
 import ExcelExportadorDinamico from "@/components/excel/ExcelExportadorDinamico";
 import { withTenantHeaders } from "@/lib/tenant";
+import { formatoFechaLocal } from "@/lib/fecha-calendario";
 
 interface EmployeeDetail {
   id: number;
@@ -247,7 +248,7 @@ export default function EmployeeDetailPage() {
     { label: "Rol", value: employee.role?.nombre },
     { label: "Tipo de contrato", value: employee.tipoContrato },
     { label: "Situación laboral", value: employee.estadoRRHH ?? "Activo" },
-    { label: "Fecha de ingreso", value: employee.fechaIngreso ? new Date(employee.fechaIngreso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) : null },
+    { label: "Fecha de ingreso", value: employee.fechaIngreso ? formatoFechaLocal(employee.fechaIngreso, { day: "2-digit", month: "long", year: "numeric" }, "") : null },
     { label: "No. empleado", value: employeeId },
   ];
 

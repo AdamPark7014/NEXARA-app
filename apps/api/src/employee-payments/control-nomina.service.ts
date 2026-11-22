@@ -13,7 +13,7 @@ import { sitioOficina } from '../attendance/asistencia-confiable.js';
 import { fechaClave, fechaColumna } from '../guardias/guardias-reglas.js';
 import { leerFestivos } from '../festivos/festivos-datos.js';
 import { comoLeToca } from '../festivos/festivos-reglas.js';
-import { parseWorkDate, workDateKey, workDayEnd, workDayStart } from '../common/time/workday.js';
+import { parseWorkDate, workDateKey, workDateKeyOf, workDayEnd, workDayStart } from '../common/time/workday.js';
 import { requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { ETIQUETA_CATEGORIA_VIATICO } from '../common/excel/etiquetas.js';
 import { diaDeLaSemana } from '../me/kpis-equipo.js';
@@ -1113,7 +1113,8 @@ export class ControlNominaService {
     const filas = personas.map((p): FilaRespuesta => {
       const id = p.persona.id;
       const u = usuarioPor.get(id);
-      const ingreso = u?.fechaIngreso ? workDateKey(u.fechaIngreso) : null;
+      // Día de calendario: se lee tal cual, sin pasarlo por la hora de México (caía un día antes).
+      const ingreso = u?.fechaIngreso ? workDateKeyOf(u.fechaIngreso) : null;
       const diasKpi = new Map((p.dias ?? []).map((d) => [d.fecha, d]));
       const entradas: EntradaDia[] = dias.map((fecha) => {
         const k = clave(id, fecha);

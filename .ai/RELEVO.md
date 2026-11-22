@@ -1,5 +1,41 @@
 # RELEVO
 
+- **21-11 ~21:31 México (claude-code, nube) — Vuelta 15 de pulido: las fechas de calendario ya no se ven (ni se cuentan) un día antes. Sin migraciones; sin desplegar.**
+  - **El defecto:** una fecha sin hora (emisión, vencimiento, vigencia, visita programada, entrega estimada, ingreso,
+    vacaciones) viaja a medianoche UTC. Leída con la hora de México cae a las 18:00 del día anterior. Se veía en:
+    - **Portal del cliente** (`tickets/mis-servicios`): factura con emisión y vencimiento un día antes; cotización,
+      fechas del proyecto, próxima visita y visitas programadas igual. En **Android e iOS** la visita del día 10
+      salía «9 dic 2026, 18:00».
+    - **Compras:** la entrega estimada para hoy salía «Atrasada 1 día» y contaba en «atrasadas»; fecha requerida, de
+      respuesta y de recepción un día antes; las recepciones del día 1 contaban en el mes anterior.
+    - **Almacén:** caducidad y fabricación de lotes, conteo programado y vencimiento de apartados.
+    - **RH:** ingreso y fin de contrato en el expediente y en la ficha, vacaciones y permisos, evaluaciones,
+      incidencias y el día de cada comida.
+    - **Indicadores y nómina (API):** la fecha de ingreso capturada en la web se leía con `workDateKey` y daba el día
+      anterior: a la persona se le exigía (y se le contaba como día sin checada) el día antes de entrar.
+  - **El arreglo:**
+    - Web: todo pasa por `lib/fecha-calendario.ts` (`formatoFechaLocal`, `aFechaLocal`), la regla que ya usaban
+      contabilidad y cotizaciones: `AAAA-MM-DD` o medianoche UTC exacta es un día; un instante con hora se queda en
+      hora local. `lib/recursos-ui.ts` (`fechaCorta`, `diasHasta`) ahora la usa, y con eso se corrigen compras y
+      almacén de una vez.
+    - API: `me/kpis-equipo.ts`, `employee-payments/control-nomina.service.ts` y
+      `employee-payments/employee-payments.service.ts` leen el ingreso con `workDateKeyOf`.
+    - Android: `NxFormat.date`/`dateTime` (`ui/enterprise/NxFoundation.kt`). iOS: `PortalFormat`
+      (`UI/Portal/PortalComponents.swift`). Un día de calendario ya no inventa hora.
+  - **Guardas:** `apps/web/lib/fecha-de-solo-dia.spec.ts` (ningún campo de solo día con
+    `new Date(x).toLocaleDateString`) y `apps/api/src/common/time/fecha-de-ingreso.spec.ts` (nadie lee el ingreso
+    con `workDateKey`).
+  - **No se tocó (queda anotado):** `costos/vehiculos/costos-vehiculos.service.ts:439` lee fechas de viático con
+    `workDateKey` (hilo de vehículos). «Hoy» con el día del navegador en asistencias (`toLocaleDateString("sv-SE")`)
+    es correcto en hora del centro; fallaría para alguien en Tijuana o Cancún.
+  - **Paridad:** Web hecho · API hecho · Android hecho (pantalla de servicios del portal; el resto de la app ya leía
+    bien cotizaciones) · iOS hecho (misma pantalla). Compras, almacén y RH de escritorio no existen en las apps.
+  - **Verificado:** `npm run typecheck` 0; jest del API 538 suites, 6,731 pruebas; vitest web 303 archivos, 2,433 pruebas;
+    `next build` termina bien (289 páginas); `nest build` bien. Las pruebas nuevas se vieron fallar antes del cambio
+    (5 en web, 2 en API). Android: `NxFormatTest` nueva; aquí no hay SDK, la corre el CI. iOS: sin Mac aquí;
+    `scripts/ios-static-check.py` sin problemas y la compilación la hace el CI. No se vio en navegador (el entorno
+    local está apagado).
+
 - **21-11 ~21:07 México (claude-code, nube) — La prueba de la web que fallaba a ratos en el CI.**
   - Era `app/(panels)/erp/hr/pulido-cola06.spec.tsx`, «explica el vacío después de una carga correcta» (falló en
     `7f90d88`, pasó en los demás). Esperaba a que «no hubiera `status`» y luego leía el texto del vacío sin esperar;
@@ -29,8 +65,7 @@
     Es la red que faltó el 21-11: dos errores que solo ve `next build` estuvieron cuatro horas en `main` (ver la
     vuelta 12). Si este trabajo sale en rojo, `main` no se puede desplegar aunque tipos y pruebas estén en verde.
   - Cuesta unos minutos de GitHub Actions por push (Linux). Si estorba, se quita borrando ese trabajo; no toca nada más.
-  - Falta ver su primera corrida en GitHub: la compilación ya pasó en esta sesión con las mismas órdenes, pero no en
-    el corredor de GitHub.
+  - Primera corrida en GitHub vista en verde sobre `760db56` (los seis trabajos, este incluido).
 
 - **21-11 ~20:58 México (claude-code, nube; Cursor/Codex no alcanzables) — Vuelta 13 de pulido: en almacén, un número de serie que ya salió no puede volver a salir. Sin migraciones; sin desplegar.**
   - **El hueco:** una serie es una pieza, pero la misma serie se podía registrar en dos salidas (etiqueta leída dos

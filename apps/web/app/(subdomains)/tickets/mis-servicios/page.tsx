@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
 import { usePortalSession } from "@/components/portal/PortalShell";
+import { formatoFechaLocal } from "@/lib/fecha-calendario";
 
 type ServicesSummary = {
   summary: {
@@ -291,8 +292,8 @@ export default function MisServiciosPage() {
                 )}
                 {p.startDate && (
                   <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 6 }}>
-                    📅 {new Date(p.startDate).toLocaleDateString("es-MX")}
-                    {p.endDate && ` → ${new Date(p.endDate).toLocaleDateString("es-MX")}`}
+                    📅 {formatoFechaLocal(p.startDate)}
+                    {p.endDate && ` → ${formatoFechaLocal(p.endDate)}`}
                   </div>
                 )}
               </div>
@@ -328,7 +329,7 @@ export default function MisServiciosPage() {
                 </div>
                 {c.nextVisitDate && (
                   <div style={{ marginTop: 8, padding: 6, background: "var(--bg-secondary)", borderRadius: 6, fontSize: 11 }}>
-                    📅 Próxima visita: <strong>{new Date(c.nextVisitDate).toLocaleDateString("es-MX")}</strong>
+                    📅 Próxima visita: <strong>{formatoFechaLocal(c.nextVisitDate)}</strong>
                   </div>
                 )}
               </div>
@@ -356,8 +357,8 @@ export default function MisServiciosPage() {
                 <tr key={q.id} style={trStyle}>
                   <Td><strong>{q.quoteNumber}</strong></Td>
                   <Td>{q.projectName || "-"}</Td>
-                  <Td>{new Date(q.issueDate).toLocaleDateString("es-MX")}</Td>
-                  <Td>{q.validUntil ? new Date(q.validUntil).toLocaleDateString("es-MX") : "-"}</Td>
+                  <Td>{formatoFechaLocal(q.issueDate)}</Td>
+                  <Td>{formatoFechaLocal(q.validUntil, undefined, "-")}</Td>
                   <Td>{q.total.toLocaleString("es-MX", { style: "currency", currency: q.currency || "MXN" })}</Td>
                   <Td><Badge color={QUOTE_STATUS_COLOR[q.status] || "#6b7280"}>{QUOTE_STATUS_LABEL[q.status] || q.status}</Badge></Td>
                   <Td>
@@ -395,8 +396,8 @@ export default function MisServiciosPage() {
               {invoices.map((inv) => (
                 <tr key={inv.id} style={trStyle}>
                   <Td><strong>{inv.invoiceNumber}</strong></Td>
-                  <Td>{new Date(inv.issueDate).toLocaleDateString("es-MX")}</Td>
-                  <Td>{new Date(inv.dueDate).toLocaleDateString("es-MX")}</Td>
+                  <Td>{formatoFechaLocal(inv.issueDate)}</Td>
+                  <Td>{formatoFechaLocal(inv.dueDate)}</Td>
                   <Td>{inv.totalAmount.toLocaleString("es-MX", { style: "currency", currency: inv.currency || "MXN" })}</Td>
                   <Td>{inv.paidAmount.toLocaleString("es-MX", { style: "currency", currency: inv.currency || "MXN" })}</Td>
                   <Td><Badge color={INVOICE_STATUS_COLOR[inv.status] || "#6b7280"}>{INVOICE_STATUS_LABEL[inv.status] || inv.status}</Badge></Td>
@@ -447,7 +448,7 @@ export default function MisServiciosPage() {
             <tbody>
               {data.upcomingVisits.map((v) => (
                 <tr key={v.id} style={trStyle}>
-                  <Td><strong>{new Date(v.scheduledDate).toLocaleDateString("es-MX")}</strong></Td>
+                  <Td><strong>{formatoFechaLocal(v.scheduledDate)}</strong></Td>
                   <Td>
                     {v.contract.contractNumber}
                     <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{v.contract.title}</div>

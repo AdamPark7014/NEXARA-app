@@ -51,6 +51,7 @@ import {
   WORKDAY_TIMEZONE,
   parseWorkDate,
   workDateKey,
+  workDateKeyOf,
   workDayAtClock,
   workDayEnd,
 } from '../common/time/workday.js';
@@ -1553,7 +1554,8 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
   const ahoraMs = e.ahora.getTime();
   const hoy = workDateKey(e.ahora, tz);
   const justificadas = new Set(e.justificadas ?? []);
-  const ingreso = e.fechaIngreso ? workDateKey(e.fechaIngreso, tz) : null;
+  // Día de calendario (medianoche o mediodía UTC): con `workDateKey` el de medianoche caía un día antes.
+  const ingreso = e.fechaIngreso ? workDateKeyOf(e.fechaIngreso, e.ahora, tz) : null;
   const extraPorDia = new Map((e.aprobacionesExtra ?? []).map((a) => [a.fecha, a]));
 
   const jornadas = armaJornadas(e.checadas, e.ahora, tz);

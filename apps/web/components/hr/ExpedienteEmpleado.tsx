@@ -11,6 +11,7 @@ import { formatApiError } from "@/lib/erp-api";
 import { obtenerExpediente, solicitarCambioRh } from "@/lib/hr-expediente-api";
 import { toast } from "@/components/Toast";
 import { FormField, FormGrid } from "@/components/ui/FormField";
+import { formatoFechaLocal } from "@/lib/fecha-calendario";
 
 type Props = { token: string; userId: string | number };
 
@@ -125,10 +126,10 @@ export default function ExpedienteEmpleado({ token, userId }: Props) {
             ["Puesto", laborales.puesto],
             ["Área", laborales.area],
             ["Jefe", laborales.manager?.nombre],
-            ["Ingreso", laborales.fechaIngreso ? new Date(laborales.fechaIngreso).toLocaleDateString("es-MX") : null],
+            ["Ingreso", laborales.fechaIngreso ? formatoFechaLocal(laborales.fechaIngreso, undefined, "") : null],
             ["Contrato", laborales.tipoContrato],
             ["Estatus RH", laborales.estadoRRHH],
-            ["Fin de contrato", laborales.contratoVenceAt ? new Date(laborales.contratoVenceAt).toLocaleDateString("es-MX") : null],
+            ["Fin de contrato", laborales.contratoVenceAt ? formatoFechaLocal(laborales.contratoVenceAt, undefined, "") : null],
           ].map(([label, value]) => (
             <div key={String(label)}>
               <dt style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase" }}>{label}</dt>
@@ -194,7 +195,7 @@ export default function ExpedienteEmpleado({ token, userId }: Props) {
                 {typeof d.archivoUrl === "string" && (/^https:\/\//i.test(d.archivoUrl) || /^\/uploads\//.test(d.archivoUrl))
                   ? <a href={d.archivoUrl} target="_blank" rel="noreferrer">Ver archivo</a>
                   : <span>Archivo no disponible</span>}
-                {d.expiresAt ? ` · vence ${new Date(d.expiresAt).toLocaleDateString("es-MX")}` : ""}
+                {d.expiresAt ? ` · vence ${formatoFechaLocal(d.expiresAt)}` : ""}
               </li>
             ))}
           </ul>
@@ -207,7 +208,7 @@ export default function ExpedienteEmpleado({ token, userId }: Props) {
         ) : (
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
             {incidencias.map((i: any) => (
-              <li key={i.id}>{new Date(i.fecha).toLocaleDateString("es-MX")} · {i.tipo} · {i.concepto}</li>
+              <li key={i.id}>{formatoFechaLocal(i.fecha)} · {i.tipo} · {i.concepto}</li>
             ))}
           </ul>
         )}
@@ -219,7 +220,7 @@ export default function ExpedienteEmpleado({ token, userId }: Props) {
         ) : (
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
             {permisos.map((p: any) => (
-              <li key={p.id}>{texto(p.type)} · {texto(p.status)} · {new Date(p.startDate).toLocaleDateString("es-MX")} → {new Date(p.endDate).toLocaleDateString("es-MX")}</li>
+              <li key={p.id}>{texto(p.type)} · {texto(p.status)} · {formatoFechaLocal(p.startDate)} → {formatoFechaLocal(p.endDate)}</li>
             ))}
           </ul>
         )}

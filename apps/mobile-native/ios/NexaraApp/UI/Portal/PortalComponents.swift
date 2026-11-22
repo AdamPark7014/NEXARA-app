@@ -797,11 +797,21 @@ enum PortalFormat {
         return f
     }()
 
+    /// Día de calendario del API: «2026-10-05» o medianoche UTC exacta, que es como llegan las
+    /// columnas de solo día (visita programada, próxima visita). Leído como instante caía en la
+    /// tarde del día anterior en México: la visita del 10 salía «9 dic 2026, 18:00». Misma regla
+    /// que la web (`lib/fecha-calendario.ts`) y que `NxFormat` en Android.
+    static func esSoloDia(_ s: String) -> Bool {
+        guard s.count >= 10 else { return false }
+        let resto = s.dropFirst(10)
+        return resto.isEmpty || resto == "T00:00:00Z" || resto == "T00:00:00.000Z"
+    }
+
     /// ISO con zona, fecha y hora sin zona (se lee en México) o solo el día.
     static func parse(_ raw: String?) -> Date? {
         let s = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard s.count >= 10 else { return nil }
-        if s.count > 10 {
+        if !esSoloDia(s) {
             if let d = isoFraccion.date(from: s) ?? isoSimple.date(from: s) { return d }
             let sinZona = String(s.prefix(19)).replacingOccurrences(of: " ", with: "T")
             if let d = local.date(from: sinZona) { return d }
@@ -821,7 +831,7 @@ enum PortalFormat {
     static func dateTime(_ raw: String?) -> String {
         let s = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if s.isEmpty || s == "null" { return "—" }
-        if s.count <= 10 { return date(s) }
+        if s.count <= 10 || esSoloDia(s) { return date(s) }
         guard let d = parse(s) else { return s }
         let c = calendario.dateComponents([.hour, .minute], from: d)
         return "\(dia(d)), \(String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0))"

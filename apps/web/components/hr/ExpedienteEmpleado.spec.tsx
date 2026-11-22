@@ -79,4 +79,21 @@ describe("ExpedienteEmpleado", () => {
     await waitFor(() => expect(screen.getByText(/Vacaciones · Pendiente/)).toBeInTheDocument());
     expect(screen.getByText(/Cambio de jefe/)).toBeInTheDocument();
   });
+
+  it("las fechas de calendario salen con el día que se capturó, no el anterior", async () => {
+    vi.mocked(obtenerExpediente).mockResolvedValue({
+      laborales: { fechaIngreso: "2026-12-01T00:00:00.000Z", contratoVenceAt: "2027-06-01T00:00:00.000Z" },
+      sensibles: null, permisosVista: {}, timeline: [],
+      documentos: [{ id: 1, tipo: "INE", archivoUrl: "/uploads/demo.pdf", expiresAt: "2028-03-01T00:00:00.000Z" }],
+      incidencias: [{ id: 1, fecha: "2026-12-02T00:00:00.000Z", tipo: "Retardo", concepto: "Llegó tarde" }],
+      permisos: [{ id: 1, type: "VACATION", status: "APPROVED", startDate: "2026-12-01T00:00:00.000Z", endDate: "2026-12-05T00:00:00.000Z" }],
+    });
+    render(<ExpedienteEmpleado token="t" userId={50} />);
+    expect(await screen.findByText("1/12/2026")).toBeInTheDocument();
+    expect(screen.getByText("1/6/2027")).toBeInTheDocument();
+    expect(screen.getByText(/vence 1\/3\/2028/)).toBeInTheDocument();
+    expect(screen.getByText(/^2\/12\/2026 · Retardo/)).toBeInTheDocument();
+    expect(screen.getByText(/1\/12\/2026 → 5\/12\/2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/30\/11\/2026/)).not.toBeInTheDocument();
+  });
 });

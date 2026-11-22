@@ -59,6 +59,7 @@ import {
 import s from "./compras.module.css";
 import { errorSeguidoDe } from "@/lib/erp-api";
 import { diaEnMexico } from "@/lib/dia-pactado";
+import { aFechaLocal } from "@/lib/fecha-calendario";
 
 const WholesalePanel = dynamic(() => import("@/components/WholesalePanel"), {
   ssr: false,
@@ -398,7 +399,7 @@ export default function ProcurementPage() {
     let esteMes = 0;
     let extra = 0;
     for (const r of receipts) {
-      const f = r.receiptDate ? new Date(r.receiptDate) : null;
+      const f = aFechaLocal(r.receiptDate);
       if (f && f.getMonth() === ahora.getMonth() && f.getFullYear() === ahora.getFullYear()) esteMes += 1;
       extra += costosExtra(r);
     }

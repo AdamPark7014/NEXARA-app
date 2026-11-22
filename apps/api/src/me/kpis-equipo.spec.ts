@@ -500,6 +500,27 @@ describe('calculaKpisPersona', () => {
     expect(totales).toMatchObject({ diasSinChecada: 2, faltasJustificadas: 1, diasConJornada: 1 });
   });
 
+  it('el ingreso capturado como día de calendario no exige el día anterior', () => {
+    const semana = [
+      entrada('15', '09:00'), salida('15', '18:00'),
+      entrada('16', '09:00'), salida('16', '18:00'),
+      entrada('17', '09:00'), salida('17', '18:00'),
+    ];
+    // RH captura «15 de septiembre»: la web lo guarda a medianoche UTC (en México, el 14 a las 18:00)
+    // y el importador de Excel, a mediodía UTC. El lunes 14 todavía no trabajaba aquí.
+    for (const fechaIngreso of [new Date('2026-09-15T00:00:00.000Z'), new Date('2026-09-15T12:00:00.000Z')]) {
+      const { dias, totales } = calcula({
+        desde: '2026-09-11',
+        hasta: '2026-09-18',
+        ahora: M('18', '08:00'),
+        fechaIngreso,
+        checadas: semana,
+      });
+      expect(dias.filter((d) => d.sinChecada).map((d) => d.fecha)).toEqual([]);
+      expect(totales).toMatchObject({ diasSinChecada: 0, diasConJornada: 3 });
+    }
+  });
+
   it('el detalle trae los tramos para la línea de tiempo', () => {
     const { dias } = calcula({
       checadas: jornadaNormal,

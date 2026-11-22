@@ -19,6 +19,7 @@ import { getAttendanceViewMode } from "@/lib/user-access";
 import { getLunchBreaksSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
+import { formatoFechaLocal } from "@/lib/fecha-calendario";
 
 const LunchBreakForm = dynamic(() => import("@/components/LunchBreakForm"), { ssr: false });
 
@@ -67,8 +68,9 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
 }
 
+/** El día de la comida es de calendario (llega a medianoche UTC): se pinta ese día, no el anterior. */
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-MX", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
+  return formatoFechaLocal(iso, { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
 }
 
 function todayIso() {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatApiError } from "@/lib/erp-api";
+import { aFechaLocal } from "@/lib/fecha-calendario";
 
 /**
  * Piezas chicas compartidas por las pantallas de Recursos (almacén, vehículos,
@@ -29,10 +30,14 @@ export function usePantallaChica(maxWidth = 640): boolean {
   return chica;
 }
 
+/**
+ * Entrega estimada, vigencia, caducidad y fecha de recepción son días de calendario: la API los
+ * manda a medianoche UTC y con `new Date()` caían en la tarde del día anterior en México.
+ */
 function aFecha(valor: string | Date | null | undefined): Date | null {
   if (!valor) return null;
-  const fecha = valor instanceof Date ? valor : new Date(valor);
-  return Number.isNaN(fecha.getTime()) ? null : fecha;
+  if (typeof valor === "string") return aFechaLocal(valor);
+  return Number.isNaN(valor.getTime()) ? null : valor;
 }
 
 /** «12 sep 2026». */

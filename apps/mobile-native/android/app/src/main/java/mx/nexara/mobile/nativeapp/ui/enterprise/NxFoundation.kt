@@ -335,6 +335,14 @@ object NxFormat {
         return if (cur.isNullOrEmpty() || cur == "MXN") text else "$text $cur"
     }
 
+    /**
+     * Día de calendario del API: `2026-09-26` o medianoche UTC exacta, que es como llegan las columnas
+     * de solo día (visita programada, vigencia, emisión). Pasado a la hora del teléfono caía en la
+     * tarde del día anterior: la visita del 10 se leía «9 dic 2026, 18:00». Misma regla que la web
+     * (`lib/fecha-calendario.ts`) y que `PortalFormat` en iOS.
+     */
+    private val SOLO_DIA = Regex("""^(\d{4}-\d{2}-\d{2})(?:T00:00:00(?:\.000)?Z)?$""")
+
     /** ISO (`2026-09-26` o con hora) → `26 sep 2026`; texto no reconocido se devuelve igual. */
     fun date(raw: Any?): String {
         val s = raw?.toString()?.trim().orEmpty()
@@ -342,15 +350,18 @@ object NxFormat {
         return parseLocal(s)?.format(DIA) ?: s
     }
 
-    /** ISO con hora → `26 sep 2026, 14:30` en la zona del teléfono. */
+    /** ISO con hora → `26 sep 2026, 14:30` en la zona del teléfono; un día de calendario, sin hora. */
     fun dateTime(raw: Any?): String {
         val s = raw?.toString()?.trim().orEmpty()
         if (s.isEmpty() || s == "null") return "—"
-        if (s.length <= 10) return date(s)
+        if (s.length <= 10 || SOLO_DIA.matches(s)) return date(s)
         return parseLocal(s)?.format(DIA_HORA) ?: s
     }
 
     private fun parseLocal(s: String): LocalDateTime? {
+        SOLO_DIA.matchEntire(s)?.let { dia ->
+            return runCatching { LocalDate.parse(dia.groupValues[1]).atStartOfDay() }.getOrNull()
+        }
         val zone = ZoneId.systemDefault()
         return runCatching { Instant.parse(s).atZone(zone).toLocalDateTime() }.getOrNull()
             ?: runCatching { OffsetDateTime.parse(s).atZoneSameInstant(zone).toLocalDateTime() }.getOrNull()
