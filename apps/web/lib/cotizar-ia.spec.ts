@@ -199,7 +199,13 @@ describe("documentoCopiadoDe", () => {
 
   it("con otro cliente, los datos de contacto del anterior no pasan", () => {
     const doc = documentoCopiadoDe(detalle, { salesClientId: 9, nombre: "Lácteos del Valle" }, hoy);
-    expect(doc).toMatchObject({ salesClientId: 9, clientName: "Lácteos del Valle", clientEmail: "", clientPhone: "" });
+    expect(doc).toMatchObject({
+      salesClientId: 9,
+      clientName: "Lácteos del Valle",
+      clientEmail: "",
+      clientPhone: "",
+      atencion: "Administración de Lácteos del Valle",
+    });
   });
 
   it("el mismo cliente dicho de otra forma de mayúsculas conserva su contacto", () => {
