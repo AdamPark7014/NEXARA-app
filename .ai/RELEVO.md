@@ -1,6 +1,6 @@
 # RELEVO
 
-- **25-11 ~02:30 México (claude-code) — Luis (Director de Operaciones) ya abre «Evidencias» en la web. Sin migraciones; sin desplegar.**
+- **25-11 ~02:30 México (claude-code) — Luis (Director de Operaciones) ya abre «Evidencias» en la web. Sin migraciones; web DESPLEGADA 25-11 como 97436aeb4 + este arreglo, sin Ensamble (vuelta atrás: nexara-web:prev).**
   - Causa: `ACTIVIDAD_PROPIA_PAGE_PATHS` abría `/erp/actividades/:id` pero no sus pestañas; el guard de AppShell regresaba a la pizarra. Igual para coord_admin, coord_ventas, vendedor, disenador, rh y contabilidad. La API sigue decidiendo qué actividad ve cada quien.
   - Plataformas: Web hecha · API, Android e iOS no aplican (la regla de páginas es solo web).
 
