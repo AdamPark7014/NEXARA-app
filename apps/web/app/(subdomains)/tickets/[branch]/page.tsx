@@ -7,6 +7,7 @@ import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLo
 import MapaVistaPrevia from "@/components/mapas/MapaVistaPrevia";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
+import { leerListaPortal } from "@/lib/portal-lista";
 import styles from "../tickets.module.css";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { isCapacitorNative } from "@/lib/capacitor-env";
@@ -85,6 +86,8 @@ export default function BranchTicketsPage() {
   const [files, setFiles] = useState<{ file: File; url: string; kind: "image" | "pdf" }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
+  const [requestsError, setRequestsError] = useState<string | null>(null);
   const [branchProjects, setBranchProjects] = useState<Array<{
     id: number;
     title: string;
@@ -296,11 +299,9 @@ export default function BranchTicketsPage() {
   };
 
   const fetchRequests = async (token: string) => {
-    const res = await fetch(buildApiUrl("branch-portal/requests"), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json().catch(() => []);
-    setRequests(Array.isArray(data) ? data : []);
+    const lista = await leerListaPortal<BranchRequest>("branch-portal/requests", token, "tus solicitudes");
+    setRequests(lista.items);
+    setRequestsError(lista.error);
   };
 
   const fetchBranchProjects = async (token: string) => {
@@ -316,11 +317,9 @@ export default function BranchTicketsPage() {
     if (fromDate) params.append("start", `${fromDate}T00:00:00.000Z`);
     if (toDate) params.append("end", `${toDate}T23:59:59.999Z`);
     const query = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(buildApiUrl(`branch-portal/tickets${query}`), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json().catch(() => []);
-    setTickets(Array.isArray(data) ? data : []);
+    const lista = await leerListaPortal<Ticket>(`branch-portal/tickets${query}`, token, "tus tickets");
+    setTickets(lista.items);
+    setTicketsError(lista.error);
   };
 
   useEffect(() => {
@@ -459,10 +458,10 @@ export default function BranchTicketsPage() {
               Sucursal: {profile?.name || displayName} · Registra solicitudes y da seguimiento al inventario de mantenimiento.
             </p>
             <div className={styles.panelKpis}>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.total}</span><span className={styles.panelKpiLabel}>Solicitudes</span></div>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.pending}</span><span className={styles.panelKpiLabel}>En proceso</span></div>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.completed}</span><span className={styles.panelKpiLabel}>Completadas</span></div>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.evidences}</span><span className={styles.panelKpiLabel}>Evidencias</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestsError ? "—" : requestStats.total}</span><span className={styles.panelKpiLabel}>Solicitudes</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestsError ? "—" : requestStats.pending}</span><span className={styles.panelKpiLabel}>En proceso</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestsError ? "—" : requestStats.completed}</span><span className={styles.panelKpiLabel}>Completadas</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestsError ? "—" : requestStats.evidences}</span><span className={styles.panelKpiLabel}>Evidencias</span></div>
             </div>
           </div>
 
@@ -545,7 +544,13 @@ export default function BranchTicketsPage() {
                   </div>
                 </div>
               </div>
-              {tickets.length === 0 && <div className={styles.mutedText}>No hay tickets para el rango seleccionado.</div>}
+              {ticketsError && (
+                <div role="alert" className={styles.actionRow}>
+                  <span className={styles.errorText}>{ticketsError}</span>
+                  <button className="button-secondary" type="button" onClick={() => token && fetchTickets(token)}>Reintentar</button>
+                </div>
+              )}
+              {!ticketsError && tickets.length === 0 && <div className={styles.mutedText}>No hay tickets para el rango seleccionado.</div>}
               {tickets.map((ticket) => (
                 <div key={ticket.id} className={`card ${styles.itemCard}`}>
                   <div className={styles.itemHeader}>
@@ -855,7 +860,13 @@ export default function BranchTicketsPage() {
 
           <div className={`card ${styles.cardSoft}`}>
             <p className={styles.sectionTitle}>Solicitudes enviadas</p>
-            {openRequests.length === 0 && <div className={styles.mutedText}>No hay solicitudes activas.</div>}
+            {requestsError && (
+              <div role="alert" className={styles.actionRow}>
+                <span className={styles.errorText}>{requestsError}</span>
+                <button className="button-secondary" type="button" onClick={() => token && fetchRequests(token)}>Reintentar</button>
+              </div>
+            )}
+            {!requestsError && openRequests.length === 0 && <div className={styles.mutedText}>No hay solicitudes activas.</div>}
             {openRequests.map((request) => (
               <div key={request.id} className={styles.itemCard}>
                 <div className={styles.itemHeader}>

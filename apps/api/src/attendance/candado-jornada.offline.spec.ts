@@ -67,4 +67,52 @@ describe('JornadaAbiertaInterceptor offline y auditoria', () => {
     await expect(i.intercept(contexto(req), siguiente)).rejects.toBeInstanceOf(ConflictException);
     expect(siguiente.handle).not.toHaveBeenCalled();
   });
+
+  /** Como queda la base al cerrar: `lastEntryAt` en null y la hora solo en las checadas. */
+  const checadas = [
+    { type: 'entrada', timestamp: new Date('2026-11-20T15:00:00Z') },
+    { type: 'salida', timestamp: new Date('2026-11-20T23:00:00Z') },
+  ];
+  const conChecadas = (lista = checadas) =>
+    new JornadaAbiertaInterceptor({
+      attendanceDay: { findFirst: jest.fn().mockResolvedValue(null) },
+      attendance: {
+        findFirst: jest.fn(async ({ where, orderBy }) => {
+          const hallados = lista.filter(
+            (c) =>
+              c.type === where.type &&
+              (!where.timestamp.lte || c.timestamp <= where.timestamp.lte) &&
+              (!where.timestamp.gte || c.timestamp >= where.timestamp.gte),
+          );
+          return (orderBy.timestamp === 'desc' ? hallados[hallados.length - 1] : hallados[0]) ?? null;
+        }),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    } as never);
+  const foto = (clientCapturedAt: string, originalUrl = '/api/activity-evidence/5/fotos') => ({
+    method: 'POST',
+    originalUrl,
+    user: tecnico,
+    body: { clientCapturedAt },
+  });
+
+  it('offline: con la jornada ya cerrada en la base deja pasar lo capturado dentro', async () => {
+    const i = conChecadas();
+    await expect(lastValueFrom(await i.intercept(contexto(foto('2026-11-20T18:00:00Z')), siguiente))).resolves.toBe('ok');
+  });
+
+  it.each([
+    ['antes de la entrada', foto('2026-11-20T14:00:00Z')],
+    ['después de la salida', foto('2026-11-20T23:30:00Z')],
+    ['con hora futura', foto('2999-01-01T00:00:00Z')],
+    ['con hora ilegible', foto('ayer')],
+    ['en otra ruta que no es evidencia', foto('2026-11-20T18:00:00Z', '/api/me/activities/5/iniciar')],
+  ])('offline: rechaza lo capturado %s', async (_caso, req) => {
+    await expect(conChecadas().intercept(contexto(req), siguiente)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('offline: una entrada sin salida no da por abierta la jornada', async () => {
+    const i = conChecadas(checadas.slice(0, 1));
+    await expect(i.intercept(contexto(foto('2026-11-20T18:00:00Z')), siguiente)).rejects.toBeInstanceOf(ConflictException);
+  });
 });

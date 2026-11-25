@@ -10,6 +10,7 @@ import MapaVistaPrevia from "@/components/mapas/MapaVistaPrevia";
 import BranchesForm from "@/components/BranchesForm";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import { buildApiUrl, getSocketBaseUrl, getApiAssetOrigin } from "@/lib/api-base";
+import { leerListaPortal } from "@/lib/portal-lista";
 import { fetchWithOfflineQueue, isQueuedResponse } from "@/lib/fetch-offline";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { isCapacitorNative } from "@/lib/capacitor-env";
@@ -140,6 +141,8 @@ export default function ClientTicketsPage() {
   const { client: session, token, refresh } = usePortalSession();
   const [error, setError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
+  const [requestsError, setRequestsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<"tickets" | "nuevo" | "inventarios" | "perfil" | "sucursales">("tickets");
@@ -433,11 +436,9 @@ export default function ClientTicketsPage() {
     }
     const query = params.toString() ? `?${params.toString()}` : "";
 
-    const res = await fetch(buildApiUrl(`client-portal/tickets${query}`), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json().catch(() => []);
-    setTickets(Array.isArray(data) ? data : []);
+    const lista = await leerListaPortal<Ticket>(`client-portal/tickets${query}`, token, "tus tickets");
+    setTickets(lista.items);
+    setTicketsError(lista.error);
     setLoading(false);
   };
 
@@ -512,11 +513,9 @@ export default function ClientTicketsPage() {
   }, [token]);
 
   const fetchRequests = async (token: string) => {
-    const res = await fetch(buildApiUrl("client-portal/requests"), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json().catch(() => []);
-    setRequests(Array.isArray(data) ? data : []);
+    const lista = await leerListaPortal<TicketRequest>("client-portal/requests", token, "tus solicitudes");
+    setRequests(lista.items);
+    setRequestsError(lista.error);
   };
 
   const fetchPendingFeedback = async (token: string) => {
@@ -953,10 +952,10 @@ export default function ClientTicketsPage() {
               Cliente: {session.client.name} · Administra solicitudes, inventarios y seguimiento en un solo flujo.
             </p>
             <div className={styles.panelKpis}>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.total}</span><span className={styles.panelKpiLabel}>Tickets</span></div>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.pending}</span><span className={styles.panelKpiLabel}>En proceso</span></div>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.closed}</span><span className={styles.panelKpiLabel}>Cerrados</span></div>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.requests}</span><span className={styles.panelKpiLabel}>Solicitudes</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketsError ? "—" : ticketStats.total}</span><span className={styles.panelKpiLabel}>Tickets</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketsError ? "—" : ticketStats.pending}</span><span className={styles.panelKpiLabel}>En proceso</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketsError ? "—" : ticketStats.closed}</span><span className={styles.panelKpiLabel}>Cerrados</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestsError ? "—" : ticketStats.requests}</span><span className={styles.panelKpiLabel}>Solicitudes</span></div>
             </div>
           </div>
 
@@ -1101,7 +1100,7 @@ export default function ClientTicketsPage() {
                     <p className={styles.sectionTitle}>Tickets activos</p>
                     <p className={styles.sectionSubtitle}>Seguimiento en tiempo real de avances y evidencias.</p>
                   </div>
-                  <div className={styles.mutedText}>{loading ? "Sincronizando..." : "Actualizado"}</div>
+                  <div className={styles.mutedText}>{loading ? "Sincronizando..." : ticketsError ? "Sin actualizar" : "Actualizado"}</div>
                 </div>
                 <div className={styles.grid200}>
                   <div>
@@ -1153,6 +1152,15 @@ export default function ClientTicketsPage() {
                   </div>
                 </div>
                 {error && <div className={styles.errorText}>{error}</div>}
+                {ticketsError && (
+                  <div role="alert" className={styles.actionRow}>
+                    <span className={styles.errorText}>{ticketsError}</span>
+                    <button className="button-secondary" type="button" onClick={() => token && fetchTickets(token)}>Reintentar</button>
+                  </div>
+                )}
+                {!loading && !ticketsError && tickets.length === 0 && (
+                  <div className={styles.mutedText}>No hay tickets para el rango seleccionado.</div>
+                )}
               </div>
               {loading && (
                 <div className={styles.loadingList}>
@@ -1564,7 +1572,13 @@ export default function ClientTicketsPage() {
               </div>
               <div className={`card ${styles.cardSoft}`}>
                 <p className={styles.sectionTitle}>Solicitudes registradas</p>
-                {openRequests.length === 0 && <div className={styles.mutedText}>No hay solicitudes activas.</div>}
+                {requestsError && (
+                  <div role="alert" className={styles.actionRow}>
+                    <span className={styles.errorText}>{requestsError}</span>
+                    <button className="button-secondary" type="button" onClick={() => token && fetchRequests(token)}>Reintentar</button>
+                  </div>
+                )}
+                {!requestsError && openRequests.length === 0 && <div className={styles.mutedText}>No hay solicitudes activas.</div>}
                 {openRequests.map((request) => (
                   <div key={request.id} className={styles.itemCard}>
                     <div className={styles.itemHeader}>

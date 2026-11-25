@@ -1,5 +1,11 @@
 # RELEVO
 
+- **25-11 ~02:00 México (claude-code) — Las 2 pruebas en rojo del candado de jornada y los errores del portal de clientes. Sin desplegar; sin migraciones.**
+  - Candado: evidencia capturada dentro de una jornada ya cerrada se acepta al llegar tarde; cada 409 queda en la bitácora. No es la copia de `e8da7d096`: esa buscaba `AttendanceDay.lastEntryAt`, que al cerrar queda en null (no servía con datos reales), y aceptaba cualquier escritura. Esta lee las checadas y solo vale para `POST activity-evidence/*`.
+  - Portal (cliente y sucursal): tickets y solicitudes que no cargan dicen el error con Reintentar, no «No hay…»; los contadores muestran «—».
+  - Verificado: candado 23/23, portal 9/9, tsc de API y web limpios. API completa: 6,860 de 6,861; la única roja es `vence-al-terminar-su-dia.spec`, que en Windows compara rutas con `\`; en CI (Linux) pasaba.
+  - Plataformas: API y Web hechas · Android e iOS: no aplica código (las apps ya mandan `capturedAt` en la foto por campo). Android del CI falló por un 429 temporal.
+
 - **22-11 ~15:45 México (cursor) — Rebase limpio sobre origin/main: candado (vigilar + sincronizar/estado-jornada), CCTV/asistencia, sin stub bridge. Push `0dd6e939a`.**
   - Error: rebasear WIP duplicado entero. Arreglo: `--onto origin/main` desde post-WIP; fusionar ambos comportamientos del candado; saltar commits solo-RELEVO; borrar `asistencia-confiable.hora-cierre-bridge.txt`.
   - Verificado local: `jornada-candado.spec` 8; `estado-jornada.spec` 5. Pendiente: `deploy/update.sh --force-all` en Hetzner.
