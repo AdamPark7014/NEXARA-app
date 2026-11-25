@@ -14,6 +14,14 @@ html[data-public-theme="dark"]:has([data-sitio]) body {
   background: #000000;
 }
 
+/*
+ * Lo que llega por un ancla o recibe el foco del teclado no queda debajo de la barra pegajosa (64 px): el navegador
+ * deja este hueco arriba al llevarlo a la vista. Se suma al `scroll-margin-top` de cada destino.
+ */
+html:has([data-sitio]) {
+  scroll-padding-top: 76px;
+}
+
 /* Sin el brillo decorativo que la plataforma pinta en body::before. */
 body:has([data-sitio])::before,
 body:has([data-sitio])::after {

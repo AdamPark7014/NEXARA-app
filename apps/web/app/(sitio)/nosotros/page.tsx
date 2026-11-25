@@ -5,7 +5,7 @@ import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import { foto } from "@/components/sitio/fotos";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
-import Aurora from "@/components/sitio/Aurora";
+import HeroPagina from "@/components/sitio/HeroPagina";
 import Flecha from "@/components/sitio/Flecha";
 import Cierre from "@/components/sitio/Cierre";
 import Certificaciones from "@/components/sitio/Certificaciones";
@@ -74,19 +74,20 @@ export default function Nosotros() {
           },
         }}
       />
-      <section className={p.hero} aria-labelledby="nosotros-hero">
-        <Aurora />
-        <div className={`${s.contenedor} ${s.centro}`}>
-          <p className={s.antetitulo}>Nosotros</p>
-          <h1 id="nosotros-hero" className={p.heroTitulo}>
-            Las personas detrás <span className={s.degradado}>de cada solución.</span>
-          </h1>
-          <p className={p.heroLead}>Ingeniería, instalación y soporte que mantienen tu operación, desde Puebla y la Ciudad de México.</p>
+      <HeroPagina
+        id="nosotros-hero"
+        visual={
           <div className={p.heroEstudio} role="img" aria-label="Integrantes del equipo de NEXARA con su uniforme">
             <EquipoGrupo prioridad />
           </div>
-        </div>
-      </section>
+        }
+      >
+        <p className={s.antetitulo}>Nosotros</p>
+        <h1 id="nosotros-hero" className={p.heroTitulo}>
+          Las personas detrás <span className={s.degradado}>de cada solución.</span>
+        </h1>
+        <p className={p.heroLead}>Ingeniería, instalación y soporte que mantienen tu operación, desde Puebla y la Ciudad de México.</p>
+      </HeroPagina>
 
       {/* Datos operativos */}
       <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="Cómo operamos" style={{ paddingTop: "clamp(56px, 7vw, 96px)" }}>

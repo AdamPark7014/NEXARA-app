@@ -9,7 +9,7 @@ import ip from "@/components/sitio/interior.module.css";
 import TarjetasRuta from "@/components/sitio/TarjetasRuta";
 import SimuladorCobertura from "@/components/sitio/SimuladorCobertura";
 import { GUIAS } from "@/lib/guias";
-import Aurora from "@/components/sitio/Aurora";
+import HeroPagina from "@/components/sitio/HeroPagina";
 import Flecha from "@/components/sitio/Flecha";
 import SubNav from "@/components/sitio/SubNav";
 import Cierre from "@/components/sitio/Cierre";
@@ -258,26 +258,23 @@ export default function PropuestaServicios() {
           },
         }}
       />
-      <section className={p.hero} aria-labelledby="servicios-hero">
-        <Aurora />
-        <div className={`${s.contenedor} ${s.centro}`}>
-          <p className={s.antetitulo}>Servicios</p>
-          <h1 id="servicios-hero" className={p.heroTitulo}>
-            Tecnología que opera <span className={s.degradado}>desde el primer día.</span>
-          </h1>
-          <p className={p.heroLead}>Diseñamos, instalamos, documentamos y damos soporte, para que todo funcione a la primera.</p>
-          <div className={s.acciones}>
-            <Link href={ruta("/contacto")} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="servicios_hero_cta">
-              Cotiza tu proyecto
-              <Flecha />
-            </Link>
-            <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={`${s.boton} ${s.botonSecundario}`}>
-              Hablar con un especialista
-              <Flecha />
-            </a>
-          </div>
+      <HeroPagina id="servicios-hero">
+        <p className={s.antetitulo}>Servicios</p>
+        <h1 id="servicios-hero" className={p.heroTitulo}>
+          Tecnología que opera <span className={s.degradado}>desde el primer día.</span>
+        </h1>
+        <p className={p.heroLead}>Diseñamos, instalamos, documentamos y damos soporte, para que todo funcione a la primera.</p>
+        <div className={s.acciones}>
+          <Link href={ruta("/contacto")} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="servicios_hero_cta">
+            Cotiza tu proyecto
+            <Flecha />
+          </Link>
+          <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={`${s.boton} ${s.botonSecundario}`}>
+            Hablar con un especialista
+            <Flecha />
+          </a>
         </div>
-      </section>
+      </HeroPagina>
 
       <SubNav titulo="Servicios" secciones={SERVICIOS.map((sv) => ({ id: sv.id, label: sv.nav }))} cta={{ href: "/contacto", label: "Cotizar" }} />
 

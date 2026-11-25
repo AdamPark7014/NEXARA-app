@@ -1,11 +1,12 @@
-import { Suspense } from "react";
+import { Suspense, type CSSProperties } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
-import Aurora from "@/components/sitio/Aurora";
+import n from "@/components/sitio/noche.module.css";
+import HeroPagina from "@/components/sitio/HeroPagina";
 import Flecha from "@/components/sitio/Flecha";
 import FormularioContacto from "@/components/sitio/FormularioContacto";
 import Copiar from "@/components/sitio/Copiar";
@@ -62,18 +63,22 @@ export default function PropuestaContacto() {
           },
         }}
       />
-      <section className={p.hero} aria-labelledby="contacto-hero" style={{ paddingBottom: "clamp(40px, 5vw, 64px)" }}>
-        <Aurora />
-        <div className={`${s.contenedor} ${s.centro}`}>
-          <p className={s.antetitulo}>Contacto</p>
-          <h1 id="contacto-hero" className={p.heroTitulo}>
-            Hablemos de <span className={s.degradado}>tu proyecto.</span>
-          </h1>
-          <p className={p.heroLead}>Te decimos qué instalar, qué posponer y un presupuesto realista. La primera respuesta suele llegar en un día hábil.</p>
-        </div>
-      </section>
+      <HeroPagina id="contacto-hero" sinHilo style={{ paddingBottom: "clamp(40px, 5vw, 64px)" }}>
+        <p className={s.antetitulo}>Contacto</p>
+        <h1 id="contacto-hero" className={p.heroTitulo}>
+          Hablemos de <span className={s.degradado}>tu proyecto.</span>
+        </h1>
+        <p className={p.heroLead}>Te decimos qué instalar, qué posponer y un presupuesto realista. La primera respuesta suele llegar en un día hábil.</p>
+      </HeroPagina>
 
-      <section id="formulario" className={s.seccion} aria-label="Formulario y canales" style={{ paddingTop: 0 }}>
+      {/* El formulario va montado en el corte entre la noche y la página, como la foto de las demás. */}
+      <section
+        id="formulario"
+        className={`${s.seccion} ${n.puente}`}
+        aria-label="Formulario y canales"
+        style={{ paddingTop: 0, "--corte": "clamp(36px, 4.2vw, 56px)" } as CSSProperties}
+      >
+        <i className={n.puenteZona} data-noche-zona="" aria-hidden="true" />
         <div className={`${s.contenedor} ${p.contacto}`}>
           <Suspense fallback={<div className={p.formulario} />}>
             <FormularioContacto />

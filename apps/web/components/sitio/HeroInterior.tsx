@@ -1,7 +1,7 @@
 import s from "./sitio.module.css";
 import p from "./paginas.module.css";
 import i from "./interior.module.css";
-import Aurora from "./Aurora";
+import HeroPagina from "./HeroPagina";
 import Migas, { type Miga } from "./Migas";
 
 type Props = {
@@ -19,22 +19,18 @@ type Props = {
   tituloLargo?: boolean;
 };
 
-/** Hero de las páginas de detalle: migas, título centrado, dos acciones y un visual ancho. */
+/** Hero de las páginas de detalle: migas, título centrado, dos acciones y un visual ancho montado en el corte. */
 export default function HeroInterior({ id, migas, antetitulo, titulo, lead, acciones, visual, tipoVisual = "foto", tituloLargo }: Props) {
   const marco = tipoVisual === "mapa" ? `${i.heroVisual} ${i.heroVisualMapa}` : i.heroVisual;
   return (
-    <section className={`${p.hero} ${i.hero}`} aria-labelledby={id}>
-      <Aurora />
-      <div className={`${s.contenedor} ${s.centro}`}>
-        {migas ? <Migas migas={migas} /> : null}
-        <p className={s.antetitulo}>{antetitulo}</p>
-        <h1 id={id} className={`${p.heroTitulo} ${tituloLargo ? i.tituloLargo : ""}`}>
-          {titulo}
-        </h1>
-        <p className={p.heroLead}>{lead}</p>
-        {acciones ? <div className={s.acciones}>{acciones}</div> : null}
-        {visual ? <div className={marco}>{visual}</div> : null}
-      </div>
-    </section>
+    <HeroPagina id={id} className={i.hero} visual={visual ? <div className={marco}>{visual}</div> : undefined}>
+      {migas ? <Migas migas={migas} /> : null}
+      <p className={s.antetitulo}>{antetitulo}</p>
+      <h1 id={id} className={`${p.heroTitulo} ${tituloLargo ? i.tituloLargo : ""}`}>
+        {titulo}
+      </h1>
+      <p className={p.heroLead}>{lead}</p>
+      {acciones ? <div className={s.acciones}>{acciones}</div> : null}
+    </HeroPagina>
   );
 }

@@ -3,6 +3,8 @@ import "./utilities.scss";
 import "./ecosystem.scss";
 import "./ui-tokens.scss";
 import "./ui-firma.scss";
+// Reglas de documento del sitio público, limitadas a `[data-sitio]`: desde aquí también llegan al 404 raíz.
+import "@/components/sitio/sitio-documento.css";
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 

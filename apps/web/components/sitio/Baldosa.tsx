@@ -1,6 +1,9 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
+import PublicIcon from "@/app/components/PublicIcon";
 import type { Foto } from "./fotos";
 import b from "./portada.module.css";
+import { HEXAGONO, type Senal } from "./senales";
 
 type Accion = { href: string; label: string; principal?: boolean; medicion?: string };
 
@@ -19,13 +22,15 @@ type Props = {
   oscura?: boolean;
   /** Texto a la izquierda y foto completa a la derecha, para la baldosa ancha con una foto horizontal. */
   lateral?: boolean;
+  /** El servicio de la baldosa: pinta sobre el nombre el mismo nodo (icono y color) que lo representa en el hero. */
+  senal?: Senal;
 };
 
 /**
  * Baldosa grande de la portada (el patrón de la portada de Apple): nombre, una línea y dos acciones centradas
  * arriba, y la imagen ocupando toda la baldosa.
  */
-export default function Baldosa({ nombre, texto, acciones, foto, arte, pie, ancha, oscura, lateral }: Props) {
+export default function Baldosa({ nombre, texto, acciones, foto, arte, pie, ancha, oscura, lateral, senal }: Props) {
   return (
     <article className={[b.baldosa, ancha ? b.ancha : "", oscura ? b.oscura : "", lateral ? b.lateral : ""].filter(Boolean).join(" ")} data-aparecer>
       {foto ? (
@@ -41,6 +46,14 @@ export default function Baldosa({ nombre, texto, acciones, foto, arte, pie, anch
             style={foto.posicion ? { objectPosition: foto.posicion } : undefined}
           />
         </div>
+      ) : null}
+      {senal ? (
+        <span className={b.senal} style={{ "--c": senal.color } as CSSProperties} aria-hidden="true">
+          <svg viewBox="0 0 52 56">
+            <path d={HEXAGONO} />
+          </svg>
+          <PublicIcon name={senal.icono} size={19} />
+        </span>
       ) : null}
       {/* h2: cada baldosa abre su propia sección de la portada, justo debajo del h1. */}
       <h2 className={b.nombre}>{nombre}</h2>

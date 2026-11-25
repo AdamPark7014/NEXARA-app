@@ -7,6 +7,8 @@ import s from "@/components/sitio/sitio.module.css";
 import Encabezado from "@/components/sitio/Encabezado";
 import Pie from "@/components/sitio/Pie";
 import NoEncontrado from "@/components/sitio/NoEncontrado";
+import Aparecer from "@/components/sitio/Aparecer";
+import Paleta from "@/components/sitio/Paleta";
 
 const display = localFont({ src: "./fonts/inter-tight-var-latin.woff2", weight: "100 900", display: "swap", variable: "--sitio-display" });
 
@@ -21,8 +23,12 @@ export default async function NotFound() {
     return (
       <div className={`${s.sitio} ${display.variable}`} data-sitio>
         <Encabezado />
+        {/* Lo mismo que monta el layout del sitio: el destino de «Saltar al contenido», las apariciones y el buscador. */}
+        <span id="contenido" tabIndex={-1} className={s.contenidoAncla} />
         <NoEncontrado />
         <Pie />
+        <Aparecer />
+        <Paleta />
       </div>
     );
   }

@@ -22,6 +22,8 @@ export default function SitioLayout({ children }: Readonly<{ children: React.Rea
   return (
     <div className={`${s.sitio} ${display.variable}`} data-sitio>
       <Encabezado />
+      {/* Destino de «Saltar al contenido» cuando no hay JavaScript (con JavaScript el foco va al `<main>`). */}
+      <span id="contenido" tabIndex={-1} className={s.contenidoAncla} />
       {children}
       <Pie />
       <Aparecer />

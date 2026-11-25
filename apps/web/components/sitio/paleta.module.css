@@ -53,6 +53,16 @@
   color: var(--fg-3);
 }
 
+/* El campo es lo único editable del diálogo y siempre tiene el foco: lo marcan el cursor de texto y una línea de
+   acento bajo la fila. El anillo general del sitio quedaba cortado por la orilla redondeada de la paleta. */
+.campo input:focus-visible {
+  outline: none;
+}
+
+.campo:focus-within {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
 .resultados {
   flex: 1;
   overflow-y: auto;

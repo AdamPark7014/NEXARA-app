@@ -5,7 +5,7 @@ import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import { foto, type Foto } from "@/components/sitio/fotos";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
-import Aurora from "@/components/sitio/Aurora";
+import HeroPagina from "@/components/sitio/HeroPagina";
 import Flecha from "@/components/sitio/Flecha";
 import Cierre from "@/components/sitio/Cierre";
 import MapaMexico from "@/components/sitio/MapaMexico";
@@ -112,25 +112,10 @@ export default async function PropuestaProyectos() {
           },
         }}
       />
-      <section className={p.hero} aria-labelledby="proyectos-hero">
-        <Aurora />
-        <div className={`${s.contenedor} ${s.centro}`}>
-          <p className={s.antetitulo}>Proyectos</p>
-          <h1 id="proyectos-hero" className={p.heroTitulo}>
-            Instalaciones <span className={s.degradado}>que operan hoy.</span>
-          </h1>
-          <p className={p.heroLead}>Videovigilancia, redes, cómputo y soporte en sitios reales, con evidencia de cada entrega.</p>
-          <div className={s.acciones}>
-            <Link href={ruta("/contacto")} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="proyectos_hero_cta">
-              Cotiza tu proyecto
-              <Flecha />
-            </Link>
-            <a href="#galeria" className={`${s.boton} ${s.botonSecundario}`}>
-              Ver la galería
-              <Flecha />
-            </a>
-          </div>
-          {/* Cuatro obras en vez de un solo recorte: la amplitud del trabajo se ve antes de bajar. */}
+      <HeroPagina
+        id="proyectos-hero"
+        visual={
+          // Cuatro obras en vez de un solo recorte: la amplitud del trabajo se ve antes de bajar.
           <div className={p.heroMosaico}>
             {MOSAICO.map((m, i) => (
               <figure key={m.tema} className={p.heroPieza}>
@@ -140,8 +125,24 @@ export default async function PropuestaProyectos() {
               </figure>
             ))}
           </div>
+        }
+      >
+        <p className={s.antetitulo}>Proyectos</p>
+        <h1 id="proyectos-hero" className={p.heroTitulo}>
+          Instalaciones <span className={s.degradado}>que operan hoy.</span>
+        </h1>
+        <p className={p.heroLead}>Videovigilancia, redes, cómputo y soporte en sitios reales, con evidencia de cada entrega.</p>
+        <div className={s.acciones}>
+          <Link href={ruta("/contacto")} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="proyectos_hero_cta">
+            Cotiza tu proyecto
+            <Flecha />
+          </Link>
+          <a href="#galeria" className={`${s.boton} ${s.botonSecundario}`}>
+            Ver la galería
+            <Flecha />
+          </a>
         </div>
-      </section>
+      </HeroPagina>
 
       <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="Proyectos por industria">
         <div className={s.contenedor}>

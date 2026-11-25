@@ -3,6 +3,7 @@ import s from "./pie.module.css";
 import base from "./sitio.module.css";
 import { ruta } from "./rutas";
 import PieAcciones from "./PieAcciones";
+import { Palabra } from "./Emblema";
 import { NEXARA_DOMICILIO, NEXARA_MAPS_LINK } from "@/lib/brand";
 
 const WHATSAPP = "https://wa.me/522226960350?text=Hola%2C%20me%20interesa%20informaci%C3%B3n%20de%20Nexara";
@@ -83,9 +84,10 @@ const REDES = [
   },
 ];
 
+/** Pie del sitio, en «Noche NEXARA»: cierra cada página en el mismo escenario con el que abre. */
 export default function Pie() {
   return (
-    <footer className={s.pie}>
+    <footer className={`${base.noche} ${s.pie}`} data-noche-zona="">
       <div className={base.contenedor}>
         <div className={s.arriba}>
           <div>
@@ -140,6 +142,10 @@ export default function Pie() {
             <PieAcciones className={s.textoBoton} />
           </div>
         </div>
+      </div>
+      {/* La firma: el nombre en filo, como una pista más, que se pierde hacia abajo. */}
+      <div className={`${base.contenedor} ${s.firma}`} aria-hidden="true">
+        <Palabra contorno className={s.firmaPalabra} />
       </div>
     </footer>
   );

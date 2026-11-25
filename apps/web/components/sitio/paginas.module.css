@@ -8,7 +8,8 @@
 .hero {
   position: relative;
   isolation: isolate;
-  padding-top: clamp(64px, 9vw, 128px);
+  /* `--bajo-barra` lo pone el escenario de noche (noche.module.css) cuando la barra flota encima. */
+  padding-top: calc(var(--bajo-barra, 0px) + clamp(64px, 9vw, 128px));
   padding-bottom: clamp(56px, 7vw, 104px);
   text-align: center;
 }
@@ -79,7 +80,8 @@
   bottom: 14px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgb(10 18 32 / 0.55);
+  /* 0.62: el texto blanco pasa de 4.5:1 aunque detrás quede la zona más clara de la foto. */
+  background: rgb(10 18 32 / 0.62);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
   backdrop-filter: blur(14px) saturate(160%);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16);
@@ -179,8 +181,16 @@
   font-weight: 600;
 }
 
+/*
+ * Donde hay subnavegación pegajosa, el hueco que el documento deja arriba (sitio-documento.css) crece para librarla
+ * también: ni un ancla ni el foco del teclado quedan debajo de las dos barras.
+ */
+:global(html:has([data-sitio])):has(.subnav) {
+  scroll-padding-top: 132px;
+}
+
 .ancla {
-  scroll-margin-top: 136px;
+  scroll-margin-top: 4px;
 }
 
 /* ── Problemas → solución ───────────────────────────────────────────────── */
@@ -750,6 +760,19 @@
   resize: vertical;
 }
 
+/* La flecha del selector es la del sitio (la del sistema quedaba pegada a la orilla), en un gris que sirve en los dos temas. */
+.campo > select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%238692a6' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px 12px;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
 .campo :is(input, select, textarea):focus {
   border-color: var(--accent);
   outline: none;
@@ -758,6 +781,46 @@
 
 .campo :is(input, textarea)::placeholder {
   color: var(--fg-3);
+}
+
+/*
+ * El campo de teléfono es un componente de la plataforma y trae sus colores (en el tema oscuro del sitio quedaba una
+ * caja blanca): aquí viste como los demás campos del formulario, con el país en un compartimento a la izquierda.
+ */
+.campo :global(.PhoneInput) {
+  min-height: 50px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--fg);
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+
+.campo :global(.PhoneInput):focus-within {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.campo :global(.PhoneInput) :global(.PhoneInputCountry) {
+  padding: 0 12px 0 14px;
+  border-right: 1px solid var(--line);
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+  color: var(--fg-2);
+}
+
+.campo :global(.PhoneInput) :global(.PhoneInputInput) {
+  min-height: 48px;
+  padding: 12px 16px 12px 14px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font-size: 16px;
+}
+
+.campo :global(.PhoneInput) :global(.PhoneInputInput)::placeholder {
+  color: var(--fg-3);
+  opacity: 1;
 }
 
 .error {

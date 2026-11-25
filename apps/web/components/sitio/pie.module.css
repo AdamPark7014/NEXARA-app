@@ -1,11 +1,30 @@
-/* Pie de página: gris perla, letra pequeña y columnas, sin tarjetas ni mapa. */
+/*
+ * Pie de página en «Noche NEXARA» (lleva también la clase `.noche` de sitio.module.css): letra pequeña y columnas,
+ * sin tarjetas ni mapa, y el nombre en filo al fondo.
+ */
 
 .pie {
-  background: var(--bg-alt);
+  position: relative;
+  overflow: clip;
+  background: var(--bg);
   color: var(--fg-2);
   font-size: 13px;
   line-height: 1.5;
   letter-spacing: -0.005em;
+}
+
+/* El hilo de color del logotipo abre el pie. */
+.pie::before {
+  content: "";
+  display: block;
+  height: 2px;
+  background: var(--espectro);
+}
+
+/* Si la página termina con el cierre (también de noche), el pie lo continúa: basta una línea tenue. */
+:global(main:has(> [data-cierre]:last-child)) + .pie::before {
+  height: 1px;
+  background: var(--line);
 }
 
 .arriba {
@@ -110,13 +129,19 @@
   gap: 4px 0;
 }
 
+/* Cada enlace legal mide al menos 24 px de alto: se puede tocar sin atinarle a un renglón de 18. */
+.legal > * {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+
 .legal > * + *::before {
   content: "";
-  display: inline-block;
+  flex: 0 0 auto;
   width: 1px;
   height: 11px;
   margin: 0 10px;
-  vertical-align: -1px;
   background: var(--line);
 }
 
@@ -142,6 +167,25 @@
   height: 13px;
 }
 
+/* ── Firma ──────────────────────────────────────────────────────────────── */
+
+.firma {
+  /* Solo asoma la mitad alta de las letras: el resto queda bajo el borde de la página. */
+  height: clamp(34px, 9.4vw, 116px);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 10%, transparent 96%);
+  mask-image: linear-gradient(180deg, #000 10%, transparent 96%);
+  pointer-events: none;
+}
+
+.firmaPalabra {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  color: #2a3c5a;
+}
+
 @media (max-width: 1068px) {
   .columnas {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -152,8 +196,27 @@
   .columnas {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  /* En el teléfono cada enlace es un renglón cómodo para el pulgar. */
+  .lista {
+    gap: 0;
+  }
+  .lista a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+  }
   .abajo {
     flex-direction: column;
     align-items: flex-start;
+  }
+  /* La fila legal se parte en dos renglones: sin filetes (uno quedaba abriendo el segundo) y con más alto. */
+  .legal {
+    gap: 0 20px;
+  }
+  .legal > * {
+    min-height: 36px;
+  }
+  .legal > * + *::before {
+    content: none;
   }
 }

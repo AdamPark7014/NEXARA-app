@@ -123,6 +123,78 @@
   color-scheme: dark;
 }
 
+/*
+ * Noche NEXARA: el marino de la plataforma y de la NAS (#070B12) como escenario fijo, igual en tema claro y oscuro.
+ * Lo usan el hero de la portada, el cierre de cada página y el pie. Dentro, el botón principal es blanco: el color
+ * queda para el logotipo y las señales.
+ */
+/* La tercera línea es la barra antes de que llegue JavaScript: si la página abre con un escenario de noche, nace de
+   noche. Va dentro de `:is()` para que un navegador sin `:has()` no descarte la regla completa. */
+.sitio .noche,
+.noche,
+:is(.sitio:has([data-hero-noche]) [data-noche="auto"]) {
+  --bg: #070b12;
+  --bg-alt: #0a111c;
+  --tile: #0d1624;
+  --tile-alt: #101b2c;
+  --card: #0e1826;
+  --sobre-tile: #16233a;
+  --fg: #f2f5f9;
+  --fg-2: #a9b5c5;
+  --fg-3: #8592a6;
+  --line: #1c2839;
+  --line-soft: #141e2d;
+  --accent: #7fd0e2;
+  --btn: #ffffff;
+  --btn-hover: #dfe8f3;
+  --btn-fg: #070b12;
+  --btn-2: rgba(255, 255, 255, 0.07);
+  --btn-2-fg: #ffffff;
+  --ok: #3dd68c;
+  --rec: #ff6369;
+  --ok-texto: #3dd68c;
+  --rec-texto: #ff6369;
+  --glass: rgba(7, 11, 18, 0.82);
+  --glass-line: rgba(255, 255, 255, 0.08);
+  --seg-bg: #0d1624;
+  --seg-on: #1c2839;
+  --seg-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --control: rgba(255, 255, 255, 0.08);
+  --control-hover: rgba(255, 255, 255, 0.14);
+  --sombra-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --sombra-md: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+  --sombra-xl: 0 30px 60px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --degradado-texto: linear-gradient(92deg, #6ec6d9 0%, #7fd0e2 60%, #9be0c9 100%);
+  color: var(--fg);
+  color-scheme: dark;
+}
+
+/* Las señales: los colores del logotipo, un punto más claros para leerse sobre la noche. */
+.sitio {
+  --senal-cian: #6ec6d9;
+  --senal-teal: #2fbf9f;
+  --senal-ambar: #fbc223;
+  --senal-magenta: #c56ab6;
+  --senal-coral: #f0704a;
+  --espectro: linear-gradient(90deg, #1fb89a 0%, #3aa9cc 34%, #a64ca6 67%, #ee8a2a 100%);
+}
+
+.sitio .noche .botonSecundario,
+.noche .botonSecundario {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+
+.sitio .noche .botonSecundario:hover,
+.noche .botonSecundario:hover {
+  background: rgba(255, 255, 255, 0.13);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+}
+
+.sitio .noche .botonPrimario,
+.noche .botonPrimario {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -10px rgba(127, 208, 226, 0.5);
+}
+
 .sitio *,
 .sitio *::before,
 .sitio *::after {
@@ -134,6 +206,20 @@
 .sitio :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+
+/* Destinos de «Saltar al contenido»: reciben el foco para que el teclado siga desde ahí, sin dibujar un marco. */
+.sitio main:focus,
+.sitio .contenidoAncla:focus {
+  outline: none;
+}
+
+.contenidoAncla {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
 }
 
 .sitio ::selection {
@@ -345,93 +431,6 @@
   .sitio *::after {
     animation: none !important;
     transition: none !important;
-  }
-}
-
-/* ── Aurora del hero ────────────────────────────────────────────────────── */
-
-/* Luz azul, sin más colores, en una franja inclinada que se desvanece. */
-.aurora {
-  position: absolute;
-  inset: -120px 0 auto;
-  z-index: -1;
-  height: 860px;
-  overflow: hidden;
-  transform: skewY(-9deg);
-  transform-origin: 0 0;
-  mask-image: linear-gradient(180deg, #000 30%, transparent 92%);
-  -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent 92%);
-  pointer-events: none;
-}
-
-.aurora i {
-  position: absolute;
-  width: 46vw;
-  height: 46vw;
-  max-width: 760px;
-  max-height: 760px;
-  border-radius: 50%;
-  filter: blur(70px);
-  opacity: var(--aurora-opacidad);
-  will-change: transform;
-}
-
-.aurora i:nth-child(1) {
-  top: -10%;
-  left: -6%;
-  background: var(--aurora-1);
-  animation: deriva1 22s var(--ease) infinite alternate;
-}
-
-.aurora i:nth-child(2) {
-  top: 8%;
-  left: 26%;
-  background: var(--aurora-2);
-  animation: deriva2 26s var(--ease) infinite alternate;
-}
-
-.aurora i:nth-child(3) {
-  top: -18%;
-  right: 8%;
-  background: var(--aurora-3);
-  animation: deriva3 24s var(--ease) infinite alternate;
-}
-
-.aurora i:nth-child(4) {
-  top: 22%;
-  right: -8%;
-  width: 30vw;
-  height: 30vw;
-  background: var(--aurora-4);
-  opacity: calc(var(--aurora-opacidad) * 0.7);
-  animation: deriva2 30s var(--ease) infinite alternate-reverse;
-}
-
-.aurora i:nth-child(5) {
-  top: 30%;
-  left: 52%;
-  width: 26vw;
-  height: 26vw;
-  background: var(--aurora-5);
-  opacity: calc(var(--aurora-opacidad) * 0.55);
-  animation: deriva1 28s var(--ease) infinite alternate-reverse;
-}
-
-@keyframes deriva1 {
-  to {
-    transform: translate3d(12vw, 6vw, 0) scale(1.15);
-  }
-}
-
-@keyframes deriva2 {
-  to {
-    transform: translate3d(-10vw, 8vw, 0) scale(0.9);
-  }
-}
-
-@keyframes deriva3 {
-  to {
-    transform: translate3d(-8vw, 10vw, 0) scale(1.1);
   }
 }
 
@@ -722,7 +721,8 @@
 .visualGrande {
   max-width: 1080px;
   margin: clamp(36px, 3.6vw, 52px) auto 0;
-  padding: 24px 0 56px;
+  /* Abajo cabe el ticket flotante: cuelga del tablero sin tapar el rótulo de la primera cámara. */
+  padding: 24px 0 112px;
   text-align: left;
 }
 
@@ -799,7 +799,7 @@
 
 /* Flota sobre la esquina del tablero, sin tapar su barra (ahí va el indicador «En vivo»). */
 .flotanteRed {
-  top: -46px;
+  top: -72px;
   right: -26px;
   width: 200px;
   padding: 12px 14px;
@@ -1281,6 +1281,7 @@
   font-size: 26px;
   font-weight: 600;
   letter-spacing: -0.03em;
+  white-space: nowrap;
   color: var(--fg);
 }
 
@@ -1323,13 +1324,17 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
-  stroke-dasharray: 1;
-  animation: traza 1.4s var(--ease-out) both;
+  /* Se descubre de izquierda a derecha. Con `vector-effect: non-scaling-stroke` un guion de largo 1 se mide en píxeles
+     de pantalla y la línea quedaba a la mitad. */
+  animation: descubre 1.4s var(--ease-out) both;
 }
 
-@keyframes traza {
+@keyframes descubre {
   from {
-    stroke-dashoffset: 1;
+    clip-path: inset(-12px 100% -12px -12px);
+  }
+  to {
+    clip-path: inset(-12px);
   }
 }
 
@@ -2152,27 +2157,20 @@
 
 /* ── Cierre ─────────────────────────────────────────────────────────────── */
 
+/* Franja de «Noche NEXARA» a todo lo ancho (lleva también la clase `.noche`); el pie la continúa sin corte. */
 .final {
-  padding-block: clamp(56px, 7vw, 96px) clamp(96px, 11vw, 152px);
+  position: relative;
+  /* Pasa por encima de la sub-barra de la página (40) y por debajo de la barra de navegación (50). */
+  z-index: 41;
+  isolation: isolate;
+  overflow: clip;
+  padding-block: clamp(84px, 10vw, 148px) clamp(76px, 9vw, 132px);
+  background: var(--bg);
 }
 
 .finalTarjeta {
   position: relative;
-  overflow: hidden;
-  isolation: isolate;
-  padding: clamp(56px, 8vw, 112px) clamp(28px, 6vw, 96px);
-  border-radius: 32px;
-  background: var(--tile);
   text-align: center;
-}
-
-.finalTarjeta .aurora {
-  inset: 0;
-  height: auto;
-  transform: none;
-  mask-image: none;
-  -webkit-mask-image: none;
-  opacity: 0.9;
 }
 
 .finalTarjeta .titulo {
@@ -2275,7 +2273,7 @@
     left: auto;
     bottom: auto;
     width: min(260px, 82%);
-    margin: -22px 12px 0 auto;
+    margin: 12px 0 0 auto;
   }
   .visual {
     padding: 8px 0 0;
@@ -2306,5 +2304,13 @@
 @media (max-width: 1068px) {
   .faq {
     grid-template-columns: 1fr;
+  }
+}
+
+/* En el teléfono los dos botones del cierre miden lo mismo, como los del hero. */
+@media (max-width: 559px) {
+  .finalTarjeta .acciones {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

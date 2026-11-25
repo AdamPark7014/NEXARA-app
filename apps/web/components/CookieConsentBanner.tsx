@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   COOKIE_CONSENT_OPEN_EVENT,
@@ -19,6 +20,10 @@ export default function CookieConsentBanner() {
   const [configure, setConfigure] = useState(false);
   const [analytics, setAnalytics] = useState(false);
   const [preferences, setPreferences] = useState(false);
+  // El aviso se aparta mientras taparía lo importante (los botones del hero, el formulario).
+  const [cede, setCede] = useState(false);
+  const tarjeta = useRef<HTMLDivElement>(null);
+  const camino = usePathname();
 
   useEffect(() => {
     setMounted(true);
@@ -43,6 +48,34 @@ export default function CookieConsentBanner() {
     return () => window.removeEventListener(COOKIE_CONSENT_OPEN_EVENT, onOpen);
   }, []);
 
+  useEffect(() => {
+    if (!mounted || !visible || configure) {
+      setCede(false);
+      return;
+    }
+    const medir = () => {
+      const t = tarjeta.current;
+      if (!t) return;
+      // Con offset* y no con el rectángulo pintado: la animación de entrada lo desplaza.
+      const izquierda = t.offsetLeft - 8;
+      const derecha = t.offsetLeft + t.offsetWidth + 8;
+      const desde = window.innerHeight - t.offsetHeight - 24;
+      setCede(
+        Array.from(document.querySelectorAll("[data-cede-aviso]")).some((z) => {
+          const r = z.getBoundingClientRect();
+          return r.height > 0 && r.bottom > desde && r.top < window.innerHeight && r.right > izquierda && r.left < derecha;
+        }),
+      );
+    };
+    medir();
+    window.addEventListener("scroll", medir, { passive: true });
+    window.addEventListener("resize", medir, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", medir);
+      window.removeEventListener("resize", medir);
+    };
+  }, [mounted, visible, configure, camino]);
+
   if (!mounted || !visible) return null;
 
   const persist = (state: CookieConsentState) => {
@@ -55,7 +88,9 @@ export default function CookieConsentBanner() {
 
   return (
     <div
+      ref={tarjeta}
       className={styles.banner}
+      data-cede={cede ? "true" : undefined}
       role="dialog"
       aria-modal="false"
       aria-labelledby="nexara-cookie-consent-title"

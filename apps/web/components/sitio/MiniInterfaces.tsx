@@ -170,7 +170,7 @@ export function GraficaEntregas() {
             <line key={y} x1="0" y1={y} x2="280" y2={y} className={s.graficaRejilla} />
           ))}
           <path d={`${linea} L280 120 L0 120 Z`} fill="url(#grafica-area)" />
-          <path d={linea} className={s.graficaLinea} pathLength={1} />
+          <path d={linea} className={s.graficaLinea} />
         </svg>
         <span className={s.graficaPunto} style={{ left: `${(ultimo[0] / 280) * 100}%`, top: `${(ultimo[1] / 120) * 100}%` }} />
       </div>

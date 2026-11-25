@@ -1,0 +1,145 @@
+/*
+ * Piezas de la «Noche NEXARA» fuera de la portada: el escenario con el que abre cada página interior, el puente que
+ * monta su foto entre la noche y la página, y el fondo del cierre. Los colores salen de `.noche` (sitio.module.css);
+ * aquí va la composición. Todo es fijo: el único movimiento orquestado del sitio es la entrada de la portada.
+ */
+
+/* ── Escenario de una página interior ───────────────────────────────────── */
+
+.escena {
+  /* La barra de navegación (64 px, sticky) flota sobre el escenario: `paginas.module.css` suma este hueco arriba. */
+  --bajo-barra: 64px;
+  overflow: clip;
+  margin-top: -64px;
+  background: var(--bg);
+}
+
+/* Con una foto montada en el corte, el escenario termina más cerca de ella. */
+.escena.conVisual {
+  padding-bottom: clamp(40px, 5vw, 64px);
+}
+
+.fondo {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background:
+    radial-gradient(58% 78% at 50% 0%, rgba(26, 62, 110, 0.52), transparent 72%),
+    radial-gradient(30% 40% at 50% 0%, rgba(110, 198, 217, 0.1), transparent 70%);
+  pointer-events: none;
+}
+
+/* En el cierre la luz va detrás del titular, no arriba. */
+.fondoCentro {
+  background:
+    radial-gradient(48% 62% at 50% 44%, rgba(26, 62, 110, 0.5), transparent 72%),
+    radial-gradient(24% 30% at 50% 40%, rgba(110, 198, 217, 0.09), transparent 70%);
+}
+
+/* La rejilla hexagonal de la plataforma, apenas visible donde hay luz. */
+.fondo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--ui-hex-grid);
+  background-size: 56px 100px;
+  background-position: 50% 0;
+  -webkit-mask-image: radial-gradient(60% 80% at 50% 0%, #000 0%, transparent 78%);
+  mask-image: radial-gradient(60% 80% at 50% 0%, #000 0%, transparent 78%);
+}
+
+.fondoCentro::before {
+  -webkit-mask-image: radial-gradient(52% 66% at 50% 44%, #000 0%, transparent 78%);
+  mask-image: radial-gradient(52% 66% at 50% 44%, #000 0%, transparent 78%);
+}
+
+/* El hilo de color del logotipo: cierra el escenario (abajo) o abre el cierre de la página (arriba). */
+.hiloAbajo::after,
+.hiloArriba::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  background: var(--espectro);
+}
+
+.hiloArriba::after {
+  inset: 0 0 auto;
+}
+
+/* ── Pistas de circuito a los costados ──────────────────────────────────── */
+
+.trazas {
+  position: absolute;
+  top: 50%;
+  width: auto;
+  height: min(408px, 86%);
+  translate: 0 -50%;
+  overflow: visible;
+  color: #22324d;
+}
+
+/* Se recorren hacia afuera cuando la pantalla se angosta: nunca pasan por detrás del texto. */
+.trazasIzq {
+  left: min(0px, calc((100vw - 1640px) / 2));
+  -webkit-mask-image: linear-gradient(90deg, #000 26%, transparent 86%);
+  mask-image: linear-gradient(90deg, #000 26%, transparent 86%);
+}
+
+.trazasDer {
+  right: min(0px, calc((100vw - 1640px) / 2));
+  -webkit-mask-image: linear-gradient(270deg, #000 26%, transparent 86%);
+  mask-image: linear-gradient(270deg, #000 26%, transparent 86%);
+}
+
+.pista {
+  stroke: currentColor;
+}
+
+.senal {
+  opacity: 0.78;
+}
+
+@media (max-width: 859px) {
+  .trazas {
+    display: none;
+  }
+}
+
+/* ── Puente: la foto de la página entre la noche y el contenido ─────────── */
+
+.puente {
+  /* Cuánto de la foto queda sobre la noche. */
+  --corte: clamp(72px, 11vw, 150px);
+  position: relative;
+  background: linear-gradient(#070b12 0 var(--corte), transparent var(--corte));
+}
+
+.puente::before {
+  content: "";
+  position: absolute;
+  inset: var(--corte) 0 auto;
+  height: 2px;
+  background: var(--espectro);
+}
+
+/* Marca hasta dónde llega la noche, para que la barra de navegación sepa cuándo cambiar (Encabezado.tsx). */
+.puenteZona {
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--corte);
+  pointer-events: none;
+}
+
+/* La foto ya no necesita su margen: el escenario le deja el aire arriba. */
+.puente > div > * {
+  margin-top: 0;
+}
+
+@media (forced-colors: active) {
+  .fondo,
+  .trazas {
+    display: none;
+  }
+}

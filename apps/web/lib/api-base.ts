@@ -103,7 +103,12 @@ export async function apiRequest(path: string, init: RequestInit = {}): Promise<
     headers.set("Content-Type", "application/json");
   }
   if (typeof window !== "undefined") {
-    const raw = window.localStorage.getItem("nexara_active_company_id");
+    let raw: string | null = null;
+    try {
+      raw = window.localStorage.getItem("nexara_active_company_id");
+    } catch {
+      /* almacenamiento bloqueado: sin empresa activa guardada */
+    }
     const id = raw ? parseInt(raw, 10) : NaN;
     if (Number.isFinite(id)) headers.set("X-Company-Id", String(id));
   }

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import CookieConsentBanner from "./CookieConsentBanner";
@@ -9,6 +9,8 @@ vi.mock("next/link", () => ({
     <a href={href}>{children}</a>
   ),
 }));
+
+vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 
 const AVISO =
   "Usamos cookies necesarias y, con tu permiso, de analítica: consulta el Aviso de Privacidad y la Política de Cookies.";
@@ -65,6 +67,22 @@ describe("CookieConsentBanner", () => {
       analytics: false,
       preferences: false,
     });
+  });
+
+  it("se aparta mientras taparía una zona marcada y vuelve al dejarla atrás", async () => {
+    const zona = document.createElement("div");
+    zona.setAttribute("data-cede-aviso", "");
+    document.body.append(zona);
+    const caja = vi.spyOn(zona, "getBoundingClientRect");
+    caja.mockReturnValue(new DOMRect(0, window.innerHeight - 60, 300, 50));
+    render(<CookieConsentBanner />);
+    const boton = await screen.findByRole("button", { name: "Solo necesarias", hidden: true });
+    const aviso = boton.closest("[role=dialog]");
+    expect(aviso).toHaveAttribute("data-cede", "true");
+    caja.mockReturnValue(new DOMRect(0, -400, 300, 50));
+    fireEvent.scroll(window);
+    expect(aviso).not.toHaveAttribute("data-cede");
+    zona.remove();
   });
 
   it("aceptar todas sigue guardando analítica y preferencias", async () => {

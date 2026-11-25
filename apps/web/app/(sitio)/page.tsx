@@ -1,23 +1,23 @@
 import type { Metadata } from "next";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
-import Link from "next/link";
 import { foto } from "@/components/sitio/fotos";
 import s from "@/components/sitio/sitio.module.css";
 import { ruta } from "@/components/sitio/rutas";
-import Aurora from "@/components/sitio/Aurora";
+import Cierre from "@/components/sitio/Cierre";
+import HeroEnsamble from "@/components/sitio/HeroEnsamble";
+import en from "@/components/sitio/ensamble.module.css";
 import Tablero from "@/components/sitio/Tablero";
 import Marcas from "@/components/sitio/Marcas";
 import Cifra from "@/components/sitio/Cifra";
-import Flecha from "@/components/sitio/Flecha";
 import Industrias, { type Industria } from "@/components/sitio/Industrias";
 import Galeria, { type FotoGaleria } from "@/components/sitio/Galeria";
 import MapaInteractivo from "@/components/sitio/MapaInteractivo";
 import Preguntas, { type Pregunta } from "@/components/sitio/Preguntas";
 import { GraficaEntregas, TicketSoporte } from "@/components/sitio/MiniInterfaces";
-import PublicIcon from "@/app/components/PublicIcon";
 import pn from "@/components/sitio/portada.module.css";
 import Baldosa from "@/components/sitio/Baldosa";
+import { senal } from "@/components/sitio/senales";
 import EquipoGrupo from "@/components/sitio/EquipoGrupo";
 import { fetchPageSection, DEFAULT_CTA, type CtaContent } from "@/lib/page-content-api";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
@@ -153,6 +153,7 @@ function Mosaico() {
         ancha
         oscura
         lateral
+        senal={senal("cctv")}
         nombre="Videovigilancia."
         texto="Cobertura pensada por zona de riesgo y evidencia cuando se necesita."
         foto={{ ...foto("muro-video-ancho", ancho), alt: "Centro de monitoreo con muro de video instalado por NEXARA", posicion: "center 45%" }}
@@ -162,6 +163,7 @@ function Mosaico() {
         ]}
       />
       <Baldosa
+        senal={senal("redes")}
         nombre="Redes y Wi‑Fi."
         texto="Cableado certificado y Wi‑Fi que aguanta la hora pico."
         foto={{ ...foto("campo-enlace-antena-ciudad", tam), alt: "Radioenlace de NEXARA sobre la ciudad", posicion: "30% 78%" }}
@@ -172,6 +174,7 @@ function Mosaico() {
       />
       <Baldosa
         oscura
+        senal={senal("computo")}
         nombre="Infraestructura."
         texto="Racks, servidores y respaldos listos para operar."
         foto={{ ...foto("rack-nexara-led", tam), alt: "Rack de servidores y switching instalado por NEXARA", posicion: "center 62%" }}
@@ -181,6 +184,7 @@ function Mosaico() {
         ]}
       />
       <Baldosa
+        senal={senal("soporte")}
         nombre="Soporte TI."
         texto="Mesa de ayuda con SLA, remota y en sitio."
         arte={<TicketSoporte />}
@@ -190,6 +194,7 @@ function Mosaico() {
         ]}
       />
       <Baldosa
+        senal={senal("software")}
         nombre="Plataformas."
         texto="Portales, automatización e indicadores, por fases."
         arte={<GraficaEntregas />}
@@ -212,7 +217,7 @@ function Mosaico() {
   );
 }
 
-/** Portada: hero centrado con el tablero como producto, baldosas de servicio, cifras, cobertura y cierre. */
+/** Portada: el hero «Ensamble» sobre la noche, el tablero como puente, baldosas de servicio, cifras, cobertura y cierre. */
 export default async function Inicio() {
   const cta = (await fetchPageSection<CtaContent>("home_cta")) ?? DEFAULT_CTA;
   const whatsapp = buildWhatsAppLeadUrl({ industryName: "tu empresa", serviceName: "CCTV, redes o soporte TI", path: "/" });
@@ -239,30 +244,18 @@ export default async function Inicio() {
         }}
       />
 
-      <section className={pn.hero} aria-labelledby="hero-titulo">
-        <Aurora />
+      <HeroEnsamble
+        titulo={["Todo conectado.", "Un solo responsable."]}
+        texto="Diseñamos, instalamos y mantenemos la seguridad, las redes y el cómputo de tu empresa con un mismo equipo, del diagnóstico al soporte."
+        whatsapp={whatsapp}
+      />
+
+      <section className={en.puente} aria-labelledby="tablero-titulo">
+        <i className={en.puenteZona} data-noche-zona="" aria-hidden="true" />
         <div className={s.contenedor}>
-          <h1 id="hero-titulo" className={pn.titulo}>
-            <span>Seguridad que ve.</span>
-            <span className={s.degradado}>Y responde.</span>
-          </h1>
-          <p className={pn.sub}>Videovigilancia, redes, cómputo y soporte TI para empresas, con un solo equipo responsable.</p>
-          <div className={pn.acciones}>
-            <Link href={ruta("/contacto")} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_hero_cta">
-              Agendar diagnóstico
-              <Flecha />
-            </Link>
-            <a
-              href={whatsapp}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`${s.boton} ${s.botonSecundario}`}
-              data-track-conversion="home_hero_whatsapp"
-            >
-              Hablar con un especialista
-              <Flecha />
-            </a>
-          </div>
+          <p id="tablero-titulo" className={en.puenteTitulo}>
+            Así se ve tu operación cuando todo reporta al mismo lugar.
+          </p>
           <Tablero />
         </div>
       </section>
@@ -338,44 +331,18 @@ export default async function Inicio() {
         </div>
       </section>
 
-      <section className={s.final} aria-labelledby="final-titulo">
-        <div className={s.contenedor}>
-          <div className={s.finalTarjeta} data-aparecer>
-            <Aurora />
-            <h2 id="final-titulo" className={s.titulo}>
-              {cta.title} {cta.titleAccent}.
-            </h2>
-            <p className={s.lead}>{cta.text}</p>
-            <div className={s.acciones}>
-              <Link href={ruta(cta.primaryHref)} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_cta_primary">
-                {cta.primaryLabel}
-                <Flecha />
-              </Link>
-              <a
-                href={whatsapp}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`${s.boton} ${s.botonSecundario}`}
-                data-track-conversion="home_cta_whatsapp"
-              >
-                Escríbenos por WhatsApp
-                <Flecha />
-              </a>
-            </div>
-            <ul className={s.finalGarantias}>
-              <li>
-                <PublicIcon name="clock" size={18} /> Primera respuesta en un día hábil
-              </li>
-              <li>
-                <PublicIcon name="mapPin" size={18} /> Diagnóstico en sitio
-              </li>
-              <li>
-                <PublicIcon name="fileCheck" size={18} /> Memoria técnica al entregar
-              </li>
-            </ul>
-          </div>
-        </div>
-      </section>
+      <Cierre
+        titulo={
+          <>
+            {cta.title} {cta.titleAccent}.
+          </>
+        }
+        texto={cta.text}
+        primario={{ href: cta.primaryHref, label: cta.primaryLabel }}
+        origen="/"
+        whatsapp={whatsapp}
+        medicion={{ primario: "home_cta_primary", whatsapp: "home_cta_whatsapp" }}
+      />
     </main>
   );
 }

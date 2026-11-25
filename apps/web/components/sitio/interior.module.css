@@ -64,7 +64,7 @@
 /* ── Hero de detalle ────────────────────────────────────────────────────── */
 
 .hero {
-  padding-top: clamp(40px, 6vw, 88px);
+  padding-top: calc(var(--bajo-barra, 0px) + clamp(40px, 6vw, 88px));
 }
 
 .tituloLargo {
@@ -159,6 +159,17 @@
 
 .rutasCuatro {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* Las salidas de «esta página no existe», montadas en el corte del escenario: sin margen arriba y con aire abajo. */
+.rutasSalida {
+  width: min(1040px, 100%);
+  margin-inline: auto;
+  padding-bottom: clamp(64px, 8vw, 112px);
+}
+
+.rutasSalida .rutas {
+  margin-top: 0;
 }
 
 .rutas > li {
@@ -681,12 +692,20 @@ a.portada:hover img,
 }
 
 .volver {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font-size: 15px;
   font-weight: 600;
   color: var(--fg-2);
+}
+
+/* Área de toque de ~44 px sin mover el diseño (el enlace mide 23 px de alto). */
+.volver::before {
+  content: "";
+  position: absolute;
+  inset: -11px -6px;
 }
 
 .volver:hover {

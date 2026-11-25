@@ -23,7 +23,12 @@ const listeners = new Set<(id: number | null) => void>();
 
 export function getActiveCompanyId(): number | null {
   if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(STORAGE_KEY);
+  let raw: string | null = null;
+  try {
+    raw = window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    /* almacenamiento bloqueado: sin empresa activa guardada */
+  }
   if (!raw) return null;
   const n = parseInt(raw, 10);
   return Number.isFinite(n) ? n : null;
@@ -31,8 +36,12 @@ export function getActiveCompanyId(): number | null {
 
 export function setActiveCompanyId(id: number | null) {
   if (typeof window === "undefined") return;
-  if (id == null) window.localStorage.removeItem(STORAGE_KEY);
-  else window.localStorage.setItem(STORAGE_KEY, String(id));
+  try {
+    if (id == null) window.localStorage.removeItem(STORAGE_KEY);
+    else window.localStorage.setItem(STORAGE_KEY, String(id));
+  } catch {
+    /* almacenamiento bloqueado: se avisa a la página, sin guardarlo */
+  }
   listeners.forEach((cb) => cb(id));
 }
 

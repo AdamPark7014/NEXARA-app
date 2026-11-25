@@ -5,7 +5,7 @@
   top: 0;
   z-index: 50;
   border-bottom: 1px solid transparent;
-  transition: border-color 0.3s var(--ease);
+  transition: border-color 0.3s var(--ease), color 0.3s var(--ease);
 }
 
 /*
@@ -32,11 +32,38 @@
   backdrop-filter: saturate(150%) blur(24px);
 }
 
+/*
+ * Primer alto del teclado: salta la barra y lleva al contenido. Vive fuera de la pantalla hasta recibir el foco y
+ * entonces cubre la marca, alineado con ella.
+ */
+.barra .saltar {
+  position: absolute;
+  top: 10px;
+  left: calc(var(--gutter) - 14px);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--btn);
+  color: var(--btn-fg);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  translate: 0 -200%;
+}
+
+.barra .saltar:focus {
+  translate: 0 0;
+}
+
 .fila {
   display: flex;
   align-items: center;
   gap: 20px;
-  height: 64px;
+  height: 63px; /* más el borde de 1 px: la barra mide 64 */
 }
 
 .barra .marca {
@@ -52,6 +79,27 @@
   width: 30px;
   height: 30px;
   object-fit: contain;
+  transition: opacity 0.35s var(--ease), scale 0.35s var(--ease), margin 0.35s var(--ease);
+}
+
+/* Arriba de la portada el emblema grande está a la vista: el de la barra se guarda y vuelve al bajar. */
+.barra[data-cima="true"] .marcaIso {
+  margin-right: -40px;
+  opacity: 0;
+  scale: 0.6;
+}
+
+/* La barra espera a que el emblema empiece a armarse (solo opacidad: un `transform` la volvería el marco de la hoja). */
+@media (prefers-reduced-motion: no-preference) {
+  :global(html:not([data-intro="visto"]):has([data-nx-escenario])) .barra {
+    animation: barraEntra 0.8s var(--ease-out) 0.45s both;
+  }
+}
+
+@keyframes barraEntra {
+  from {
+    opacity: 0;
+  }
 }
 
 .marcaNombre {

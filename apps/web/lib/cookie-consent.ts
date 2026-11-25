@@ -47,11 +47,14 @@ export function necessaryOnlyConsent(): CookieConsentState {
   return createConsentState({ analytics: false, preferences: false });
 }
 
+/** La decisión de esta visita cuando el navegador no deja guardar: no se vuelve a preguntar en cada página. */
+let enMemoria: CookieConsentState | null = null;
+
 export function getCookieConsent(): CookieConsentState | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
-    if (!raw) return null;
+    if (!raw) return enMemoria;
     const parsed = JSON.parse(raw) as CookieConsentState;
     if (!parsed || parsed.version !== 1 || !parsed.categories) return null;
     return {
@@ -64,7 +67,7 @@ export function getCookieConsent(): CookieConsentState | null {
       },
     };
   } catch {
-    return null;
+    return enMemoria;
   }
 }
 
@@ -74,7 +77,12 @@ export function setCookieConsent(state: CookieConsentState): void {
     analytics: state.categories.analytics,
     preferences: state.categories.preferences,
   });
-  window.localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(normalized));
+  try {
+    window.localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(normalized));
+    enMemoria = null;
+  } catch {
+    enMemoria = normalized;
+  }
   window.dispatchEvent(
     new CustomEvent(COOKIE_CONSENT_EVENT, { detail: normalized }),
   );

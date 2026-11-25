@@ -2,7 +2,7 @@ import Link from "next/link";
 import PublicIcon from "@/app/components/PublicIcon";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import s from "./sitio.module.css";
-import Aurora from "./Aurora";
+import FondoNoche from "./FondoNoche";
 import Flecha from "./Flecha";
 import { ruta } from "./rutas";
 
@@ -22,7 +22,10 @@ type Props = {
   medicion?: { primario: string; whatsapp: string; ruta?: string };
 };
 
-/** Llamado final de cada página: tarjeta con el degradado de marca, dos acciones y tres garantías. */
+/**
+ * Llamado final de cada página: una franja de «Noche NEXARA» con dos acciones y tres garantías. Se continúa con el
+ * pie, que es de la misma noche: la página abre y cierra en el mismo escenario.
+ */
 export default function Cierre({
   titulo,
   texto,
@@ -35,10 +38,10 @@ export default function Cierre({
     whatsapp ?? buildWhatsAppLeadUrl({ industryName: "mi empresa", serviceName: "CCTV, redes o soporte TI", path: origen });
   const clave = origen.replace(/\W+/g, "_").replace(/^_|_$/g, "") || "inicio";
   return (
-    <section className={s.final} aria-labelledby={`cierre-${clave}`}>
+    <section className={`${s.noche} ${s.final}`} aria-labelledby={`cierre-${clave}`} data-cierre="" data-noche-zona="">
+      <FondoNoche hilo="arriba" luz="centro" />
       <div className={s.contenedor}>
         <div className={s.finalTarjeta} data-aparecer>
-          <Aurora />
           <h2 id={`cierre-${clave}`} className={s.titulo}>
             {titulo}
           </h2>

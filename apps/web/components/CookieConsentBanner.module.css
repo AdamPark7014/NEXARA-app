@@ -13,7 +13,7 @@
   margin: 0;
   padding: 18px 18px 16px;
   border-radius: 18px;
-  background: color-mix(in srgb, var(--card, #ffffff) 90%, transparent);
+  background: color-mix(in srgb, var(--card, #ffffff) 97%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
   box-shadow:
@@ -21,7 +21,7 @@
     inset 0 0 0 1px var(--glass-line, rgba(10, 37, 64, 0.08));
   color: var(--fg, #0a2540);
   font-family: var(--font, "Inter", system-ui, sans-serif);
-  animation: entra 0.45s var(--ease-out, ease-out) both;
+  animation: entra 0.45s var(--ease-out, ease-out) backwards;
 }
 
 @keyframes entra {
@@ -29,6 +29,11 @@
     opacity: 0;
     transform: translateY(12px);
   }
+}
+
+.banner[data-cede="true"] {
+  visibility: hidden;
+  opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

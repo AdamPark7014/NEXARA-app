@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { applyPublicTheme } from "@/components/PublicThemeToggle";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { applyPublicTheme, PUBLIC_THEME_KEY } from "@/components/PublicThemeToggle";
 
 type Tema = "dark" | "light";
 
@@ -11,6 +11,21 @@ const leerTema = (): Tema =>
 /** Cambia entre claro y oscuro con el mismo mecanismo del sitio (`data-public-theme`). */
 export default function TemaBoton({ className, conTexto = false }: { className?: string; conTexto?: boolean }) {
   const [tema, setTema] = useState<Tema>("light");
+
+  // El 404 de una ruta dinámica (`notFound()`) llega sin HTML del servidor: React pinta la página entera en el
+  // navegador y el guion en línea del layout raíz no se ejecuta, así que `<html>` se queda sin tema. Se repone aquí,
+  // antes del primer pintado, con la misma regla del guion: oscuro solo si la persona lo eligió.
+  useLayoutEffect(() => {
+    const raiz = document.documentElement;
+    if (raiz.hasAttribute("data-public-theme")) return;
+    let guardado: string | null = null;
+    try {
+      guardado = localStorage.getItem(PUBLIC_THEME_KEY);
+    } catch {
+      /* almacenamiento bloqueado: tema claro */
+    }
+    raiz.setAttribute("data-public-theme", guardado === "dark" ? "dark" : "light");
+  }, []);
 
   useEffect(() => {
     setTema(leerTema());

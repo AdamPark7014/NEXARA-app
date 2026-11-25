@@ -49,12 +49,17 @@ const createDeviceId = (): string => {
 
 const getOrCreateDeviceId = (): string => {
   if (typeof window === 'undefined') return '';
-  const stored = normalize(window.localStorage.getItem(DEVICE_ID_KEY), 80);
-  if (stored) return stored;
+  try {
+    const stored = normalize(window.localStorage.getItem(DEVICE_ID_KEY), 80);
+    if (stored) return stored;
 
-  const nextId = createDeviceId();
-  window.localStorage.setItem(DEVICE_ID_KEY, nextId);
-  return nextId;
+    const nextId = createDeviceId();
+    window.localStorage.setItem(DEVICE_ID_KEY, nextId);
+    return nextId;
+  } catch {
+    // Almacenamiento bloqueado: identificador de esta carga, sin guardarlo.
+    return createDeviceId();
+  }
 };
 
 /** Fuerza lectura de plataforma / navegador desde el cliente (siempre). */
@@ -173,7 +178,11 @@ export const saveDeviceIdentity = (identity: DeviceIdentity): void => {
     browser: normalize(identity.browser, 40),
   };
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    /* almacenamiento bloqueado */
+  }
 };
 
 export const getDeviceIdentityHeaders = async (): Promise<Record<string, string>> => {

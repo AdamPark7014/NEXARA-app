@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
 import { useScrollLock } from "@/components/ui/useScrollLock";
 import s from "./encabezado.module.css";
@@ -54,6 +54,11 @@ export default function Encabezado() {
   const [hoja, setHoja] = useState(false);
   const [hojaGrupo, setHojaGrupo] = useState<MenuId | null>(null);
   const [bajado, setBajado] = useState(false);
+  // Cada página abre con un escenario de noche (`data-hero-noche`) y cierra con otro (`data-noche-zona`): mientras
+  // uno queda detrás de la barra, la barra viste de noche también. `null` es «todavía no se mide» (servidor y primer
+  // pintado): ahí decide el CSS con `:has()`.
+  const [noche, setNoche] = useState<boolean | null>(null);
+  const portada = camino === ruta("/");
   const [atajo, setAtajo] = useState("Ctrl K");
   const cierre = useRef<number | undefined>(undefined);
 
@@ -61,12 +66,29 @@ export default function Encabezado() {
     if (/mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent)) setAtajo("⌘K");
   }, []);
 
-  useEffect(() => {
-    const alBajar = () => setBajado(window.scrollY > 8);
+  // Antes de pintar: al cambiar de página la barra no parpadea con el color de la anterior.
+  useLayoutEffect(() => {
+    const alBajar = () => {
+      setBajado(window.scrollY > 8);
+      // ¿Qué hay detrás de la barra, a media altura (32 px)?
+      let detras = false;
+      for (const zona of document.querySelectorAll("[data-hero-noche], [data-noche-zona]")) {
+        const r = zona.getBoundingClientRect();
+        if (r.top <= 32 && r.bottom > 32) {
+          detras = true;
+          break;
+        }
+      }
+      setNoche(detras);
+    };
     alBajar();
     window.addEventListener("scroll", alBajar, { passive: true });
-    return () => window.removeEventListener("scroll", alBajar);
-  }, []);
+    window.addEventListener("resize", alBajar, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", alBajar);
+      window.removeEventListener("resize", alBajar);
+    };
+  }, [camino]);
 
   useEffect(() => {
     const alTeclear = (e: KeyboardEvent) => {
@@ -93,6 +115,17 @@ export default function Encabezado() {
   const cerrarLuego = () => {
     window.clearTimeout(cierre.current);
     cierre.current = window.setTimeout(() => setMenu(null), 140);
+  };
+
+  // «Saltar al contenido»: el foco pasa al `<main>` de la página y el lector de pantalla lo anuncia. Sin JavaScript
+  // el enlace lleva al ancla `#contenido` que el layout deja justo antes.
+  const alSaltar = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const principal = document.querySelector<HTMLElement>("[data-sitio] main");
+    if (!principal) return;
+    e.preventDefault();
+    principal.tabIndex = -1;
+    principal.focus({ preventScroll: true });
+    window.scrollTo(0, 0);
   };
 
   const actual = (href: string) => {
@@ -136,8 +169,16 @@ export default function Encabezado() {
   );
 
   return (
-    <header className={s.barra} data-bajado={bajado || hoja ? "true" : "false"}>
+    <header
+      className={`${s.barra} ${noche ? base.noche : ""}`}
+      data-noche={noche === null ? "auto" : noche ? "si" : "no"}
+      data-bajado={bajado || hoja ? "true" : "false"}
+      data-cima={portada && noche !== false && !bajado && !hoja ? "true" : "false"}
+    >
       <div className={`${base.contenedor} ${s.fila}`}>
+        <a className={s.saltar} href="#contenido" onClick={alSaltar}>
+          Saltar al contenido
+        </a>
         <Link href={ruta("/")} className={s.marca} aria-label="NEXARA, inicio">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/nexara-mark-v2.png" alt="" className={s.marcaIso} width={30} height={30} />

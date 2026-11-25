@@ -31,12 +31,17 @@ export default function LoginWelcomeBanner() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    let raw: string | null = null;
+    try {
+      raw = window.sessionStorage.getItem(STORAGE_KEY);
+      window.sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* almacenamiento bloqueado: sin saludo (este aviso se monta también en el sitio público) */
+    }
     if (!raw) return;
 
     setGreeting(parseGreeting(raw));
     setIsClosing(false);
-    window.sessionStorage.removeItem(STORAGE_KEY);
 
     const fadeTimer = window.setTimeout(() => setIsClosing(true), 4200);
     const removeTimer = window.setTimeout(() => {

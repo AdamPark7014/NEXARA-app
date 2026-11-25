@@ -110,7 +110,7 @@ export default function FormularioContacto() {
     <div className={p.formulario}>
       <h2 className={p.formularioTitulo}>Cuéntanos tu proyecto.</h2>
       <p className={p.formularioNota}>Qué necesitas, cuántas sedes y qué tan urgente es.</p>
-      <form ref={forma} className={p.campos} onSubmit={enviar}>
+      <form ref={forma} className={p.campos} onSubmit={enviar} data-cede-aviso="">
         <div className={p.camposFila}>
           <label className={p.campo}>
             Nombre

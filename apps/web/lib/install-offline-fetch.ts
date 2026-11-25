@@ -101,13 +101,14 @@ function getPanelAuthToken(): string | undefined {
 function getPanelUserId(): number | string | undefined {
   if (typeof window === "undefined") return undefined;
   for (const [almacen, clave] of [
-    [window.sessionStorage, "nexara_user"],
-    [window.sessionStorage, "clientSession"],
-    [window.sessionStorage, "branchSession"],
-    [window.localStorage, "nexara_user"],
+    ["sessionStorage", "nexara_user"],
+    ["sessionStorage", "clientSession"],
+    ["sessionStorage", "branchSession"],
+    ["localStorage", "nexara_user"],
   ] as const) {
     try {
-      const raw = almacen.getItem(clave);
+      // Con el almacenamiento bloqueado, leer `window.localStorage` ya lanza: por eso va dentro del try.
+      const raw = window[almacen].getItem(clave);
       if (!raw) continue;
       const p = JSON.parse(raw) as { id?: number | string; client?: { id?: number }; branch?: { id?: number } };
       const id = p?.id ?? p?.client?.id ?? p?.branch?.id;
