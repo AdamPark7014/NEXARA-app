@@ -1,5 +1,10 @@
 # RELEVO
 
+- **25-11 ~10:15 México (claude-code) — Web pública rediseñada completa (todas las secciones e interiores, pedido de Adam). En main, sin desplegar; sin migraciones; espera su visto bueno visual.**
+  - `components/sitio`: `EquipoVivo`, `MapaInteractivo`, `Industrias`, `Visor`, `Ampliar`, `Problemas`, `Recorrido`, `Interaccion` (`data-luz`, `data-inclina`), `pausa.ts` (`html[data-pausa]`, botón en el pie), `Explorador`, `IndiceGuia`; estilos en `vivo.module.css`, `profundo.module.css` y bloques «Lo vivo». Tablero: tocar una cámara la agranda. Contacto: elegir servicios escribe el primer renglón del mensaje; el POST no cambia. Legal: portada común, texto intacto.
+  - Verificado: compilación de producción; 14 rutas en 1440, 1024, 390 y 360 px con y sin almacenamiento, sin errores ni desbordes; «reducir movimiento» y pausa detienen todo; teclado; formulario hasta el POST interceptado; 1,610 pruebas de sitio y lib (la suite web completa se corrió antes de los interiores: 2,560 + 8 del ERP por tiempo, que pasan solas).
+  - Plataformas: Web hecha · API, Android e iOS: no aplica.
+
 - **25-11 ~03:40 México (claude-code) — El seed ya no toca cuentas existentes y la lista de personas sale del repo. API y `deploy/nexara.sh`; sin migraciones; SIN DESPLEGAR.**
   - Antes: `prisma db seed` reescribía contraseña, rol, menú, jefe, bloqueo y estado de las cuentas de la plantilla, y sin variables ponía una contraseña inservible. Reproducido en base desechable.
   - Ahora, tres comandos separados sobre `prisma/seed-seguro.ts`: `prisma db seed` solo agrega roles y departamentos; `npm run seed:cuentas` da de alta las que falten; `npm run cuentas:administrar` (alinear, retirar, contrasena-inicial) cambia las pedidas. Revisa todo antes de escribir, una transacción con candado, `--simular`, y en una base en uso pide `SEED_AUTORIZAR_CUENTAS=<base>@<host>` (y `--solo` para cambiar).
