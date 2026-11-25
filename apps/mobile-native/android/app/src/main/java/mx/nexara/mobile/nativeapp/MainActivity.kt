@@ -257,7 +257,8 @@ class MainActivity : FragmentActivity() {
 
     /** Obtiene el token actual de FCM y lo reenvía al backend si hay sesión. */
     private fun refreshFcmToken() {
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+        val mensajeria = runCatching { FirebaseMessaging.getInstance() }.getOrNull() ?: return
+        mensajeria.token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
                 Log.w("MainActivity", "FCM getToken falló: ${task.exception?.message}")
                 return@addOnCompleteListener

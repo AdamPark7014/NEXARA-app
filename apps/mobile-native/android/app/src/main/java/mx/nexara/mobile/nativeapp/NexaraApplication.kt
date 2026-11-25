@@ -18,7 +18,8 @@ import mx.nexara.mobile.nativeapp.push.PushPayload
 class NexaraApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
-        FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
+        // Sin google-services.json (build de prueba) Firebase no se inicia y getInstance() truena.
+        runCatching { FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG }
         // Canales antes que nada: un push con la app cerrada arranca el proceso
         // directo en NexaraFirebaseService, sin pasar por MainActivity.
         NexaraNotifications.ensureChannels(this)

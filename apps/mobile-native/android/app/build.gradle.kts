@@ -5,8 +5,16 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("com.google.gms.google-services")
-    id("com.google.firebase.crashlytics")
+    id("com.google.gms.google-services") apply false
+    id("com.google.firebase.crashlytics") apply false
+}
+
+// `google-services.json` no se versiona (trae llaves de Google). Sin él se compila en debug, sin push
+// ni Crashlytics; el preflight del final no deja generar un release sin él.
+val googleServicesFile = file("google-services.json")
+if (googleServicesFile.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
 }
 
 val keystorePropertiesFile = rootProject.file("key.properties")
@@ -270,6 +278,14 @@ gradle.taskGraph.whenReady {
             |  rechaza tras la subida. Copia key.properties.example y rellénalo, o
             |  genera el keystore con:
             |      pwsh -File scripts/build-play-aab.ps1 -CreateKeystore
+        """.trimMargin()
+    }
+
+    if (!googleServicesFile.exists()) {
+        problems += """
+            |Falta ${googleServicesFile.path}
+            |  Sin él la app sale sin push ni Crashlytics. Cópialo de
+            |  secrets/nexara/firebase/google-services.json (no se versiona).
         """.trimMargin()
     }
 

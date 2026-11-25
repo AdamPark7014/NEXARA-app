@@ -53,6 +53,7 @@ jobs:
       ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
       ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      GOOGLE_SERVICE_INFO_PLIST_BASE64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -172,6 +173,13 @@ jobs:
           brew update
           brew install xcodegen
           xcodegen --version
+
+      - name: Write GoogleService-Info.plist (push FCM)
+        working-directory: apps/mobile-native/ios
+        run: |
+          if [ -z "${GOOGLE_SERVICE_INFO_PLIST_BASE64}" ]; then echo "::error::Falta el secreto GOOGLE_SERVICE_INFO_PLIST_BASE64: la app saldría sin push."; exit 1; fi
+          printf '%s' "${GOOGLE_SERVICE_INFO_PLIST_BASE64}" | base64 --decode > Resources/GoogleService-Info.plist
+          plutil -lint Resources/GoogleService-Info.plist
 
       - name: Generate Xcode project from XcodeGen spec
         working-directory: apps/mobile-native/ios

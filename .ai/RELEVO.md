@@ -2,6 +2,7 @@
 
 - **25-11 ~10:30 México (claude-code) — Repositorio nuevo: historia sin coautores de IA y sin credenciales.**
   - Cambiaron todos los identificadores de commit (main viejo abbdcfe5e = 530db7f28 aquí). Nadie debe empujar desde un clon anterior: clonar de nuevo y reaplicar lo pendiente como parche.
+  - `google-services.json` y `GoogleService-Info.plist` ya no se versionan (llaves de Google). Copias en secrets/nexara/firebase: sin la de Android no se genera un release; TestFlight usa el secreto GOOGLE_SERVICE_INFO_PLIST_BASE64.
   - Salieron de la historia los Excel de usuarios, los seeds viejos con personas y los secretos escritos. El mapa viejo → nuevo y el respaldo están fuera del repo.
 
 - **25-11 ~10:15 México (claude-code) — Web pública rediseñada completa (todas las secciones e interiores, pedido de Adam). En main, sin desplegar; sin migraciones; espera su visto bueno visual.**
