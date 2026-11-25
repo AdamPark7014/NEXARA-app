@@ -14,6 +14,8 @@ type Props = {
   /** Foto a sangre; el velo de arriba deja leer el texto. */
   foto?: Foto & { alt: string; posicion?: string };
   /** Mini interfaz al pie cuando la baldosa no lleva foto. */
+  /** Lo que se mueve sobre la foto (visor, ondas, barrido). */
+  capa?: React.ReactNode;
   arte?: React.ReactNode;
   /** Composición a todo el ancho al pie (la foto de grupo del equipo). */
   pie?: React.ReactNode;
@@ -30,9 +32,9 @@ type Props = {
  * Baldosa grande de la portada (el patrón de la portada de Apple): nombre, una línea y dos acciones centradas
  * arriba, y la imagen ocupando toda la baldosa.
  */
-export default function Baldosa({ nombre, texto, acciones, foto, arte, pie, ancha, oscura, lateral, senal }: Props) {
+export default function Baldosa({ nombre, texto, acciones, foto, capa, arte, pie, ancha, oscura, lateral, senal }: Props) {
   return (
-    <article className={[b.baldosa, ancha ? b.ancha : "", oscura ? b.oscura : "", lateral ? b.lateral : ""].filter(Boolean).join(" ")} data-aparecer>
+    <article style={senal ? ({ "--c": senal.color } as CSSProperties) : undefined} data-luz="" className={[b.baldosa, ancha ? b.ancha : "", oscura ? b.oscura : "", lateral ? b.lateral : ""].filter(Boolean).join(" ")} data-aparecer>
       {foto ? (
         <div className={b.foto}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -47,6 +49,7 @@ export default function Baldosa({ nombre, texto, acciones, foto, arte, pie, anch
           />
         </div>
       ) : null}
+      {capa}
       {senal ? (
         <span className={b.senal} style={{ "--c": senal.color } as CSSProperties} aria-hidden="true">
           <svg viewBox="0 0 52 56">

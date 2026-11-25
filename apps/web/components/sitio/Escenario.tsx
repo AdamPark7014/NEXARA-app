@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { crearCircuitos, type Caja, type Circuitos, type Medidas } from "./circuitos-motor";
+import { PAUSA_EVENTO, aplicarPausa, leerPausa } from "./pausa";
 import base from "./sitio.module.css";
 import e from "./ensamble.module.css";
 
 /** La entrada se ve una vez por sesión; al recargar a propósito se vuelve a ver. */
 const VISTA = "nx:intro";
-const PAUSA = "nx:pausa";
 
 type Props = { children: React.ReactNode; etiquetadoPor: string };
 
@@ -33,9 +33,8 @@ export default function Escenario({ children, etiquetadoPor }: Props) {
     const quieto = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     setConMovimiento(!quieto);
 
-    let enPausa = false;
+    const enPausa = leerPausa();
     try {
-      enPausa = sessionStorage.getItem(PAUSA) === "1";
       sessionStorage.setItem(VISTA, "1");
     } catch {
       /* almacenamiento bloqueado: la entrada se repite y la pausa dura lo que la página */
@@ -147,14 +146,19 @@ export default function Escenario({ children, etiquetadoPor }: Props) {
 
   const alternarPausa = () => {
     const sigue = !pausa;
-    setPausa(sigue);
-    motor.current?.pausar(sigue);
-    try {
-      sessionStorage.setItem(PAUSA, sigue ? "1" : "0");
-    } catch {
-      /* sin almacenamiento */
-    }
+    aplicarPausa(sigue);
   };
+
+  // La pausa es de todo el sitio: también se cambia desde el pie.
+  useEffect(() => {
+    const alCambiar = (ev: Event) => {
+      const enPausa = (ev as CustomEvent<boolean>).detail;
+      setPausa(enPausa);
+      motor.current?.pausar(enPausa);
+    };
+    window.addEventListener(PAUSA_EVENTO, alCambiar);
+    return () => window.removeEventListener(PAUSA_EVENTO, alCambiar);
+  }, []);
 
   return (
     <section

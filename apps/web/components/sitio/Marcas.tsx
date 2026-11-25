@@ -1,4 +1,6 @@
+import type { CSSProperties } from "react";
 import s from "./sitio.module.css";
+import v from "./vivo.module.css";
 
 /** Logos reales en /public/marcas: los fabricantes de lo que NEXARA instala, sin los de consumo (impresoras, memorias). */
 const MARCAS: [string, string][] = [
@@ -23,12 +25,16 @@ export default function Marcas() {
     <section className={s.marcas} aria-label="Fabricantes">
       <div className={s.contenedor}>
         <p className={s.marcasTitulo}>Integramos tecnología de los fabricantes líderes.</p>
-        <div className={s.marcasFila}>
-          {MARCAS.map(([n, nombre]) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={n} src={`/marcas/marcas-${n}.webp`} alt={nombre} className={s.marca} loading="lazy" decoding="async" />
+        <ul className={v.panal}>
+          {MARCAS.map(([n, nombre], i) => (
+            <li key={n} style={{ "--i": i } as CSSProperties}>
+              <span className={v.celda}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/marcas/marcas-${n}.webp`} alt={nombre} loading="lazy" decoding="async" />
+              </span>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );

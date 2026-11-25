@@ -1,0 +1,1217 @@
+/*
+ * Lo vivo del sitio: la pista de secciones, el equipo en escena, las puertas de industrias, el panal de marcas, el
+ * visor de cámara, las fotos que se amplían y las tarjetas que se voltean. Todo habla el idioma del hero: hexágonos,
+ * señales de color y pistas. Lo que avanza solo se detiene con `<html data-pausa>` (sitio-documento.css).
+ */
+
+/* ── Pista de secciones ─────────────────────────────────────────────────── */
+
+.recorrido {
+  display: none;
+}
+
+@media (min-width: 1480px) {
+  .recorrido {
+    --tinta: 91 107 128;
+    position: fixed;
+    top: 50%;
+    left: 26px;
+    z-index: 45;
+    display: grid;
+    gap: 10px;
+    translate: 0 -50%;
+  }
+  .recorrido[data-noche],
+  :global(html[data-public-theme="dark"]) .recorrido {
+    --tinta: 139 152 170;
+  }
+}
+
+.recorridoPista {
+  position: absolute;
+  inset: 14px auto 14px 13px;
+  width: 2px;
+  border-radius: 2px;
+  background: rgb(var(--tinta) / 0.28);
+}
+
+.recorridoPista::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, #1fb89a, #3aa9cc 34%, #a64ca6 67%, #ee8a2a);
+  transform: scaleY(var(--avance));
+  transform-origin: 50% 0;
+  transition: transform 0.5s var(--ease-out);
+}
+
+.recorrido button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.recorrido svg {
+  width: 13px;
+  margin-inline: auto;
+  overflow: visible;
+  transition: width 0.3s var(--ease-out);
+}
+
+.recorrido path {
+  fill: var(--bg);
+  stroke: rgb(var(--tinta));
+  stroke-width: 5;
+  transition: fill 0.3s var(--ease), stroke 0.3s var(--ease);
+}
+
+.recorrido[data-noche] path {
+  fill: #070b12;
+}
+
+.recorrido button[data-estado="visto"] path {
+  fill: #3aa9cc;
+  stroke: #3aa9cc;
+}
+
+.recorrido button[data-estado="aqui"] svg,
+.recorrido button:hover svg {
+  width: 19px;
+}
+
+.recorrido button[data-estado="aqui"] path {
+  fill: #3aa9cc;
+  stroke: #9be0c9;
+  filter: drop-shadow(0 0 6px #3aa9cc);
+}
+
+.recorrido button span {
+  position: absolute;
+  left: 34px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #070b12;
+  box-shadow: inset 0 0 0 1px rgb(127 208 226 / 0.4), 0 10px 30px -10px rgb(0 0 0 / 0.5);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  translate: -6px 0;
+  pointer-events: none;
+  transition: opacity 0.2s var(--ease), translate 0.2s var(--ease);
+}
+
+.recorrido button:is(:hover, :focus-visible) span {
+  opacity: 1;
+  translate: 0 0;
+}
+
+/* ── Equipo en escena ───────────────────────────────────────────────────── */
+
+.equipo {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  padding-block: clamp(80px, 9vw, 136px) clamp(48px, 5vw, 72px);
+  background: var(--bg);
+}
+
+.equipo .cabeza {
+  text-align: center;
+}
+
+.escena {
+  position: relative;
+  width: min(1480px, 100%);
+  margin: clamp(36px, 4vw, 60px) auto 0;
+  padding-inline: clamp(0px, 3vw, 48px);
+}
+
+.fila {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+}
+
+/* La línea del piso: la pista de color donde cada persona es un nodo. */
+.fila::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #1fb89a 8%, #3aa9cc 36%, #a64ca6 66%, #ee8a2a 92%, transparent);
+  box-shadow: 0 0 22px rgb(58 169 204 / 0.5);
+}
+
+.fila li {
+  position: relative;
+  z-index: calc(20 - var(--lejos));
+  aspect-ratio: 1 / 2.5;
+}
+
+.fila button {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.fila button:focus-visible {
+  outline-offset: 6px;
+  border-radius: 12px;
+}
+
+.fila img {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 190%;
+  max-width: none;
+  height: auto;
+  transform: translateX(-50%) scale(calc(1.06 - min(var(--lejos), 4) * 0.045));
+  transform-origin: 50% 100%;
+  filter: grayscale(0.85) brightness(calc(0.72 - min(var(--lejos), 4) * 0.05));
+  pointer-events: none;
+  transition: transform 0.55s var(--ease-out), filter 0.45s var(--ease);
+}
+
+.fila li[data-activo] img {
+  transform: translateX(-50%) scale(1.34);
+  filter: brightness(1.06) drop-shadow(0 0 1px var(--c)) drop-shadow(0 0 2px var(--c)) drop-shadow(0 0 22px color-mix(in srgb, var(--c) 60%, transparent));
+}
+
+.hex {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  width: 226%;
+  overflow: visible;
+  opacity: 0;
+  translate: -50% 0;
+  scale: 0.8;
+  pointer-events: none;
+  transition: opacity 0.35s var(--ease), scale 0.6s var(--ease-out);
+}
+
+.fila li[data-activo] .hex {
+  opacity: 1;
+  scale: 1;
+}
+
+.hexLuz {
+  fill: color-mix(in srgb, var(--c) 20%, transparent);
+}
+
+.hexTrazo {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 0.7;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 2px var(--c));
+}
+
+.fila li[data-activo] .hexTrazo {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.9s var(--ease-out);
+}
+
+.nodo {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border: 2px solid color-mix(in srgb, var(--c) 70%, #070b12);
+  border-radius: 50%;
+  background: #070b12;
+  transition: background-color 0.3s var(--ease), box-shadow 0.3s var(--ease), scale 0.3s var(--ease-out);
+}
+
+.fila li[data-activo] .nodo {
+  background: var(--c);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--c) 24%, transparent), 0 0 26px var(--c);
+  scale: 1.15;
+}
+
+.quien {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 84px;
+  padding-top: 28px;
+  text-align: center;
+}
+
+.quien b {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 2.4vw, 34px);
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.028em;
+}
+
+.quien span {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--c);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .quien {
+    animation: sube 0.4s var(--ease-out) both;
+  }
+}
+
+@keyframes sube {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.equipo .acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+@media (max-width: 859px) {
+  .escena {
+    padding: 0;
+  }
+  .fila {
+    grid-template-columns: repeat(var(--n), 30vw);
+    overflow-x: auto;
+    padding: 54px 35vw 12px;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+  }
+  .fila::-webkit-scrollbar {
+    display: none;
+  }
+  .fila::after {
+    /* En la fila que se desliza la línea corre a todo lo largo. */
+    position: absolute;
+    inset: auto auto 11px 0;
+    width: calc(30vw * var(--n) + 70vw);
+  }
+  .fila li {
+    aspect-ratio: 1 / 1.9;
+  }
+  .fila img {
+    width: 165%;
+  }
+  .hex {
+    width: 190%;
+  }
+}
+
+/* ── Industrias como puertas ────────────────────────────────────────────── */
+
+.puertas {
+  display: flex;
+  gap: 10px;
+  height: 560px;
+  margin-top: clamp(40px, 4.4vw, 60px);
+}
+
+.puerta {
+  position: relative;
+  isolation: isolate;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #0b1220;
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  transition: flex-grow 0.65s var(--ease-out);
+}
+
+.puerta[data-abierta] {
+  flex-grow: 8.5;
+}
+
+.puerta > img {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(0.7) brightness(0.62);
+  transition: filter 0.6s var(--ease), scale 1.2s var(--ease-out);
+}
+
+.puerta[data-abierta] > img {
+  filter: none;
+  scale: 1.03;
+}
+
+/* Velo: la foto queda limpia a la derecha y el texto va sobre fondo casi sólido. */
+.puerta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgb(7 11 18 / 0.2), rgb(7 11 18 / 0.78));
+  transition: opacity 0.4s var(--ease);
+}
+
+.puerta[data-abierta]::before {
+  background: linear-gradient(90deg, rgb(7 11 18 / 0.97) 0%, rgb(7 11 18 / 0.95) 46%, rgb(7 11 18 / 0.5) 64%, transparent 84%);
+}
+
+/* El canto encendido con la señal de la industria. */
+.puerta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1.5px var(--c), inset 0 -70px 90px -70px var(--c);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s var(--ease);
+}
+
+.puerta[data-abierta]::after,
+.puerta:hover::after {
+  opacity: 1;
+}
+
+.puerta h3 {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.puerta[data-abierta] h3 {
+  inset: 0 0 auto;
+  pointer-events: none;
+}
+
+.puerta button {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.puerta:not([data-abierta]) button {
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+  padding: 0 0 26px;
+}
+
+.puerta[data-abierta] button {
+  padding: 32px 36px 0;
+}
+
+.puerta button:focus-visible {
+  outline-offset: -6px;
+  border-radius: 20px;
+}
+
+.puertaIcono {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 52px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: color-mix(in srgb, var(--c) 34%, #070b12);
+  color: #fff;
+  transition: background-color 0.3s var(--ease);
+}
+
+.puerta[data-abierta] .puertaIcono {
+  background: var(--c);
+  color: #070b12;
+}
+
+.puertaNombre {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.puerta:not([data-abierta]) .puertaNombre {
+  writing-mode: vertical-rl;
+  rotate: 180deg;
+}
+
+.puerta[data-abierta] .puertaNombre {
+  font-size: clamp(30px, 3vw, 42px);
+}
+
+.puertaCuerpo {
+  position: absolute;
+  inset: auto auto 32px 36px;
+  width: min(440px, calc(100% - 72px));
+  opacity: 0;
+  translate: 0 14px;
+  transition: opacity 0.2s var(--ease), translate 0.2s var(--ease);
+}
+
+.puerta[data-abierta] .puertaCuerpo {
+  opacity: 1;
+  translate: 0 0;
+  transition-delay: 0.28s;
+  transition-duration: 0.45s;
+}
+
+/* El ancho fijo evita que el texto se reacomode mientras la puerta se abre. */
+.puertaCuerpo > div {
+  width: 100%;
+}
+
+.puertaRiesgo {
+  font-size: 16px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--c) 78%, #fff);
+}
+
+.puertaTexto {
+  margin-top: 8px;
+  font-size: 17px;
+  line-height: 1.5;
+  color: rgb(255 255 255 / 0.88);
+}
+
+.puertaLista {
+  display: grid;
+  gap: 9px;
+  margin-top: 20px;
+}
+
+.puertaLista li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 15.5px;
+  font-weight: 500;
+}
+
+.puertaLista svg {
+  flex: none;
+  color: var(--c);
+}
+
+.puerta .puertaEnlace {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  margin-top: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.puerta .puertaEnlace:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.puertaReloj {
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: var(--c);
+  transform-origin: 0 50%;
+  animation: llena 5.2s linear both;
+}
+
+@keyframes llena {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media (max-width: 900px) {
+  .puertas {
+    flex-direction: column;
+    height: auto;
+  }
+  .puerta {
+    flex: none;
+    border-radius: 20px;
+  }
+  .puerta h3 {
+    position: relative;
+    inset: auto;
+  }
+  .puerta:not([data-abierta]) button,
+  .puerta[data-abierta] button {
+    flex-direction: row;
+    padding: 12px 18px;
+  }
+  .puerta:not([data-abierta]) .puertaNombre {
+    writing-mode: initial;
+    rotate: none;
+  }
+  .puerta[data-abierta] .puertaNombre {
+    font-size: 24px;
+  }
+  .puerta[data-abierta]::before {
+    background: linear-gradient(180deg, rgb(7 11 18 / 0.72), rgb(7 11 18 / 0.2) 24%, rgb(7 11 18 / 0.94) 52%);
+  }
+  .puerta[data-abierta] h3 {
+    inset: auto;
+  }
+  .puertaCuerpo {
+    position: static;
+    width: auto;
+    display: grid;
+    grid-template-rows: 0fr;
+    padding-inline: 20px;
+    transition: grid-template-rows 0.45s var(--ease-out), opacity 0.3s var(--ease);
+  }
+  .puertaCuerpo > div {
+    overflow: hidden;
+  }
+  .puerta[data-abierta] .puertaCuerpo {
+    grid-template-rows: 1fr;
+    padding-block: 190px 20px;
+  }
+  .puertaReloj {
+    display: none;
+  }
+}
+
+/* ── Panal de marcas ────────────────────────────────────────────────────── */
+
+.panal {
+  --lado: clamp(104px, 10.4vw, 150px);
+  display: grid;
+  grid-template-columns: repeat(10, calc(var(--lado) / 2));
+  justify-content: center;
+  column-gap: 5px;
+  row-gap: 5px;
+  margin-top: 34px;
+  padding-bottom: calc(var(--lado) * 0.28);
+}
+
+.panal li {
+  grid-column: span 2;
+  height: calc(var(--lado) * 1.1547);
+  margin-bottom: calc(var(--lado) * -0.2887);
+}
+
+.panal li:nth-child(6) {
+  grid-column: 2 / span 2;
+}
+
+.celda {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--line);
+  transition: background 0.35s var(--ease), scale 0.45s var(--ease-out);
+}
+
+.celda::before {
+  content: "";
+  position: absolute;
+  inset: 1.5px;
+  clip-path: inherit;
+  background: #fff;
+}
+
+.celda:hover {
+  background: linear-gradient(135deg, #1fb89a, #3aa9cc 34%, #a64ca6 67%, #ee8a2a);
+  scale: 1.07;
+}
+
+.celda:hover::before {
+  inset: 3px;
+}
+
+.celda img {
+  position: relative;
+  width: 74%;
+  aspect-ratio: 667 / 384;
+  object-fit: contain;
+  filter: grayscale(1);
+  opacity: 0.72;
+  transition: filter 0.3s var(--ease), opacity 0.3s var(--ease);
+}
+
+.celda:hover img {
+  filter: none;
+  opacity: 1;
+}
+
+:global(html[data-public-theme="dark"]) .celda::before {
+  background: #0d1625;
+}
+
+:global(html[data-public-theme="dark"]) .celda img {
+  filter: grayscale(1) invert(1) contrast(1.05);
+  mix-blend-mode: screen;
+}
+
+/* Una luz recorre el panal. */
+@media (prefers-reduced-motion: no-preference) {
+  .panal li .celda {
+    animation: recorre 7s linear calc(var(--i) * 0.32s) infinite;
+  }
+}
+
+@keyframes recorre {
+  0%,
+  9%,
+  100% {
+    background-color: var(--line);
+  }
+  4% {
+    background-color: #3aa9cc;
+  }
+}
+
+@media (max-width: 734px) {
+  .panal {
+    --lado: min(112px, 29.5vw);
+    grid-template-columns: repeat(6, calc(var(--lado) / 2));
+  }
+  .panal li:nth-child(6) {
+    grid-column: span 2;
+  }
+  .panal li:nth-child(5n + 4) {
+    grid-column: 2 / span 2;
+  }
+  .panal li:last-child {
+    grid-column: 3 / span 2;
+  }
+}
+
+/* ── Visor de cámara ────────────────────────────────────────────────────── */
+
+.visor {
+  --vx: 0.66;
+  --vy: 0.42;
+  --lente: 190px;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  container-type: size;
+  cursor: crosshair;
+}
+
+/* Esquinas del cuadro. */
+.visor::before {
+  content: "";
+  position: absolute;
+  inset: 22px;
+  opacity: 0.75;
+  background:
+    linear-gradient(#fff, #fff) 0 0 / 26px 2px,
+    linear-gradient(#fff, #fff) 0 0 / 2px 26px,
+    linear-gradient(#fff, #fff) 100% 0 / 26px 2px,
+    linear-gradient(#fff, #fff) 100% 0 / 2px 26px,
+    linear-gradient(#fff, #fff) 0 100% / 26px 2px,
+    linear-gradient(#fff, #fff) 0 100% / 2px 26px,
+    linear-gradient(#fff, #fff) 100% 100% / 26px 2px,
+    linear-gradient(#fff, #fff) 100% 100% / 2px 26px;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.lente {
+  position: absolute;
+  top: calc(var(--vy) * 100cqh);
+  left: calc(var(--vx) * 100cqw);
+  width: var(--lente);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% -50%;
+  background: var(--foto) no-repeat;
+  background-size: 210cqw auto;
+  background-position: calc(var(--vx) * 100%) calc(var(--vy) * 100%);
+  box-shadow: 0 0 0 2px var(--senal-cian), 0 0 0 9px rgb(7 11 18 / 0.35), 0 0 46px rgb(110 198 217 / 0.6);
+  scale: 0.7;
+  opacity: 0.9;
+  pointer-events: none;
+  transition: scale 0.35s var(--ease-out);
+}
+
+.lente::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(var(--senal-cian), var(--senal-cian)) 50% 50% / 30px 1.5px no-repeat,
+    linear-gradient(var(--senal-cian), var(--senal-cian)) 50% 50% / 1.5px 30px no-repeat;
+}
+
+.visor[data-mira] .lente {
+  scale: 1;
+  opacity: 1;
+}
+
+@property --vx {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.5;
+}
+
+@property --vy {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.5;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .visor:not([data-mira]) {
+    animation: pasea 14s ease-in-out infinite;
+  }
+}
+
+@keyframes pasea {
+  0%,
+  100% {
+    --vx: 0.62;
+    --vy: 0.36;
+  }
+  33% {
+    --vx: 0.84;
+    --vy: 0.6;
+  }
+  66% {
+    --vx: 0.5;
+    --vy: 0.68;
+  }
+}
+
+@media (max-width: 734px) {
+  .visor {
+    --lente: 128px;
+  }
+}
+
+/* Ondas de radio de «Redes y Wi‑Fi». */
+.ondas {
+  position: absolute;
+  left: 20%;
+  top: 34%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.ondas i {
+  position: absolute;
+  width: 420px;
+  aspect-ratio: 1;
+  border: 2px solid var(--senal-teal);
+  border-radius: 50%;
+  translate: -50% -50%;
+  scale: 0.1;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ondas i {
+    animation: onda 4.2s linear infinite;
+  }
+  .ondas i:nth-child(2) {
+    animation-delay: -1.4s;
+  }
+  .ondas i:nth-child(3) {
+    animation-delay: -2.8s;
+  }
+}
+
+@keyframes onda {
+  from {
+    scale: 0.1;
+    opacity: 0.75;
+  }
+  to {
+    scale: 1.9;
+    opacity: 0;
+  }
+}
+
+/* Barrido de revisión sobre el rack. */
+.barrido {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.barrido::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 34%;
+  border-bottom: 2px solid var(--senal-ambar);
+  background: linear-gradient(180deg, transparent, rgb(251 194 35 / 0.2));
+  translate: 0 -110%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .barrido::before {
+    animation: barre 5.5s ease-in-out infinite;
+  }
+}
+
+@keyframes barre {
+  0%,
+  12% {
+    translate: 0 -60%;
+    opacity: 0;
+  }
+  24% {
+    opacity: 1;
+  }
+  80%,
+  100% {
+    translate: 0 300%;
+    opacity: 0;
+  }
+}
+
+/* ── Fotos que se amplían ───────────────────────────────────────────────── */
+
+.ampliar {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: var(--tile);
+  cursor: zoom-in;
+}
+
+.ampliar img {
+  transition: scale 0.9s var(--ease-out);
+}
+
+.ampliar:hover img {
+  scale: 1.05;
+}
+
+.esquinas {
+  position: absolute;
+  inset: 18px;
+  opacity: 0.85;
+  background:
+    linear-gradient(#fff, #fff) 0 0 / 22px 2px,
+    linear-gradient(#fff, #fff) 0 0 / 2px 22px,
+    linear-gradient(#fff, #fff) 100% 0 / 22px 2px,
+    linear-gradient(#fff, #fff) 100% 0 / 2px 22px,
+    linear-gradient(#fff, #fff) 0 100% / 22px 2px,
+    linear-gradient(#fff, #fff) 0 100% / 2px 22px,
+    linear-gradient(#fff, #fff) 100% 100% / 22px 2px,
+    linear-gradient(#fff, #fff) 100% 100% / 2px 22px;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 0 3px rgb(0 0 0 / 0.5));
+  pointer-events: none;
+  transition: inset 0.4s var(--ease-out);
+}
+
+.ampliar:is(:hover, :focus-visible) .esquinas {
+  inset: 12px;
+}
+
+.ampliarIcono {
+  position: absolute;
+  right: 28px;
+  bottom: 28px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgb(7 11 18 / 0.72);
+  color: #fff;
+  pointer-events: none;
+}
+
+.ampliarIcono svg {
+  width: 18px;
+}
+
+.dialogo {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: clamp(16px, 4vw, 56px);
+  border: 0;
+  background: none;
+  color: #fff;
+}
+
+.dialogo[open] {
+  display: grid;
+  place-items: center;
+}
+
+.dialogo::backdrop {
+  background: rgb(5 8 14 / 0.94);
+}
+
+.dialogo figure {
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+}
+
+.dialogo img {
+  width: auto;
+  max-width: 100%;
+  max-height: calc(100dvh - 150px);
+  border-radius: 18px;
+  box-shadow: 0 0 0 1.5px rgb(127 208 226 / 0.55), 0 0 90px rgb(58 169 204 / 0.28);
+}
+
+.dialogo figcaption {
+  font-size: 16px;
+}
+
+.dialogo > button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+  cursor: pointer;
+}
+
+.dialogo > button svg {
+  width: 20px;
+}
+
+/* ── Problemas que se voltean ───────────────────────────────────────────── */
+
+.interruptor {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 48px;
+  margin: clamp(28px, 3vw, 40px) auto 0;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: var(--sombra-md), inset 0 0 0 1px var(--line);
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.interruptor i {
+  position: relative;
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--rec);
+  transition: background 0.35s var(--ease);
+}
+
+.interruptor i::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  transition: translate 0.35s var(--ease-out);
+}
+
+.interruptor[aria-checked="true"] i {
+  background: var(--ok);
+}
+
+.interruptor[aria-checked="true"] i::after {
+  translate: 22px 0;
+}
+
+.interruptor + ul {
+  margin-top: 28px;
+}
+
+.volteo {
+  display: flex;
+  flex-direction: column;
+  perspective: 1400px;
+}
+
+.volteoCuerpo {
+  position: relative;
+  display: grid;
+  flex: 1 1 auto;
+  transform-style: preserve-3d;
+  transition: transform 0.75s var(--ease-out) calc(var(--i) * 70ms);
+}
+
+.volteo[data-vuelta] .volteoCuerpo {
+  transform: rotateY(180deg);
+}
+
+.volteoCuerpo .cara {
+  grid-area: 1 / 1;
+  min-height: 290px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.volteoCuerpo .caraAtras {
+  justify-content: center;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--c) 30%, #070b12), #070b12 70%);
+  box-shadow: inset 0 0 0 1.5px var(--c), 0 24px 60px -24px var(--c);
+  color: #fff;
+  transform: rotateY(180deg);
+}
+
+.caraEtiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--c) 75%, #fff);
+}
+
+.caraSolucion {
+  margin-top: 14px;
+  font-family: var(--font-display);
+  font-size: clamp(21px, 1.8vw, 25px);
+  line-height: 1.22;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.volteoBoton {
+  align-self: flex-start;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .volteoCuerpo,
+  .fila img,
+  .puerta,
+  .hex {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .recorrido,
+  .visor,
+  .ondas,
+  .barrido {
+    display: none;
+  }
+}
+
+/* Diez certificaciones: 3, 4 y 3 en escritorio. */
+.panalDiez {
+  --lado: clamp(128px, 13.4vw, 184px);
+  grid-template-columns: repeat(8, calc(var(--lado) / 2));
+}
+
+.panalDiez li:nth-child(1) {
+  grid-column: 2 / span 2;
+}
+
+.panalDiez li:nth-child(4) {
+  grid-column: 1 / span 2;
+}
+
+.panalDiez li:nth-child(6) {
+  grid-column: span 2;
+}
+
+.panalDiez li:nth-child(8) {
+  grid-column: 2 / span 2;
+}
+
+.celdaMono img {
+  width: 66%;
+  aspect-ratio: auto;
+  max-height: 34%;
+}
+
+.celdaMono img[data-alto] {
+  max-height: 46%;
+}
+
+@media (max-width: 734px) {
+  .panalDiez {
+    --lado: min(112px, 29.5vw);
+    grid-template-columns: repeat(6, calc(var(--lado) / 2));
+  }
+  .panalDiez li:nth-child(n) {
+    grid-column: span 2;
+  }
+  .panalDiez li:nth-child(5n + 4) {
+    grid-column: 2 / span 2;
+  }
+}
+
+@media (max-width: 734px) {
+  .volteoCuerpo .cara {
+    min-height: 190px;
+  }
+}

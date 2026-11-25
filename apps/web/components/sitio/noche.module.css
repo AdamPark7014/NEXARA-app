@@ -143,3 +143,26 @@
     display: none;
   }
 }
+
+/* La luz que sigue al cursor (Interaccion.tsx pone `--mx` y `--my` en la sección) y las señales que corren. */
+.foco {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, -400px), rgba(110, 198, 217, 0.15), transparent 70%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .senal {
+    stroke-dasharray: 60 22;
+    animation: corre 5s linear infinite;
+  }
+  .trazasDer .senal {
+    animation-direction: reverse;
+  }
+}
+
+@keyframes corre {
+  to {
+    stroke-dashoffset: -164;
+  }
+}

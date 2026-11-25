@@ -45,7 +45,7 @@ export default function Metodo({
         <p className={s.antetitulo}>{antetitulo}</p>
         <h2 className={s.titulo}>{titulo}</h2>
         <p className={s.lead}>{lead}</p>
-        <div className={s.metodoIndice}>
+        <div className={s.metodoIndice} style={{ "--avance": (activo + 1) / pasos.length } as React.CSSProperties}>
           {pasos.map((p, i) => (
             <button key={p.num} type="button" aria-current={i === activo ? "step" : undefined} onClick={() => ir(i)}>
               <span>{p.num}</span>
@@ -64,6 +64,7 @@ export default function Metodo({
             data-indice={i}
             data-activo={i === activo ? "true" : "false"}
             className={s.metodoPaso}
+            data-luz=""
           >
             <div className={s.metodoFoto}>
               {/* eslint-disable-next-line @next/next/no-img-element */}

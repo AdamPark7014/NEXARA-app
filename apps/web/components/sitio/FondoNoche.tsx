@@ -13,6 +13,7 @@ export default function FondoNoche({ hilo = "abajo", luz = "arriba" }: Props) {
   const clases = [n.fondo, luz === "centro" ? n.fondoCentro : "", hilo === "arriba" ? n.hiloArriba : hilo === "abajo" ? n.hiloAbajo : ""];
   return (
     <div className={clases.filter(Boolean).join(" ")} aria-hidden="true">
+      <i className={n.foco} />
       <Trazas lado="izq" />
       <Trazas lado="der" />
     </div>

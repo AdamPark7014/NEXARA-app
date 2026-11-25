@@ -1,6 +1,8 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
 import i from "./interior.module.css";
+import { SENALES } from "./senales";
 import Flecha from "./Flecha";
 
 export type Ruta = {
@@ -24,9 +26,9 @@ export default function Rutas({ rutas, ir = "Ver detalle", columnas = 3, nivel =
   const Titulo = nivel === 2 ? "h2" : "h3";
   return (
     <ul className={`${i.rutas} ${columnas === 4 ? i.rutasCuatro : ""}`}>
-      {rutas.map((r) => (
-        <li key={r.href} data-aparecer>
-          <Link href={r.href} className={i.ruta} data-flecha>
+      {rutas.map((r, n) => (
+        <li key={r.href} data-aparecer style={{ "--c": SENALES[n % 5].color } as CSSProperties}>
+          <Link href={r.href} className={i.ruta} data-flecha data-luz="">
             {r.icono ? (
               <span className={i.rutaIcono}>
                 <PublicIcon name={r.icono} size={20} />

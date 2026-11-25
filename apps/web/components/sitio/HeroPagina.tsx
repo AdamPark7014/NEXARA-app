@@ -11,6 +11,8 @@ type Props = {
   children: ReactNode;
   /** Foto, mosaico o mapa: va montado en el corte entre la noche y la página. */
   visual?: ReactNode;
+  /** Pieza a todo lo ancho dentro de la noche, debajo del texto (el equipo en Nosotros). */
+  pieHero?: ReactNode;
   /** Sin el hilo de color al pie: lo pone la sección que sigue (por ejemplo, un `PuenteNoche`). */
   sinHilo?: boolean;
   className?: string;
@@ -22,13 +24,14 @@ type Props = {
  * texto centrado y, si la hay, la foto de la página a caballo entre la noche y el contenido. La barra de navegación
  * viste de noche mientras tiene detrás una sección con `data-hero-noche` (Encabezado.tsx).
  */
-export default function HeroPagina({ id, children, visual, sinHilo, className, style }: Props) {
+export default function HeroPagina({ id, children, visual, pieHero, sinHilo, className, style }: Props) {
   const clases = [s.noche, p.hero, n.escena, visual ? n.conVisual : "", className ?? ""];
   return (
     <>
       <section className={clases.filter(Boolean).join(" ")} aria-labelledby={id} data-hero-noche="" style={style}>
         <FondoNoche hilo={visual || sinHilo ? "ninguno" : "abajo"} />
         <div className={`${s.contenedor} ${s.centro}`}>{children}</div>
+        {pieHero}
       </section>
       {visual ? (
         <div className={n.puente}>

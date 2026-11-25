@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
@@ -6,9 +7,13 @@ import { foto } from "@/components/sitio/fotos";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
 import ip from "@/components/sitio/interior.module.css";
+import Problemas from "@/components/sitio/Problemas";
+import Visor from "@/components/sitio/Visor";
+import { SENALES, senal, type Senal } from "@/components/sitio/senales";
 import TarjetasRuta from "@/components/sitio/TarjetasRuta";
 import SimuladorCobertura from "@/components/sitio/SimuladorCobertura";
 import { GUIAS } from "@/lib/guias";
+import FondoNoche from "@/components/sitio/FondoNoche";
 import HeroPagina from "@/components/sitio/HeroPagina";
 import Flecha from "@/components/sitio/Flecha";
 import SubNav from "@/components/sitio/SubNav";
@@ -51,7 +56,7 @@ const PROBLEMAS: { titulo: string; texto: string; solucion: string }[] = [
 ];
 
 type Servicio = {
-  id: string;
+  id: Senal["id"];
   icono: PublicIconName;
   nav: string;
   titulo: string;
@@ -115,6 +120,7 @@ const SERVICIOS: Servicio[] = [
       <>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img {...foto("muro-video-ancho", "(max-width: 1068px) 100vw, 620px")} alt="Muro de video de un centro de monitoreo instalado por NEXARA" loading="lazy" decoding="async" />
+        <Visor src={foto("muro-video-ancho", "").src} />
         <span className={s.chip} style={{ top: 20, left: 20 }}>
           <i /> CAM 12 · En vivo
         </span>
@@ -290,23 +296,7 @@ export default function PropuestaServicios() {
             </div>
             <p className={s.lead}>Y cómo lo dejamos resuelto, con un responsable y por escrito.</p>
           </div>
-          <ul className={p.problemas}>
-            {PROBLEMAS.map((pr) => (
-              <li key={pr.titulo} className={p.problema} data-aparecer>
-                <span className={p.problemaEtiqueta}>
-                  <PublicIcon name="alert" size={16} /> Lo que suele fallar
-                </span>
-                <h3 className={p.problemaTitulo}>{pr.titulo}</h3>
-                <p className={p.problemaTexto}>{pr.texto}</p>
-                <div className={p.solucion}>
-                  <span className={p.solucionEtiqueta}>
-                    <PublicIcon name="check" size={16} /> Con NEXARA
-                  </span>
-                  <p className={p.solucionTexto}>{pr.solucion}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <Problemas problemas={PROBLEMAS} />
         </div>
       </section>
 
@@ -314,7 +304,7 @@ export default function PropuestaServicios() {
       <section className={s.seccion} aria-label="Servicios en detalle">
         <div className={s.contenedor}>
           {SERVICIOS.map((sv, i) => (
-            <article key={sv.id} id={sv.id} className={`${p.servicio} ${p.ancla} ${i % 2 ? p.servicioInverso : ""}`} data-aparecer>
+            <article key={sv.id} id={sv.id} className={`${p.servicio} ${p.ancla} ${i % 2 ? p.servicioInverso : ""}`} data-aparecer style={{ "--c": senal(sv.id).color } as CSSProperties}>
               <div>
                 <span className={p.servicioIcono}>
                   <PublicIcon name={sv.icono} size={22} />
@@ -347,7 +337,9 @@ export default function PropuestaServicios() {
                   ))}
                 </p>
               </div>
-              <div className={p.servicioArte}>{sv.arte}</div>
+              <div className={p.servicioArte} data-luz="" data-inclina="5">
+                {sv.arte}
+              </div>
             </article>
           ))}
         </div>
@@ -370,7 +362,8 @@ export default function PropuestaServicios() {
       </section>
 
       {/* Lo que se entrega */}
-      <section className={s.seccion} aria-labelledby="entregas-titulo">
+      <section className={`${s.noche} ${s.seccion} ${s.seccionNoche}`} data-noche-zona="" aria-labelledby="entregas-titulo">
+        <FondoNoche hilo="ninguno" />
         <div className={s.contenedor}>
           <div className={s.cabeza} data-aparecer>
             <div>
@@ -388,8 +381,8 @@ export default function PropuestaServicios() {
             </p>
           </div>
           <ul className={ip.entregables}>
-            {ENTREGABLES.map((e) => (
-              <li key={e.titulo} className={ip.entregable} data-aparecer>
+            {ENTREGABLES.map((e, i) => (
+              <li key={e.titulo} className={ip.entregable} style={{ "--c": SENALES[i % 5].color } as CSSProperties} data-aparecer data-luz="">
                 <span className={ip.rutaIcono}>
                   <PublicIcon name={e.icono} size={20} />
                 </span>
@@ -428,7 +421,7 @@ export default function PropuestaServicios() {
           </div>
           <div className={ip.modalidades}>
             {MODALIDADES.map((m) => (
-              <article key={m.titulo} className={ip.tarjeta} data-aparecer>
+              <article key={m.titulo} className={ip.tarjeta} data-aparecer data-luz="" data-inclina="3">
                 <span className={ip.rutaIcono}>
                   <PublicIcon name={m.icono} size={20} />
                 </span>

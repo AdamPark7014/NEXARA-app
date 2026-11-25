@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import s from "./sitio.module.css";
+import Ampliar from "./Ampliar";
 import Flecha from "./Flecha";
 
 export type FotoGaleria = { src: string; srcSet?: string; alt: string; tema: string; pie: string };
@@ -18,6 +19,12 @@ export default function Galeria({ fotos, enlace }: { fotos: FotoGaleria[]; enlac
     if (!p) return;
     setAlInicio(p.scrollLeft < 8);
     setAlFinal(p.scrollLeft + p.clientWidth >= p.scrollWidth - 8);
+    // Cada tarjeta gira hacia el centro según qué tan lejos va (`--k` de -1 a 1).
+    const centro = p.scrollLeft + p.clientWidth / 2;
+    for (const li of Array.from(p.children) as HTMLElement[]) {
+      const k = (li.offsetLeft + li.offsetWidth / 2 - centro) / p.clientWidth;
+      li.style.setProperty("--k", Math.max(-1, Math.min(1, k)).toFixed(3));
+    }
   }, []);
 
   useEffect(() => {
@@ -37,15 +44,17 @@ export default function Galeria({ fotos, enlace }: { fotos: FotoGaleria[]; enlac
   return (
     <div className={s.galeria}>
       <ul ref={pista} className={s.pista} onScroll={medir} aria-label="Fotografías de proyectos">
-        {fotos.map((f) => (
+        {fotos.map((f, i) => (
           <li key={f.src} className={s.tarjeta}>
             <figure>
-              <div className={s.tarjetaFoto}>
+              <Ampliar src={f.src} pie={f.pie} className={s.tarjetaFoto}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={f.src} srcSet={f.srcSet} sizes="(max-width: 734px) 80vw, 400px" alt={f.alt} loading="lazy" decoding="async" />
-              </div>
+              </Ampliar>
               <figcaption className={s.tarjetaTexto}>
-                <span className={s.tarjetaTema}>{f.tema}</span>
+                <span className={s.tarjetaTema}>
+                  {String(i + 1).padStart(2, "0")} · {f.tema}
+                </span>
                 <span className={s.tarjetaPie}>{f.pie}</span>
               </figcaption>
             </figure>

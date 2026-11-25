@@ -1,5 +1,6 @@
+import type { CSSProperties } from "react";
+import v from "./vivo.module.css";
 import s from "./sitio.module.css";
-import p from "./paginas.module.css";
 
 /**
  * Certificaciones y alianzas reales, a una tinta (`/public/certificaciones/mono`, sacadas de los originales de la
@@ -28,11 +29,13 @@ export default function Certificaciones({ gris = false }: { gris?: boolean }) {
             Certificaciones <span className={s.tenue}>y alianzas.</span>
           </h2>
         </header>
-        <ul className={p.logos} data-aparecer>
-          {CERTIFICACIONES.map((c) => (
-            <li key={c.clave} className={p.logo}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`/certificaciones/mono/${c.clave}.png`} alt={c.alt} loading="lazy" decoding="async" data-alto={c.alto ? "" : undefined} />
+        <ul className={`${v.panal} ${v.panalDiez}`} data-aparecer>
+          {CERTIFICACIONES.map((c, i) => (
+            <li key={c.clave} style={{ "--i": i } as CSSProperties}>
+              <span className={`${v.celda} ${v.celdaMono}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/certificaciones/mono/${c.clave}.png`} alt={c.alt} loading="lazy" decoding="async" data-alto={c.alto ? "" : undefined} />
+              </span>
             </li>
           ))}
         </ul>

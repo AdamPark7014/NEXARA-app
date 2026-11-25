@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
@@ -5,12 +6,15 @@ import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import { foto } from "@/components/sitio/fotos";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
+import FondoNoche from "@/components/sitio/FondoNoche";
 import HeroPagina from "@/components/sitio/HeroPagina";
 import Flecha from "@/components/sitio/Flecha";
 import Cierre from "@/components/sitio/Cierre";
 import Certificaciones from "@/components/sitio/Certificaciones";
 import { EQUIPO, retrato } from "@/components/sitio/equipo";
-import EquipoGrupo from "@/components/sitio/EquipoGrupo";
+import EquipoVivo from "@/components/sitio/EquipoVivo";
+import Ampliar from "@/components/sitio/Ampliar";
+import { HEXAGONO, SENALES } from "@/components/sitio/senales";
 import { ruta } from "@/components/sitio/rutas";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
 
@@ -74,14 +78,7 @@ export default function Nosotros() {
           },
         }}
       />
-      <HeroPagina
-        id="nosotros-hero"
-        visual={
-          <div className={p.heroEstudio} role="img" aria-label="Integrantes del equipo de NEXARA con su uniforme">
-            <EquipoGrupo prioridad />
-          </div>
-        }
-      >
+      <HeroPagina id="nosotros-hero" pieHero={<EquipoVivo prioridad />}>
         <p className={s.antetitulo}>Nosotros</p>
         <h1 id="nosotros-hero" className={p.heroTitulo}>
           Las personas detrás <span className={s.degradado}>de cada solución.</span>
@@ -97,7 +94,7 @@ export default function Nosotros() {
           </p>
           <ul className={p.datos}>
             {DATOS.map((d) => (
-              <li key={d.etiqueta} className={p.dato} data-aparecer>
+              <li key={d.etiqueta} className={p.dato} data-aparecer data-luz="">
                 <span className={p.datoIcono}>
                   <PublicIcon name={d.icono} size={22} />
                 </span>
@@ -144,7 +141,8 @@ export default function Nosotros() {
       </section>
 
       {/* Principios */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="principios-titulo">
+      <section className={`${s.noche} ${s.seccion} ${s.seccionNoche}`} data-noche-zona="" aria-labelledby="principios-titulo">
+        <FondoNoche hilo="ninguno" />
         <div className={s.contenedor}>
           <header className={s.centro} data-aparecer>
             <p className={s.antetitulo}>Principios</p>
@@ -155,7 +153,7 @@ export default function Nosotros() {
           </header>
           <ol className={p.tres}>
             {PRINCIPIOS.map((pr, i) => (
-              <li key={pr.titulo} className={p.tresItem} data-aparecer>
+              <li key={pr.titulo} className={p.tresItem} data-aparecer data-luz="" style={{ "--c": SENALES[i].color } as CSSProperties}>
                 <span className={p.tresNumero}>0{i + 1}</span>
                 <h3 className={p.tresTitulo}>{pr.titulo}</h3>
                 <p className={p.tresTexto}>{pr.texto}</p>
@@ -181,7 +179,10 @@ export default function Nosotros() {
             {EN_CAMPO.map((f) => (
               <figure key={f.src} className={p.foto} data-aparecer>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={f.src} srcSet={f.srcSet} sizes={f.sizes} alt={f.alt} loading="lazy" decoding="async" />
+                <Ampliar src={f.src} pie={f.pie}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={f.src} srcSet={f.srcSet} sizes={f.sizes} alt={f.alt} loading="lazy" decoding="async" />
+                </Ampliar>
                 <figcaption>
                   <span className={p.fotoTema}>{f.tema}</span>
                   {f.pie}
@@ -203,9 +204,12 @@ export default function Nosotros() {
             <p className={s.lead}>Ingeniería, operación e instalación: las personas detrás de cada entrega.</p>
           </header>
           <ul className={p.equipo}>
-            {EQUIPO.map((x) => (
-              <li key={x.clave} className={p.persona} data-aparecer>
-                <div className={p.retrato}>
+            {EQUIPO.map((x, i) => (
+              <li key={x.clave} className={p.persona} data-aparecer data-inclina="9" style={{ "--c": SENALES[i % 5].color } as CSSProperties}>
+                <div className={p.retrato} data-luz="">
+                  <svg className={p.retratoHex} viewBox="0 0 52 56" aria-hidden="true">
+                    <path d={HEXAGONO} />
+                  </svg>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={retrato(x.clave)} alt={`${x.nombre}, ${x.rol.toLowerCase()} de NEXARA`} width={512} height={492} loading="lazy" decoding="async" />
                 </div>

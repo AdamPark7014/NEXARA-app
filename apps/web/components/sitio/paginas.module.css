@@ -1102,3 +1102,140 @@
     aspect-ratio: 4 / 3;
   }
 }
+
+/* ── Lo vivo ────────────────────────────────────────────────────────────── */
+
+/* Retratos: credencial de noche con hexágono de la señal, que se inclina y se enciende. */
+.persona {
+  --rx: 0deg;
+  --ry: 0deg;
+  perspective: 900px;
+}
+
+.retrato {
+  background:
+    radial-gradient(72% 62% at 50% 46%, color-mix(in srgb, var(--c) 34%, transparent), transparent 74%),
+    radial-gradient(circle, rgb(127 208 226 / 0.14) 1px, transparent 1.4px) 0 0 / 14px 14px,
+    #0a111c;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 34%, transparent);
+  transform: rotateX(var(--rx)) rotateY(var(--ry));
+  transition: transform 0.3s var(--ease-out), box-shadow 0.4s var(--ease);
+}
+
+.persona:hover .retrato {
+  box-shadow: inset 0 0 0 1.5px var(--c), 0 26px 60px -22px var(--c);
+}
+
+.retratoHex {
+  position: absolute;
+  inset: 7% 12% auto;
+  width: 76%;
+  overflow: visible;
+  transition: scale 0.6s var(--ease-out), rotate 0.8s var(--ease-out);
+}
+
+.retratoHex path {
+  fill: color-mix(in srgb, var(--c) 16%, transparent);
+  stroke: var(--c);
+  stroke-width: 0.7;
+  stroke-linejoin: round;
+}
+
+.persona:hover .retratoHex {
+  scale: 1.1;
+  rotate: 60deg;
+}
+
+.retrato img {
+  position: relative;
+  filter: drop-shadow(0 0 1px color-mix(in srgb, var(--c) 70%, transparent)) drop-shadow(0 0 16px rgb(0 0 0 / 0.6));
+}
+
+.persona:hover .retrato img {
+  transform: scale(1.09);
+}
+
+/* Tarjetas que se inclinan. */
+.caso,
+.servicioArte {
+  --rx: 0deg;
+  --ry: 0deg;
+  transform: perspective(1100px) rotateX(var(--rx)) rotateY(var(--ry));
+  transition: transform 0.3s var(--ease-out), box-shadow 0.3s var(--ease);
+}
+
+.caso:hover {
+  box-shadow: 0 26px 60px -26px var(--c);
+}
+
+.casoMetrica {
+  font-variant-numeric: tabular-nums;
+}
+
+.servicioIcono {
+  width: 56px;
+  height: 60px;
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--c) 46%, #070b12), #070b12);
+  color: #fff;
+}
+
+.servicioArte {
+  box-shadow: 0 40px 90px -40px color-mix(in srgb, var(--c) 70%, transparent), inset 0 0 0 1.5px color-mix(in srgb, var(--c) 50%, transparent);
+}
+
+/* Principios y documentación: cada paso es un nodo de la pista. */
+.tresItem {
+  position: relative;
+  padding: 28px;
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  box-shadow: var(--sombra-sm), inset 0 0 0 1px var(--line-soft), inset 0 3px 0 var(--c);
+}
+
+.tresNumero {
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 56px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--c) 60%, #070b12), #070b12);
+  color: #fff;
+  font-size: 15px;
+}
+
+.dato {
+  transition: translate 0.35s var(--ease-out), box-shadow 0.35s var(--ease);
+}
+
+.dato:hover {
+  translate: 0 -6px;
+  box-shadow: var(--sombra-md);
+}
+
+.heroPieza {
+  position: relative;
+}
+
+[data-noche-zona] :is(.caso, .tresItem) {
+  background:
+    radial-gradient(90% 70% at 0% 0%, color-mix(in srgb, var(--c) 20%, transparent), transparent 70%),
+    rgb(14 24 38 / 0.8);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 36%, transparent);
+}
+
+[data-noche-zona] .caso:hover {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 60%, transparent), 0 30px 80px -30px var(--c);
+}
+
+[data-noche-zona] .casoSector {
+  color: color-mix(in srgb, var(--c) 80%, #fff);
+}
+
+[data-noche-zona] .casoMetrica {
+  font-size: clamp(24px, 2.2vw, 32px);
+  letter-spacing: -0.03em;
+  color: #fff;
+}

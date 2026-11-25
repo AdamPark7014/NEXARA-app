@@ -60,3 +60,45 @@ html body:has([data-sitio]) [data-sitio] :where(main, section, article) {
   max-width: none;
   margin-inline: 0;
 }
+
+/*
+ * Borde de luz: cualquier pieza con `data-luz` enciende su contorno alrededor del cursor (Interaccion.tsx). Con el dedo
+ * se enciende la que va a media pantalla. El color sale de `--c` (su señal) o del espectro del logotipo.
+ */
+[data-sitio] [data-luz] {
+  position: relative;
+}
+
+[data-sitio] [data-luz]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  padding: 2px;
+  border-radius: inherit;
+  background:
+    radial-gradient(
+      300px circle at var(--mx, 50%) var(--my, 0px),
+      color-mix(in srgb, var(--c, #3aa9cc) 60%, #fff) 0%,
+      var(--c, #3aa9cc) 26%,
+      color-mix(in srgb, var(--c, #a64ca6) 40%, transparent) 60%,
+      transparent 80%
+    );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+[data-sitio] [data-luz]:is(:hover, :focus-within, [data-encendida])::after {
+  opacity: 1;
+}
+
+/* Pausa de todo lo que se mueve solo (WCAG 2.2.2). */
+html[data-pausa] [data-sitio] *,
+html[data-pausa] [data-sitio] *::before,
+html[data-pausa] [data-sitio] *::after {
+  animation-iteration-count: 1 !important; /* lo que gira sin fin termina; lo que entra una vez, entra */
+}

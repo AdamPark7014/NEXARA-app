@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
@@ -17,8 +19,12 @@ import Preguntas, { type Pregunta } from "@/components/sitio/Preguntas";
 import { GraficaEntregas, TicketSoporte } from "@/components/sitio/MiniInterfaces";
 import pn from "@/components/sitio/portada.module.css";
 import Baldosa from "@/components/sitio/Baldosa";
-import { senal } from "@/components/sitio/senales";
-import EquipoGrupo from "@/components/sitio/EquipoGrupo";
+import { SENALES, senal } from "@/components/sitio/senales";
+import EquipoVivo from "@/components/sitio/EquipoVivo";
+import FondoNoche from "@/components/sitio/FondoNoche";
+import Flecha from "@/components/sitio/Flecha";
+import Visor from "@/components/sitio/Visor";
+import v from "@/components/sitio/vivo.module.css";
 import { fetchPageSection, DEFAULT_CTA, type CtaContent } from "@/lib/page-content-api";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
@@ -157,6 +163,11 @@ function Mosaico() {
         nombre="Videovigilancia."
         texto="Cobertura pensada por zona de riesgo y evidencia cuando se necesita."
         foto={{ ...foto("muro-video-ancho", ancho), alt: "Centro de monitoreo con muro de video instalado por NEXARA", posicion: "center 45%" }}
+        capa={
+          <div className={pn.capaVisor}>
+            <Visor src={foto("muro-video-ancho", "").src} />
+          </div>
+        }
         acciones={[
           { href: ruta("/servicios#cctv"), label: "Ver más", principal: true },
           { href: ruta("/contacto?servicio=cctv"), label: "Cotizar", medicion: "home_baldosa_cctv" },
@@ -167,6 +178,13 @@ function Mosaico() {
         nombre="Redes y Wi‑Fi."
         texto="Cableado certificado y Wi‑Fi que aguanta la hora pico."
         foto={{ ...foto("campo-enlace-antena-ciudad", tam), alt: "Radioenlace de NEXARA sobre la ciudad", posicion: "30% 78%" }}
+        capa={
+          <span className={v.ondas} aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+        }
         acciones={[
           { href: ruta("/servicios#redes"), label: "Ver más", principal: true },
           { href: ruta("/contacto?servicio=redes"), label: "Cotizar", medicion: "home_baldosa_redes" },
@@ -178,6 +196,7 @@ function Mosaico() {
         nombre="Infraestructura."
         texto="Racks, servidores y respaldos listos para operar."
         foto={{ ...foto("rack-nexara-led", tam), alt: "Rack de servidores y switching instalado por NEXARA", posicion: "center 62%" }}
+        capa={<span className={v.barrido} aria-hidden="true" />}
         acciones={[
           { href: ruta("/servicios#computo"), label: "Ver más", principal: true },
           { href: ruta("/contacto?servicio=computo"), label: "Cotizar", medicion: "home_baldosa_computo" },
@@ -201,16 +220,6 @@ function Mosaico() {
         acciones={[
           { href: ruta("/servicios#software"), label: "Ver más", principal: true },
           { href: ruta("/contacto?servicio=software"), label: "Cotizar", medicion: "home_baldosa_software" },
-        ]}
-      />
-      <Baldosa
-        ancha
-        nombre="Un solo equipo."
-        texto="Las mismas personas diseñan, instalan y te atienden después."
-        pie={<EquipoGrupo />}
-        acciones={[
-          { href: ruta("/nosotros#equipo"), label: "Conoce al equipo", principal: true },
-          { href: ruta("/proyectos"), label: "Ver proyectos" },
         ]}
       />
     </section>
@@ -264,11 +273,28 @@ export default async function Inicio() {
 
       <Mosaico />
 
+      <section className={`${s.noche} ${v.equipo}`} aria-labelledby="equipo-inicio" data-noche-zona="">
+        <FondoNoche hilo="arriba" />
+        <div className={`${s.contenedor} ${v.cabeza}`} data-aparecer>
+          <h2 id="equipo-inicio" className={s.titulo}>
+            Un solo equipo. <span className={s.degradado}>Con nombre y cara.</span>
+          </h2>
+          <p className={s.lead} style={{ marginInline: "auto" }}>Las mismas personas diseñan, instalan y te atienden después.</p>
+        </div>
+        <EquipoVivo />
+        <div className={v.acciones}>
+          <Link href={ruta("/nosotros#equipo")} className={`${s.boton} ${s.botonPrimario}`}>
+            Conoce al equipo
+            <Flecha />
+          </Link>
+        </div>
+      </section>
+
       <section className={`${s.seccion} ${pn.seccionCifras}`} aria-label="NEXARA en cifras">
         <div className={s.contenedor}>
           <ul className={pn.cifras}>
-            {CIFRAS.map((c) => (
-              <li key={c.texto} data-aparecer>
+            {CIFRAS.map((c, i) => (
+              <li key={c.texto} data-aparecer style={{ "--c": SENALES[i].color } as CSSProperties}>
                 <Cifra valor={c.valor} className={pn.cifra} />
                 <p className={pn.cifraTexto}>{c.texto}</p>
               </li>
@@ -277,11 +303,12 @@ export default async function Inicio() {
         </div>
       </section>
 
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="cobertura-titulo">
+      <section className={`${s.noche} ${s.seccion} ${pn.cobertura}`} aria-labelledby="cobertura-titulo" data-noche-zona="">
+        <FondoNoche hilo="ninguno" />
         <div className={s.contenedor}>
           <header className={s.centro} data-aparecer>
             <h2 id="cobertura-titulo" className={s.titulo}>
-              Base en Puebla y CDMX. <span className={s.tenue}>Alcance nacional.</span>
+              Base en Puebla y CDMX. <span className={s.degradado}>Alcance nacional.</span>
             </h2>
             <p className={s.lead}>Toca tu estado y te decimos cómo lo atendemos.</p>
           </header>

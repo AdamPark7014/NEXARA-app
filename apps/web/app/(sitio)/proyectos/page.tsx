@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
@@ -5,11 +6,14 @@ import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import { foto, type Foto } from "@/components/sitio/fotos";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
+import FondoNoche from "@/components/sitio/FondoNoche";
 import HeroPagina from "@/components/sitio/HeroPagina";
 import Flecha from "@/components/sitio/Flecha";
 import Cierre from "@/components/sitio/Cierre";
 import MapaMexico from "@/components/sitio/MapaMexico";
 import ListaCiudades from "@/components/sitio/ListaCiudades";
+import Ampliar from "@/components/sitio/Ampliar";
+import { SENALES } from "@/components/sitio/senales";
 import Sincronia from "@/components/sitio/Sincronia";
 import { ruta } from "@/components/sitio/rutas";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
@@ -118,7 +122,7 @@ export default async function PropuestaProyectos() {
           // Cuatro obras en vez de un solo recorte: la amplitud del trabajo se ve antes de bajar.
           <div className={p.heroMosaico}>
             {MOSAICO.map((m, i) => (
-              <figure key={m.tema} className={p.heroPieza}>
+              <figure key={m.tema} className={p.heroPieza} data-luz="">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img {...m} alt={m.alt} fetchPriority={i === 0 ? "high" : undefined} decoding="async" style={{ objectPosition: m.posicion }} />
                 <figcaption>{m.tema}</figcaption>
@@ -144,7 +148,8 @@ export default async function PropuestaProyectos() {
         </div>
       </HeroPagina>
 
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="Proyectos por industria">
+      <section className={`${s.noche} ${s.seccion} ${s.seccionNoche}`} data-noche-zona="" aria-label="Proyectos por industria">
+        <FondoNoche hilo="ninguno" />
         <div className={s.contenedor}>
           <div className={s.cabeza} data-aparecer>
             <div>
@@ -156,8 +161,8 @@ export default async function PropuestaProyectos() {
             <p className={s.lead}>Proyectos representativos por industria, sin nombrar a los clientes.</p>
           </div>
           <ul className={p.casos}>
-            {CASOS.map((c) => (
-              <li key={c.sector} className={p.caso} data-aparecer>
+            {CASOS.map((c, i) => (
+              <li key={c.sector} className={p.caso} data-aparecer data-luz="" data-inclina="4" style={{ "--c": SENALES[i % 5].color } as CSSProperties}>
                 <div className={p.casoCabeza}>
                   <span className={p.casoSector}>
                     <PublicIcon name={c.icono} size={18} /> {c.sector}
@@ -227,8 +232,10 @@ export default async function PropuestaProyectos() {
           <div className={p.mosaico}>
             {GALERIA.map((g) => (
               <figure key={g.src} data-aparecer>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={g.src} srcSet={g.srcSet} sizes={g.sizes} width={g.w} height={g.h} alt={g.alt} loading="lazy" decoding="async" />
+                <Ampliar src={g.src} pie={g.pie}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={g.src} srcSet={g.srcSet} sizes={g.sizes} width={g.w} height={g.h} alt={g.alt} loading="lazy" decoding="async" />
+                </Ampliar>
                 <figcaption>
                   <b>{g.tema}</b>
                   {g.pie}
@@ -249,7 +256,7 @@ export default async function PropuestaProyectos() {
           </header>
           <ol className={p.tres}>
             {DOCUMENTACION.map((d, i) => (
-              <li key={d.titulo} className={p.tresItem} data-aparecer>
+              <li key={d.titulo} className={p.tresItem} data-aparecer data-luz="" style={{ "--c": SENALES[i].color } as CSSProperties}>
                 <span className={p.tresNumero}>0{i + 1}</span>
                 <h3 className={p.tresTitulo}>{d.titulo}</h3>
                 <p className={p.tresTexto}>{d.texto}</p>

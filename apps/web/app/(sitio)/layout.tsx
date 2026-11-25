@@ -4,6 +4,8 @@ import s from "@/components/sitio/sitio.module.css";
 import Encabezado from "@/components/sitio/Encabezado";
 import Pie from "@/components/sitio/Pie";
 import Aparecer from "@/components/sitio/Aparecer";
+import Recorrido from "@/components/sitio/Recorrido";
+import Interaccion from "@/components/sitio/Interaccion";
 import ExtrasSitio from "@/components/sitio/ExtrasSitio";
 import Paleta from "@/components/sitio/Paleta";
 
@@ -27,6 +29,8 @@ export default function SitioLayout({ children }: Readonly<{ children: React.Rea
       {children}
       <Pie />
       <Aparecer />
+      <Interaccion />
+      <Recorrido />
       <Paleta />
       <ExtrasSitio />
     </div>

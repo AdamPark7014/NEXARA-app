@@ -1,87 +1,213 @@
-/* Mapa interactivo de cobertura: estados que responden al cursor, ruta que se dibuja y ficha del estado. */
+/*
+ * Mapa de cobertura sobre la noche: el país es una placa con canto, las señales salen de Puebla y el estado elegido se
+ * levanta con el color de cómo se atiende (`--c`). Vive dentro de una sección `.noche` (sitio.module.css).
+ */
 
 .marco {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr);
-  gap: clamp(24px, 4vw, 56px);
+  grid-template-columns: minmax(0, 1.75fr) minmax(290px, 1fr);
+  gap: clamp(20px, 3vw, 44px);
   align-items: center;
-  margin-top: clamp(40px, 5vw, 64px);
+  margin-top: clamp(12px, 2vw, 28px);
 }
 
 .lienzo {
+  --rx: 0deg;
+  --ry: 0deg;
   position: relative;
+  perspective: 1500px;
 }
 
 .lienzo svg {
+  position: relative;
   display: block;
   width: 100%;
   height: auto;
   overflow: visible;
   touch-action: manipulation;
+  transform: rotateX(calc(16deg + var(--rx))) rotateY(var(--ry));
+  transform-origin: 50% 60%;
+  transition: transform 0.35s var(--ease-out);
+}
+
+/* Barrido de radar alrededor de Puebla (63 % , 73 % del lienzo). */
+.radar {
+  position: absolute;
+  left: 63%;
+  top: 70%;
+  width: 92%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% -50%;
+  background:
+    repeating-radial-gradient(circle, transparent 0 13%, rgb(127 208 226 / 0.1) 13.1% 13.3%),
+    conic-gradient(from 0deg, rgb(47 191 159 / 0.28), transparent 70deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 20%, transparent);
+  mask-image: radial-gradient(closest-side, #000 20%, transparent);
+  pointer-events: none;
+}
+
+.canto path {
+  fill: #050d18;
+  stroke: rgb(110 198 217 / 0.2);
+  stroke-width: 0.6;
 }
 
 .estado {
-  fill: var(--mapa-estado);
-  stroke: var(--mapa-borde);
-  stroke-width: 1.2;
+  fill: url(#mapa-cara);
+  stroke: rgb(127 208 226 / 0.42);
+  stroke-width: 0.9;
   stroke-linejoin: round;
   cursor: pointer;
-  transition: fill 0.2s var(--ease), opacity 0.2s var(--ease);
+  transition: fill 0.2s var(--ease);
 }
 
 .estado[data-modo="campo"] {
-  fill: color-mix(in srgb, var(--accent) 34%, var(--mapa-estado));
+  fill: #12554f;
 }
 
 .estado[data-modo="base"] {
-  fill: var(--accent);
+  fill: #8a6a12;
 }
 
 .estado:hover {
-  fill: color-mix(in srgb, var(--accent) 22%, var(--mapa-estado-hover));
+  fill: #1e4468;
 }
 
-.estado[data-modo="campo"]:hover {
-  fill: color-mix(in srgb, var(--accent) 52%, var(--mapa-estado));
-}
-
-.estado[data-activo] {
-  fill: color-mix(in srgb, var(--accent) 70%, var(--card));
-}
-
-.estado[data-modo="base"][data-activo],
-.estado[data-modo="base"]:hover {
-  fill: color-mix(in srgb, var(--accent) 85%, #000);
-}
-
-/* El estado activo se redibuja encima con su contorno, para que el borde no quede bajo los vecinos. */
-.contorno {
-  fill: none;
-  stroke: color-mix(in srgb, var(--fg) 75%, transparent);
-  stroke-width: 2;
-  stroke-linejoin: round;
+.trama {
+  opacity: 0.5;
   pointer-events: none;
 }
 
-/* Latido continuo de las dos sedes */
+.punto {
+  fill: #7fd0e2;
+  opacity: 0.4;
+}
+
+.alzado {
+  pointer-events: none;
+  animation: alza 0.45s var(--ease-out) both;
+  transform: translateY(-9px);
+}
+
+.alzadoLuz {
+  fill: var(--c);
+  opacity: 0.55;
+}
+
+.alzadoCanto {
+  fill: color-mix(in srgb, var(--c) 38%, #050d18);
+}
+
+.alzadoCara {
+  fill: color-mix(in srgb, var(--c) 72%, #0c1a2e);
+  stroke: color-mix(in srgb, var(--c) 60%, #fff);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+@keyframes alza {
+  from {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+.rutas {
+  pointer-events: none;
+}
+
+.rutas g {
+  --c: var(--senal-cian);
+}
+
+.rutas g[data-modo="campo"] {
+  --c: var(--senal-teal);
+}
+
+.rutaTenue {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 0.8;
+  opacity: 0.2;
+}
+
+.rutaPulso {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-dasharray: 5 120;
+  stroke-dashoffset: 5;
+  opacity: 0;
+}
+
+.puntoEstado {
+  fill: var(--c);
+  opacity: 0.75;
+}
+
+.ruta {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  filter: drop-shadow(0 0 6px var(--c));
+  pointer-events: none;
+}
+
+.cometa {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-dasharray: 4 130;
+  stroke-dashoffset: 4;
+  opacity: 0;
+  filter: drop-shadow(0 0 6px var(--c));
+  pointer-events: none;
+}
+
 .pulso {
-  fill: var(--accent);
+  fill: var(--senal-ambar);
+  opacity: 0;
   pointer-events: none;
   transform-box: fill-box;
   transform-origin: center;
-  animation: halo 2.6s var(--ease-out) infinite;
 }
 
-/* Rótulo en píldora (estado activo o sede) */
+.sede {
+  fill: var(--senal-ambar);
+  stroke: #fff;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 8px var(--senal-ambar));
+  pointer-events: none;
+}
+
+.destino {
+  fill: #070b12;
+  stroke: #fff;
+  stroke-width: 2.6;
+  pointer-events: none;
+}
+
+.halo {
+  fill: var(--c);
+  opacity: 0;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
 .rotulo {
   pointer-events: none;
 }
 
 .rotulo rect {
-  fill: var(--card);
-  stroke: var(--line);
-  stroke-width: 1;
-  filter: drop-shadow(0 3px 8px rgb(10 37 64 / 0.16));
+  fill: rgb(7 11 18 / 0.9);
+  stroke: var(--c);
+  stroke-width: 1.2;
 }
 
 .rotulo text {
@@ -90,19 +216,45 @@
   font-weight: 600;
   letter-spacing: -0.01em;
   text-anchor: middle;
-  fill: var(--fg);
+  fill: #fff;
 }
 
-.ruta {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  filter: drop-shadow(0 2px 4px color-mix(in srgb, var(--accent) 45%, transparent));
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0;
-  pointer-events: none;
-  animation: trazo 0.7s var(--ease-out) both;
+@media (prefers-reduced-motion: no-preference) {
+  .marco[data-viva] .radar {
+    animation: gira 7s linear infinite;
+  }
+  .marco[data-viva] .rutaPulso {
+    animation: viaja 3.6s linear calc(var(--i) * -0.83s) infinite;
+  }
+  .marco[data-viva] .pulso {
+    animation: halo 2.6s var(--ease-out) infinite;
+  }
+  .ruta {
+    animation: trazo 0.8s var(--ease-out) both;
+  }
+  .cometa {
+    animation: viaja 1.6s var(--ease) 0.3s infinite;
+  }
+  .halo {
+    animation: halo 1.9s var(--ease-out) 0.5s infinite;
+  }
+}
+
+@keyframes gira {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes viaja {
+  from {
+    stroke-dashoffset: 5;
+    opacity: 1;
+  }
+  to {
+    stroke-dashoffset: -100;
+    opacity: 1;
+  }
 }
 
 @keyframes trazo {
@@ -111,48 +263,26 @@
   }
 }
 
-.destino {
-  fill: var(--card);
-  stroke: var(--accent);
-  stroke-width: 3;
-  pointer-events: none;
-}
-
-.halo {
-  fill: var(--accent);
-  opacity: 0.35;
-  pointer-events: none;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: halo 2s var(--ease-out) infinite;
-}
-
 @keyframes halo {
   from {
     transform: scale(1);
-    opacity: 0.4;
+    opacity: 0.55;
   }
   to {
-    transform: scale(3.6);
+    transform: scale(4);
     opacity: 0;
   }
 }
 
-.sede {
-  fill: var(--accent);
-  stroke: var(--card);
-  stroke-width: 2.5;
-  pointer-events: none;
-}
-
-
 /* ── Ficha del estado ───────────────────────────────────────────────────── */
 
 .ficha {
-  padding: clamp(24px, 3vw, 32px);
+  position: relative;
+  padding: clamp(24px, 2.6vw, 34px);
   border-radius: var(--radius-xl);
-  background: var(--card);
-  box-shadow: var(--sombra-md), inset 0 0 0 1px var(--line-soft);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 13%, transparent), transparent 55%), rgb(14 24 38 / 0.82);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 34%, transparent), 0 30px 80px -30px color-mix(in srgb, var(--c) 45%, transparent);
+  transition: box-shadow 0.5s var(--ease);
 }
 
 .elegir {
@@ -160,18 +290,18 @@
   gap: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--fg-3);
+  color: var(--fg-2);
 }
 
 .elegir select {
-  min-height: 44px;
+  min-height: 48px;
   padding: 0 40px 0 14px;
-  border: 1px solid var(--line);
+  border: 1px solid #33435c;
   border-radius: 12px;
-  background: var(--bg)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%236b7a90' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+  background: #0a111c
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23a9b5c5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
     no-repeat right 14px center;
-  color: var(--fg);
+  color: #fff;
   font: inherit;
   font-size: 16px;
   font-weight: 500;
@@ -179,16 +309,34 @@
 }
 
 .elegir select:focus {
-  border-color: var(--accent);
+  border-color: var(--c);
   outline: none;
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 26%, transparent);
+}
+
+.fichaEntra {
+  /* Alto fijo: el paseo no mueve el botón ni la página. */
+  min-height: 218px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fichaEntra {
+    animation: fichaEntra 0.45s var(--ease-out) both;
+  }
+}
+
+@keyframes fichaEntra {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
 }
 
 .nombre {
   margin-top: 24px;
   font-family: var(--font-display);
-  font-size: clamp(28px, 2.8vw, 36px);
-  line-height: 1.08;
+  font-size: clamp(30px, 3vw, 42px);
+  line-height: 1.05;
   font-weight: 600;
   letter-spacing: -0.03em;
 }
@@ -197,18 +345,23 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
-  padding: 5px 12px;
+  margin-top: 14px;
+  padding: 6px 13px;
   border-radius: 999px;
-  background: var(--control);
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 45%, transparent);
   font-size: 13.5px;
   font-weight: 600;
 }
 
-.modo i {
+.modo i,
+.leyenda i {
+  display: inline-block;
   width: 9px;
   height: 9px;
   border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 10px var(--c);
 }
 
 .detalle {
@@ -221,37 +374,37 @@
 .ciudades {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   margin-top: 16px;
 }
 
 .ciudades a {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  padding: 0 12px;
+  min-height: 36px;
+  padding: 0 14px;
   border-radius: 999px;
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px #33435c;
   font-size: 14px;
   font-weight: 500;
-  color: var(--fg-2);
-  transition: color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+  color: var(--fg);
+  transition: box-shadow 0.15s var(--ease);
 }
 
 .ciudades a:hover {
-  color: var(--accent);
-  box-shadow: inset 0 0 0 1.5px var(--accent);
+  box-shadow: inset 0 0 0 1.5px var(--c);
 }
 
 .accion {
-  margin-top: 24px;
+  margin-top: 20px;
 }
 
 .leyenda {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 20px;
-  margin-top: 16px;
+  gap: 8px 22px;
+  margin-top: 8px;
   font-size: 13.5px;
   color: var(--fg-2);
 }
@@ -260,30 +413,11 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  transition: color 0.3s var(--ease);
 }
 
-.leyenda i,
-.modo i {
-  display: inline-block;
-}
-
-.leyenda i {
-  width: 12px;
-  height: 12px;
-  border-radius: 4px;
-}
-
-.colorBase {
-  background: var(--accent);
-}
-
-.colorCampo {
-  background: color-mix(in srgb, var(--accent) 34%, var(--mapa-estado));
-}
-
-.colorExtendida {
-  background: var(--mapa-estado);
-  box-shadow: inset 0 0 0 1px var(--line);
+.leyenda span[data-activa] {
+  color: #fff;
 }
 
 @media (max-width: 1068px) {
@@ -292,13 +426,17 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ruta,
-  .halo,
-  .pulso {
-    animation: none;
+@media (max-width: 734px) {
+  .lienzo {
+    margin-inline: -8px;
   }
-  .pulso {
-    opacity: 0;
+  .rotulo text {
+    font-size: 24px;
+  }
+  .rotulo rect {
+    rx: 20px;
+  }
+  .leyenda {
+    padding-inline: 8px;
   }
 }

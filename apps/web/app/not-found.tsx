@@ -8,6 +8,7 @@ import Encabezado from "@/components/sitio/Encabezado";
 import Pie from "@/components/sitio/Pie";
 import NoEncontrado from "@/components/sitio/NoEncontrado";
 import Aparecer from "@/components/sitio/Aparecer";
+import Interaccion from "@/components/sitio/Interaccion";
 import Paleta from "@/components/sitio/Paleta";
 
 const display = localFont({ src: "./fonts/inter-tight-var-latin.woff2", weight: "100 900", display: "swap", variable: "--sitio-display" });
@@ -28,6 +29,7 @@ export default async function NotFound() {
         <NoEncontrado />
         <Pie />
         <Aparecer />
+        <Interaccion />
         <Paleta />
       </div>
     );
