@@ -67,15 +67,6 @@ case "$cmd" in
     # Una imagen anterior al 25-11-2026 trae el seed que reescribía cuentas: ahí no se corre.
     compose exec -T api sh -c "cd /app/apps/api && { test -f prisma/seed-estructura.ts || { echo 'La imagen trae el seed viejo, que reescribe cuentas: despliega antes.'; exit 1; }; } && npx prisma db seed${extra}"
     ;;
-  cleanup-users)
-    cat "$REPO_ROOT/apps/api/scripts/cleanup-ghost-users.sql" | psql_db
-    ;;
-  delete-ghost-users)
-    cat "$REPO_ROOT/apps/api/scripts/delete-ghost-users.sql" | psql_db
-    ;;
-  audit-users)
-    cat "$REPO_ROOT/apps/api/scripts/audit-org-users.sql" | psql_db
-    ;;
   close-attendance)
     email="${1:-}"
     if [[ -z "$email" ]]; then
@@ -91,6 +82,6 @@ case "$cmd" in
     ;;
   help|*)
     echo "Usage: ./deploy/nexara.sh <command>"
-    echo "Commands: up | up:fast | rebuild | ps | logs | restart | down | migrate | seed | cleanup-users | delete-ghost-users | audit-users | close-attendance | validate"
+    echo "Commands: up | up:fast | rebuild | ps | logs | restart | down | migrate | seed | close-attendance | validate"
     ;;
 esac

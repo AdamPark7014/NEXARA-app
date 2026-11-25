@@ -1,5 +1,10 @@
 # RELEVO
 
+## Turno claude-code - 27-11-2026: datos fuera del repo
+
+- Pedido de Adam: salieron listas de personas (auditoria de organigrama, usuarios retirados, jefes) y un revisor de cuentas de prueba; copias locales en `C:\dev\secrets\nexara\datos-fuera-del-repo-2026-11-25`. `nexara.sh` ya no trae `cleanup-users`, `delete-ghost-users` ni `audit-users`.
+- Los correos que el codigo usa para permisos se quedan. Sin cambios de producto ni migraciones. Historial sin tocar.
+
 - **27-11 ~16:35 México (claude-code) — Apps 1.5.0 enviadas a revisión en las dos tiendas, con OK de Adam.**
   - iOS 1.5.0 (18): WAITING_FOR_REVIEW (subida por ios-testflight.yml, run 46074789773). Android 1.5.0 (25): producción, lanzamiento completo, «Cambios en revisión»; se libera sola al aprobarse (publicación gestionada apagada). Mapping en `apps/mobile-native/play-releases/mapping-v25-1.5.0.txt` (fuera de git).
   - Siguientes números libres: Android 26, iOS build 19.
