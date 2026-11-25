@@ -43,6 +43,10 @@ describe('canOpenPage · guardas de ruta por rol', () => {
     ]) {
       expect(canOpenPage(role, '/erp/mis-actividades/nueva'), role).toBe(true);
       expect(canOpenPage(role, '/erp/pizarra'), role).toBe(true);
+      // Quien abre la actividad abre sus pestañas (bug real 25-11: «Evidencias» regresaba a Actividades).
+      for (const pestana of ['', '/evidencias', '/historial', '/cotizacion']) {
+        expect(canOpenPage(role, `/erp/actividades/742${pestana}`), `${role} ${pestana}`).toBe(true);
+      }
     }
     expect(canOpenPage(ROLES.CLIENTE, '/erp/mis-actividades/nueva')).toBe(false);
   });

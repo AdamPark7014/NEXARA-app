@@ -30,7 +30,9 @@ export const ACTIVIDAD_PROPIA_PAGE_PATHS: PageRule[] = [
   '/erp/pizarra/**',
   // Detalle de su propia actividad (07-11): «Mis actividades», la revisión y el chat enlazan
   // aquí. Solo el número (`:id` es numérico); la API decide si es suya.
+  // Con sus pestañas (25-11): sin ellas, «Evidencias» regresaba a Actividades al supervisor.
   '/erp/actividades/:id',
+  '/erp/actividades/:id/**',
 ];
 
 /** Core ola1 — Pizarra / Asistencias / Chat / Actividades (paths canónicos ERP). */

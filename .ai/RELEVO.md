@@ -1,5 +1,9 @@
 # RELEVO
 
+- **25-11 ~02:30 México (claude-code) — Luis (Director de Operaciones) ya abre «Evidencias» en la web. Sin migraciones; sin desplegar.**
+  - Causa: `ACTIVIDAD_PROPIA_PAGE_PATHS` abría `/erp/actividades/:id` pero no sus pestañas; el guard de AppShell regresaba a la pizarra. Igual para coord_admin, coord_ventas, vendedor, disenador, rh y contabilidad. La API sigue decidiendo qué actividad ve cada quien.
+  - Plataformas: Web hecha · API, Android e iOS no aplican (la regla de páginas es solo web).
+
 - **25-11 ~02:15 México (claude-code) — Web pública «Ensamble»: portada con el logo y los circuitos, noche NEXARA en todas las páginas y sitio que abre con el almacenamiento bloqueado. En main, sin desplegar; sin migraciones. Publicarla espera el visto bueno visual de Adam.**
   - Base: respaldo del 22-11 11:50 UTC. Los arreglos de las ~2 h siguientes vivían en el contenedor de nube y no están en la PC; se rehicieron los visibles: gráfica a medias, aviso de cookies que tapaba botones y formulario (`data-cede-aviso`), tablero, contraste en oscuro, cierre en teléfono, barra de 64 px. Faltan los menores (pausa global, menús táctiles, plano del simulador en teléfono, textos de botones unificados).
   - Tronaba sin almacenamiento: `LoginWelcomeBanner`, `tenant`, `install-offline-fetch`, `api-base`, `cookie-consent`, `device-identity`. Prueba: `lib/almacenamiento-bloqueado.spec.ts`.
