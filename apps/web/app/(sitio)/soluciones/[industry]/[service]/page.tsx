@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -18,6 +19,8 @@ import SubNav from "@/components/sitio/SubNav";
 import Rutas from "@/components/sitio/TarjetasRuta";
 import Preguntas from "@/components/sitio/Preguntas";
 import ArteServicio from "@/components/sitio/ArteServicio";
+import FondoNoche from "@/components/sitio/FondoNoche";
+import { senal } from "@/components/sitio/senales";
 import Cierre from "@/components/sitio/Cierre";
 import Flecha from "@/components/sitio/Flecha";
 import { foto, fotoOg } from "@/components/sitio/fotos";
@@ -279,7 +282,8 @@ export default async function ProgrammaticLandingPage(props: { params: Promise<P
       />
 
       {/* El reto de la industria y lo que buscamos */}
-      <section id="reto" className={`${s.seccion} ${s.seccionAlt} ${p.ancla}`} aria-labelledby="reto-titulo">
+      <section id="reto" className={`${s.noche} ${s.seccion} ${s.seccionNoche} ${p.ancla}`} data-noche-zona="" aria-labelledby="reto-titulo">
+        <FondoNoche hilo="ninguno" />
         <div className={`${s.contenedor} ${i.dos}`}>
           <div data-aparecer>
             <p className={s.antetitulo}>El reto</p>
@@ -288,7 +292,7 @@ export default async function ProgrammaticLandingPage(props: { params: Promise<P
             </h2>
             <p className={s.lead}>{industry.painPoint}</p>
           </div>
-          <div className={i.tarjeta} data-aparecer>
+          <div className={i.tarjeta} data-aparecer data-luz="" data-inclina="4">
             <span className={i.tarjetaEtiqueta}>
               <PublicIcon name="target" size={16} /> Resultados
             </span>
@@ -308,7 +312,7 @@ export default async function ProgrammaticLandingPage(props: { params: Promise<P
       {/* Qué entregamos */}
       <section id="entregamos" className={`${s.seccion} ${p.ancla}`} aria-labelledby="entregamos-titulo">
         <div className={s.contenedor}>
-          <article className={p.servicio} data-aparecer>
+          <article className={p.servicio} data-aparecer style={{ "--c": senal(visual.ancla).color } as CSSProperties}>
             <div>
               <span className={p.servicioIcono}>
                 <PublicIcon name={visual.icono} size={22} />
@@ -336,7 +340,7 @@ export default async function ProgrammaticLandingPage(props: { params: Promise<P
                 </Link>
               </p>
             </div>
-            <div className={p.servicioArte}>
+            <div className={p.servicioArte} data-luz="" data-inclina="5">
               <ArteServicio servicio={service.slug} alt={`${service.name} instalado por NEXARA`} />
             </div>
           </article>

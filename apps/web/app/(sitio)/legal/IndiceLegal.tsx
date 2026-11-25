@@ -2,15 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
+import { SENALES } from "@/components/sitio/senales";
+import x from "@/components/sitio/profundo.module.css";
 import styles from "./legal.module.css";
 
-const DOCUMENTOS = [
-  { href: "/legal/privacidad", label: "Aviso de privacidad" },
-  { href: "/legal/terminos", label: "Términos y condiciones" },
-  { href: "/legal/cookies", label: "Política de cookies" },
-  { href: "/legal/eliminar-cuenta", label: "Eliminar tu cuenta" },
-  { href: "/legal/marca", label: "Uso de marca" },
+const DOCUMENTOS: { href: string; label: string; icono: PublicIconName }[] = [
+  { href: "/legal/privacidad", label: "Aviso de privacidad", icono: "lock" },
+  { href: "/legal/terminos", label: "Términos y condiciones", icono: "fileCheck" },
+  { href: "/legal/cookies", label: "Política de cookies", icono: "shield" },
+  { href: "/legal/eliminar-cuenta", label: "Eliminar tu cuenta", icono: "users" },
+  { href: "/legal/marca", label: "Uso de marca", icono: "layers" },
 ];
 
 const aId = (texto: string) =>
@@ -65,19 +68,7 @@ export default function IndiceLegal() {
   }, [ruta]);
 
   return (
-    <aside className={styles.indice} aria-label="Documentos legales">
-      <nav className={styles.indiceDocumentos} aria-label="Documentos">
-        <p className={styles.indiceTitulo}>Documentos</p>
-        <ul>
-          {DOCUMENTOS.map((d) => (
-            <li key={d.href}>
-              <Link href={d.href} aria-current={ruta === d.href ? "page" : undefined}>
-                {d.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+    <aside className={styles.indice} aria-label="Índice del documento">
       {secciones.length > 1 ? (
         <nav className={styles.indiceSecciones} aria-label="En esta página">
           <p className={styles.indiceTitulo}>En esta página</p>
@@ -93,5 +84,26 @@ export default function IndiceLegal() {
         </nav>
       ) : null}
     </aside>
+  );
+}
+
+/** Los documentos como tarjetas en la portada del centro legal; la del documento abierto queda encendida. */
+export function DocumentosLegales() {
+  const ruta = usePathname();
+  return (
+    <nav aria-label="Documentos legales">
+      <ul className={x.legalDocs}>
+        {DOCUMENTOS.map((d, i) => (
+          <li key={d.href} style={{ "--c": SENALES[i % 5].color } as CSSProperties}>
+            <Link href={d.href} aria-current={ruta === d.href ? "page" : undefined} data-luz="">
+              <span aria-hidden="true">
+                <PublicIcon name={d.icono} size={22} />
+              </span>
+              {d.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }

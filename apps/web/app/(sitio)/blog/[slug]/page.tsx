@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -8,7 +9,10 @@ import { recortarDescripcion } from "@/lib/seo/textos";
 import PublicIcon from "@/app/components/PublicIcon";
 import s from "@/components/sitio/sitio.module.css";
 import i from "@/components/sitio/interior.module.css";
-import Migas from "@/components/sitio/Migas";
+import HeroInterior from "@/components/sitio/HeroInterior";
+import IndiceGuia from "@/components/sitio/IndiceGuia";
+import x from "@/components/sitio/profundo.module.css";
+import { SENALES } from "@/components/sitio/senales";
 import Directorio from "@/components/sitio/Directorio";
 import Cierre from "@/components/sitio/Cierre";
 import Flecha from "@/components/sitio/Flecha";
@@ -129,19 +133,22 @@ function OtrasGuias({ actual }: { actual?: string }) {
         <h2 id="otras-guias" className={s.titulo}>
           Más guías <span className={s.tenue}>del equipo.</span>
         </h2>
-        <ul className={i.entradas}>
-          {otras.map((g) => (
-            <li key={g.slug} className={i.entrada} data-aparecer>
-              <Link href={`/blog/${g.slug}`} className={i.portada} tabIndex={-1} aria-hidden="true">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img {...foto(g.foto, "(max-width: 734px) 100vw, 380px")} alt="" loading="lazy" decoding="async" />
-              </Link>
-              <p className={i.fecha}>
-                {g.tema} · {g.lectura} min
-              </p>
-              <h3 className={i.entradaTitulo}>
-                <Link href={`/blog/${g.slug}`}>{g.titulo}</Link>
-              </h3>
+        <ul className={x.notas}>
+          {otras.map((g, n) => (
+            <li key={g.slug} className={`${x.nota} ${x.notaTercio}`} data-aparecer data-luz="" data-inclina="4" style={{ "--c": SENALES[n % 5].color } as CSSProperties}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img {...foto(g.foto, "(max-width: 900px) 100vw, 400px")} alt="" loading="lazy" decoding="async" />
+              <div className={x.notaTexto}>
+                <p className={x.notaEtiqueta}>
+                  {g.tema} · {g.lectura} min
+                </p>
+                <h3>
+                  <Link href={`/blog/${g.slug}`}>{g.titulo}</Link>
+                </h3>
+                <p>
+                  <span>{g.resumen}</span>
+                </p>
+              </div>
             </li>
           ))}
         </ul>
@@ -163,26 +170,29 @@ function GuiaPagina({ guia }: { guia: Guia }) {
       />
       <BarraLectura articulo="nota" />
       <article id="nota" aria-labelledby="nota-titulo">
-        <header className={i.articulo}>
-          <Migas alinear="izq" migas={[{ href: "/", label: "Inicio" }, { href: "/blog", label: "Blog" }, { label: guia.titulo }]} />
-          <p className={i.fecha}>
-            {guia.tema} · {guia.lectura} min de lectura · <time dateTime={guia.publicada}>{fechaLarga(guia.publicada)}</time>
-          </p>
-          <h1 id="nota-titulo" className={i.articuloTitulo}>
-            {guia.titulo}
-          </h1>
-          <p className={i.articuloLead}>{guia.resumen}</p>
-        </header>
+        <HeroInterior
+          id="nota-titulo"
+          tituloLargo
+          migas={[{ href: "/", label: "Inicio" }, { href: "/blog", label: "Blog" }, { label: guia.titulo }]}
+          antetitulo={
+            <>
+              {guia.tema} · {guia.lectura} min · <time dateTime={guia.publicada}>{fechaLarga(guia.publicada)}</time>
+            </>
+          }
+          titulo={guia.titulo}
+          lead={guia.resumen}
+          visual={
+            // eslint-disable-next-line @next/next/no-img-element
+            <img {...foto(guia.foto, "(max-width: 1260px) 100vw, 1200px")} alt="" fetchPriority="high" decoding="async" />
+          }
+        />
 
-        <figure className={i.articuloPortada}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img {...foto(guia.foto, "(max-width: 1100px) 100vw, 1040px")} alt="" fetchPriority="high" decoding="async" />
-        </figure>
-
+        <div className={x.lectura}>
+        <IndiceGuia secciones={guia.secciones.map((sc, n) => ({ id: `parte-${n + 1}`, titulo: sc.titulo }))} />
         <div className={i.articulo} style={{ paddingTop: 0 }}>
           <div className={i.prosa}>
-            {guia.secciones.map((sc) => (
-              <section key={sc.titulo}>
+            {guia.secciones.map((sc, n) => (
+              <section key={sc.titulo} id={`parte-${n + 1}`}>
                 <h2>{sc.titulo}</h2>
                 {sc.parrafos.map((p) => (
                   <p key={p.slice(0, 40)}>{p}</p>
@@ -212,6 +222,7 @@ function GuiaPagina({ guia }: { guia: Guia }) {
             </Link>
           </aside>
           <Pie />
+        </div>
         </div>
       </article>
 
@@ -268,28 +279,27 @@ export default async function BlogPostPage(props: { params: Promise<Params> }) {
 
       <BarraLectura articulo="nota" />
       <article id="nota" aria-labelledby="nota-titulo">
-        <header className={i.articulo}>
-          <Migas alinear="izq" migas={[{ href: "/", label: "Inicio" }, { href: "/blog", label: "Blog" }, { label: post.title }]} />
-          <p className={i.fecha}>
-            <time dateTime={publicada}>{fechaLarga(publicada)}</time>
-          </p>
-          <h1 id="nota-titulo" className={i.articuloTitulo}>
-            {post.title}
-          </h1>
-          {post.summary ? <p className={i.articuloLead}>{post.summary}</p> : null}
-          {post.tags?.length ? (
-            <div className={i.etiquetas}>
-              {post.tags.map((t) => (
-                <span key={t}>{t}</span>
-              ))}
-            </div>
-          ) : null}
-        </header>
-
-        <figure className={i.articuloPortada}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img {...imagen} alt="" fetchPriority="high" decoding="async" />
-        </figure>
+        <HeroInterior
+          id="nota-titulo"
+          tituloLargo
+          migas={[{ href: "/", label: "Inicio" }, { href: "/blog", label: "Blog" }, { label: post.title }]}
+          antetitulo={<time dateTime={publicada}>{fechaLarga(publicada)}</time>}
+          titulo={post.title}
+          lead={post.summary ?? ""}
+          acciones={
+            post.tags?.length ? (
+              <div className={i.etiquetas}>
+                {post.tags.map((t) => (
+                  <span key={t}>{t}</span>
+                ))}
+              </div>
+            ) : undefined
+          }
+          visual={
+            // eslint-disable-next-line @next/next/no-img-element
+            <img {...imagen} alt="" fetchPriority="high" decoding="async" />
+          }
+        />
 
         <div className={i.articulo} style={{ paddingTop: 0 }}>
           <div className={i.cuerpo}>{post.content}</div>

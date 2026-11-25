@@ -1215,3 +1215,38 @@
     min-height: 190px;
   }
 }
+
+/* Barrido lento del hero de detalle. */
+.barridoCian {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.barridoCian::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 26%;
+  border-right: 2px solid rgb(127 208 226 / 0.8);
+  background: linear-gradient(90deg, transparent, rgb(58 169 204 / 0.24));
+  translate: -110% 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .barridoCian::before {
+    animation: cruza 7s ease-in-out 1s infinite;
+  }
+}
+
+@keyframes cruza {
+  0%,
+  10% {
+    translate: -110% 0;
+  }
+  55%,
+  100% {
+    translate: 420% 0;
+  }
+}

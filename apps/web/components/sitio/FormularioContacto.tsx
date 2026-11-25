@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import PhoneField from "@/components/PhoneField";
 import PublicIcon from "@/app/components/PublicIcon";
@@ -10,7 +10,9 @@ import { findGeoCity } from "@/lib/seo/geo-cities";
 import { findIndustryLanding, findServiceLanding } from "@/lib/seo/programmatic-landings";
 import s from "./sitio.module.css";
 import p from "./paginas.module.css";
+import x from "./profundo.module.css";
 import Flecha from "./Flecha";
+import { SENALES, type Senal } from "./senales";
 import { MENU_INDUSTRIAS } from "./Encabezado";
 
 /** `?servicio=` llega desde los bloques de Servicios. */
@@ -32,6 +34,28 @@ export default function FormularioContacto() {
   const [error, setError] = useState<string | null>(null);
   const [telefono, setTelefono] = useState("");
   const forma = useRef<HTMLFormElement>(null);
+  const [elegidos, setElegidos] = useState<Senal["id"][]>([]);
+  const [avance, setAvance] = useState(0);
+
+  const medirAvance = () => {
+    const f = forma.current;
+    if (!f) return;
+    const campos = Array.from(f.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input[required], textarea[required]"));
+    setAvance(campos.filter((c) => c.value.trim() && c.checkValidity()).length / campos.length);
+  };
+
+  /** Lo que se toca arriba queda escrito como primer renglón del mensaje, sin borrar lo demás. */
+  const alternar = (id: Senal["id"]) => {
+    const lista = elegidos.includes(id) ? elegidos.filter((e) => e !== id) : [...elegidos, id];
+    setElegidos(lista);
+    const t = forma.current?.elements.namedItem("message");
+    if (t instanceof HTMLTextAreaElement) {
+      const resto = t.value.replace(/^Me interesa: [^\n]*\n?/, "");
+      const nombres = SENALES.filter((n) => lista.includes(n.id)).map((n) => n.nombre);
+      t.value = nombres.length ? `Me interesa: ${nombres.join(", ")}.\n${resto}` : resto;
+    }
+    medirAvance();
+  };
 
   const prellenado = useMemo(() => {
     const servicio = params.get("servicio");
@@ -96,6 +120,8 @@ export default function FormularioContacto() {
             onClick={() => {
               setEstado("listo");
               forma.current?.reset();
+              setElegidos([]);
+              setAvance(0);
             }}
           >
             Enviar otro mensaje
@@ -107,10 +133,22 @@ export default function FormularioContacto() {
 
   const enviando = estado === "enviando";
   return (
-    <div className={p.formulario}>
+    <div className={p.formulario} data-luz="">
+      <span className={x.avance} style={{ "--avance": avance } as CSSProperties} aria-hidden="true" />
       <h2 className={p.formularioTitulo}>Cuéntanos tu proyecto.</h2>
       <p className={p.formularioNota}>Qué necesitas, cuántas sedes y qué tan urgente es.</p>
-      <form ref={forma} className={p.campos} onSubmit={enviar} data-cede-aviso="">
+      <form ref={forma} className={p.campos} onSubmit={enviar} onInput={medirAvance} data-cede-aviso="">
+        <fieldset className={x.senales} disabled={enviando}>
+          <legend>¿Qué quieres resolver? Elige uno o varios.</legend>
+          {SENALES.map((n) => (
+            <button key={n.id} type="button" aria-pressed={elegidos.includes(n.id)} onClick={() => alternar(n.id)} style={{ "--c": n.color } as CSSProperties}>
+              <span>
+                <PublicIcon name={n.icono} size={20} />
+              </span>
+              {n.nombre}
+            </button>
+          ))}
+        </fieldset>
         <div className={p.camposFila}>
           <label className={p.campo}>
             Nombre

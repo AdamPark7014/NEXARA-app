@@ -253,3 +253,63 @@
     padding: 6px 14px;
   }
 }
+
+/* El documento como una hoja, con el hilo de color arriba; el índice corre por una pista. */
+.page {
+  position: relative;
+  max-width: none;
+  padding: clamp(26px, 4.4vw, 68px);
+  border-radius: 28px;
+  background: var(--card);
+  box-shadow: var(--sombra-xl), inset 0 0 0 1px var(--line-soft);
+}
+
+.page::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 28px;
+  border-radius: 28px 28px 0 0;
+  border-top: 4px solid transparent;
+  background: linear-gradient(90deg, #1fb89a 0%, #3aa9cc 34%, #a64ca6 67%, #ee8a2a 100%) border-box;
+  -webkit-mask: linear-gradient(#000 0 4px, transparent 4px);
+  mask: linear-gradient(#000 0 4px, transparent 4px);
+  pointer-events: none;
+}
+
+.section {
+  position: relative;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+
+.sectionTitle::before {
+  content: "";
+  flex: none;
+  width: 16px;
+  height: 17px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: linear-gradient(150deg, #1fb89a, #3aa9cc 55%, #a64ca6);
+}
+
+.indiceSecciones a {
+  border-left: 2px solid var(--line);
+  border-radius: 0 8px 8px 0;
+}
+
+.indiceSecciones a[aria-current] {
+  border-left-color: transparent;
+  border-image: linear-gradient(180deg, #1fb89a, #a64ca6) 1;
+  box-shadow: none;
+}
+
+@media (max-width: 734px) {
+  .page {
+    padding: 28px 20px;
+    border-radius: 22px;
+  }
+}

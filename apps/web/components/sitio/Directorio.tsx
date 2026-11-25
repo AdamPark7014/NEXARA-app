@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+import { SENALES } from "./senales";
 import Link from "next/link";
 import { getProgrammaticLandings, findServiceLanding } from "@/lib/seo/programmatic-landings";
 import { findGeoCity } from "@/lib/seo/geo-cities";
@@ -54,8 +56,8 @@ export default function Directorio({ titulo = "Explora más", lead, actual, excl
         </h2>
         {lead ? <p className={i.directorioLead}>{lead}</p> : null}
         <div className={i.directorioRejilla}>
-          {columnas.map((c) => (
-            <div key={c.titulo} className={i.directorioGrupo}>
+          {columnas.map((c, n) => (
+            <div key={c.titulo} className={i.directorioGrupo} data-luz="" style={{ "--c": SENALES[n % 5].color } as CSSProperties}>
               <h3>{c.titulo}</h3>
               <ul>
                 {c.enlaces.map((e) => (

@@ -12,6 +12,7 @@ import Flecha from "@/components/sitio/Flecha";
 import Cierre from "@/components/sitio/Cierre";
 import Certificaciones from "@/components/sitio/Certificaciones";
 import { EQUIPO, retrato } from "@/components/sitio/equipo";
+import v from "@/components/sitio/vivo.module.css";
 import EquipoVivo from "@/components/sitio/EquipoVivo";
 import Ampliar from "@/components/sitio/Ampliar";
 import { HEXAGONO, SENALES } from "@/components/sitio/senales";
@@ -93,8 +94,8 @@ export default function Nosotros() {
             Un integrador con disciplina de campo. <span className={s.tenue}>Diseñamos, instalamos y sostenemos la tecnología de empresas que no pueden detenerse.</span>
           </p>
           <ul className={p.datos}>
-            {DATOS.map((d) => (
-              <li key={d.etiqueta} className={p.dato} data-aparecer data-luz="">
+            {DATOS.map((d, n) => (
+              <li key={d.etiqueta} className={p.dato} data-aparecer data-luz="" style={{ "--c": SENALES[n].color } as CSSProperties}>
                 <span className={p.datoIcono}>
                   <PublicIcon name={d.icono} size={22} />
                 </span>
@@ -109,7 +110,8 @@ export default function Nosotros() {
       {/* Quiénes somos */}
       <section className={s.seccion} aria-labelledby="quienes-titulo">
         <div className={`${s.contenedor} ${p.dos}`}>
-          <figure className={p.dosFoto} data-aparecer>
+          <figure className={p.dosFoto} data-aparecer data-luz="">
+            <span className={v.esquinas} aria-hidden="true" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img {...foto("equipo-nexara-polos", "(max-width: 1068px) 100vw, 560px")} alt="Integrantes del equipo NEXARA" loading="lazy" decoding="async" />
           </figure>

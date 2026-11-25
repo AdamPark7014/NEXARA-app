@@ -55,6 +55,8 @@ export default function Tablero() {
   const [auto, setAuto] = useState(true);
   const [pausa, setPausa] = useState(false);
   const [visible, setVisible] = useState(true);
+  // Cámara en grande; tocarla otra vez regresa a la cuadrícula.
+  const [foco, setFoco] = useState<string | null>(null);
   const raiz = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -126,12 +128,22 @@ export default function Tablero() {
         </div>
         <div key={vista} className={`${s.ventanaCuerpo} ${s.vistaEntra}`} role="tabpanel" aria-label={VISTAS.find((v) => v.id === vista)?.label}>
           {vista === "camaras" ? (
-            <div className={s.camaras} aria-hidden="true">
+            <div className={s.camaras} data-foco={foco ? "" : undefined}>
               {CAMARAS.map((c, i) => (
-                <figure key={c.id} className={s.camara}>
+                <figure key={c.id} className={s.camara} data-foco={foco === c.id ? "" : undefined}>
+                  <button
+                    type="button"
+                    className={s.camaraBoton}
+                    aria-pressed={foco === c.id}
+                    aria-label={`${foco === c.id ? "Ver todas las cámaras" : "Agrandar"}: ${c.id}, ${c.lugar}`}
+                    onClick={() => {
+                      setAuto(false);
+                      setFoco(foco === c.id ? null : c.id);
+                    }}
+                  />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={c.src} srcSet={c.srcSet} sizes={c.sizes} alt="" loading="eager" decoding="async" />
-                  <span className={s.rec}>
+                  <img src={c.src} srcSet={c.srcSet} sizes="(max-width: 734px) 90vw, 620px" alt="" loading="eager" decoding="async" />
+                  <span className={s.rec} aria-hidden="true">
                     <i /> REC
                   </span>
                   {c.deteccion ? (
@@ -139,10 +151,10 @@ export default function Tablero() {
                       <span>Persona</span>
                     </span>
                   ) : null}
-                  <span className={s.camaraEtiqueta}>
+                  <span className={s.camaraEtiqueta} aria-hidden="true">
                     {c.id} · {c.lugar}
                   </span>
-                  <span className={s.camaraHora}>
+                  <span className={s.camaraHora} aria-hidden="true">
                     <Reloj desfase={i} />
                   </span>
                 </figure>

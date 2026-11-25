@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -13,9 +14,12 @@ import p from "@/components/sitio/paginas.module.css";
 import i from "@/components/sitio/interior.module.css";
 import HeroInterior from "@/components/sitio/HeroInterior";
 import SubNav from "@/components/sitio/SubNav";
-import Rutas, { type Ruta } from "@/components/sitio/TarjetasRuta";
+import Rutas from "@/components/sitio/TarjetasRuta";
 import MapaMexico from "@/components/sitio/MapaMexico";
 import Preguntas from "@/components/sitio/Preguntas";
+import FondoNoche from "@/components/sitio/FondoNoche";
+import Explorador, { type Exploracion } from "@/components/sitio/Explorador";
+import { SENALES } from "@/components/sitio/senales";
 import Cierre from "@/components/sitio/Cierre";
 import Flecha from "@/components/sitio/Flecha";
 import { MODO_CIUDAD, visualIndustria, visualServicio } from "@/components/sitio/visuales";
@@ -96,10 +100,10 @@ export default async function CoberturaCityPage(props: { params: Promise<Params>
     },
   ];
 
-  const servicios: Ruta[] = GEO_SERVICE_SLUGS.flatMap((slug) => {
+  const servicios: Exploracion[] = GEO_SERVICE_SLUGS.flatMap((slug) => {
     const svc = findServiceLanding(slug);
     return svc
-      ? [{ href: `/cobertura/${city.slug}/${slug}`, titulo: svc.name, texto: svc.summary, icono: visualServicio(slug).icono }]
+      ? [{ href: `/cobertura/${city.slug}/${slug}`, titulo: svc.name, texto: svc.summary, icono: visualServicio(slug).icono, foto: visualServicio(slug).foto }]
       : [];
   });
   servicios.push({
@@ -107,6 +111,7 @@ export default async function CoberturaCityPage(props: { params: Promise<Params>
     titulo: "Otro proyecto",
     texto: `Cuéntanos qué necesitas en ${city.name} y te decimos cómo lo resolvemos.`,
     icono: "clipboard",
+    foto: "campo-levantamiento-patio",
   });
 
   return (
@@ -222,12 +227,13 @@ export default async function CoberturaCityPage(props: { params: Promise<Params>
             </div>
             <p className={s.lead}>Cada servicio tiene su página con lo que incluye y las preguntas antes de cotizar.</p>
           </div>
-          <Rutas rutas={servicios} ir="Ver servicio" />
+          <Explorador rutas={servicios} ir="Ver servicio" />
         </div>
       </section>
 
       {/* Cómo se atiende la ciudad */}
-      <section id="como" className={`${s.seccion} ${p.ancla}`} aria-labelledby="como-titulo">
+      <section id="como" className={`${s.noche} ${s.seccion} ${s.seccionNoche} ${p.ancla}`} data-noche-zona="" aria-labelledby="como-titulo">
+        <FondoNoche hilo="ninguno" />
         <div className={s.contenedor}>
           <div data-aparecer>
             <p className={s.antetitulo}>Cómo trabajamos aquí</p>
@@ -241,8 +247,8 @@ export default async function CoberturaCityPage(props: { params: Promise<Params>
               { icono: "hardhat" as const, etiqueta: "En sitio", valor: modo.enSitio },
               { icono: "layers" as const, etiqueta: "Qué instalamos", valor: "CCTV, redes, cómputo y soporte" },
               { icono: "building" as const, etiqueta: "Varias sedes", valor: "El mismo estándar en cada una" },
-            ].map((d) => (
-              <li key={d.etiqueta} className={p.dato} data-aparecer>
+            ].map((d, n) => (
+              <li key={d.etiqueta} className={p.dato} data-aparecer data-luz="" style={{ "--c": SENALES[n].color } as CSSProperties}>
                 <PublicIcon name={d.icono} size={22} className={p.datoIcono} />
                 <p className={p.datoEtiqueta}>{d.etiqueta}</p>
                 <p className={p.datoValor}>{d.valor}</p>

@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
@@ -5,11 +6,11 @@ import { fetchPublishedNews, normalizeNewsImageUrl, toPlainExcerpt, type PublicN
 import { GUIAS, type Guia } from "@/lib/guias";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import s from "@/components/sitio/sitio.module.css";
-import i from "@/components/sitio/interior.module.css";
+import x from "@/components/sitio/profundo.module.css";
+import { SENALES } from "@/components/sitio/senales";
 import HeroInterior from "@/components/sitio/HeroInterior";
 import Directorio from "@/components/sitio/Directorio";
 import Cierre from "@/components/sitio/Cierre";
-import Flecha from "@/components/sitio/Flecha";
 import { foto, type Foto } from "@/components/sitio/fotos";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -63,28 +64,20 @@ const deGuia = (g: Guia): Entrada => ({
   imagen: (sizes) => foto(g.foto, sizes),
 });
 
+/** Lo más reciente, montado en el corte entre la noche y la página. */
 function Destacada({ e, antetitulo }: { e: Entrada; antetitulo: string }) {
   return (
-    <article className={i.destacada} data-aparecer>
-      <Link href={e.href} className={i.portada} tabIndex={-1} aria-hidden="true">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img {...e.imagen("(max-width: 1068px) 100vw, 660px")} alt="" fetchPriority="high" decoding="async" />
-      </Link>
-      <div>
-        <p className={s.antetitulo}>{antetitulo}</p>
-        <p className={i.fecha}>
-          {e.etiqueta} · <time dateTime={e.fecha}>{fechaLarga(e.fecha)}</time>
+    <article className={x.estelar} data-luz="">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img {...e.imagen("(max-width: 1260px) 100vw, 1200px")} alt="" fetchPriority="high" decoding="async" />
+      <div className={x.estelarTexto} style={{ "--c": "var(--senal-cian)" } as CSSProperties}>
+        <p className={x.notaEtiqueta}>
+          {antetitulo} · {e.etiqueta}
         </p>
-        <h2 className={i.destacadaTitulo}>
+        <h2>
           <Link href={e.href}>{e.titulo}</Link>
         </h2>
-        <p className={i.resumen}>{e.resumen}</p>
-        <p style={{ marginTop: 28 }}>
-          <Link href={e.href} className={s.enlace}>
-            Leer
-            <Flecha />
-          </Link>
-        </p>
+        <p>{e.resumen}</p>
       </div>
     </article>
   );
@@ -92,18 +85,20 @@ function Destacada({ e, antetitulo }: { e: Entrada; antetitulo: string }) {
 
 function Rejilla({ entradas }: { entradas: Entrada[] }) {
   return (
-    <ul className={i.entradas}>
-      {entradas.map((e) => (
-        <li key={e.clave} className={i.entrada} data-aparecer>
-          <Link href={e.href} className={i.portada} tabIndex={-1} aria-hidden="true">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img {...e.imagen("(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 380px")} alt="" loading="lazy" decoding="async" />
-          </Link>
-          <p className={i.fecha}>{e.etiqueta}</p>
-          <h3 className={i.entradaTitulo}>
-            <Link href={e.href}>{e.titulo}</Link>
-          </h3>
-          <p className={i.resumen}>{e.resumen}</p>
+    <ul className={x.notas}>
+      {entradas.map((e, n) => (
+        <li key={e.clave} className={x.nota} data-aparecer data-luz="" data-inclina="4" style={{ "--c": SENALES[n % 5].color } as CSSProperties}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img {...e.imagen("(max-width: 900px) 100vw, 620px")} alt="" loading="lazy" decoding="async" />
+          <div className={x.notaTexto}>
+            <p className={x.notaEtiqueta}>{e.etiqueta}</p>
+            <h3>
+              <Link href={e.href}>{e.titulo}</Link>
+            </h3>
+            <p>
+              <span>{e.resumen}</span>
+            </p>
+          </div>
         </li>
       ))}
     </ul>
@@ -143,14 +138,9 @@ export default async function BlogPage() {
           </>
         }
         lead="Guías prácticas y aprendizajes de obra, escritos por el equipo que instala, para decidir mejor antes de cotizar."
+        tipoVisual="libre"
+        visual={hayNotas ? <Destacada e={notas[0]} antetitulo="Lo más reciente" /> : <Destacada e={guias[0]} antetitulo="Guía destacada" />}
       />
-
-      {/* Lo más reciente: la última nota de Studio o, sin notas, la primera guía. */}
-      <section className={s.seccion} aria-label="Lo más reciente" style={{ paddingTop: 0 }}>
-        <div className={s.contenedor}>
-          {hayNotas ? <Destacada e={notas[0]} antetitulo="Lo más reciente" /> : <Destacada e={guias[0]} antetitulo="Guía destacada" />}
-        </div>
-      </section>
 
       {hayNotas && notas.length > 1 ? (
         <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="notas-titulo">

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { findIndustryLanding, getProgrammaticLandings } from "@/lib/seo/programmatic-landings";
@@ -16,6 +17,9 @@ import SubNav from "@/components/sitio/SubNav";
 import Rutas, { type Ruta } from "@/components/sitio/TarjetasRuta";
 import MapaMexico from "@/components/sitio/MapaMexico";
 import Directorio from "@/components/sitio/Directorio";
+import FondoNoche from "@/components/sitio/FondoNoche";
+import Explorador from "@/components/sitio/Explorador";
+import { SENALES } from "@/components/sitio/senales";
 import Cierre from "@/components/sitio/Cierre";
 import Flecha from "@/components/sitio/Flecha";
 import { foto, fotoOg } from "@/components/sitio/fotos";
@@ -320,7 +324,8 @@ export default async function IndustryHubPage(props: { params: Promise<Params> }
       <SubNav titulo={hub.name} secciones={secciones} cta={{ href: contactoHref, label: "Cotizar" }} />
 
       {/* El riesgo y lo que dejamos resuelto */}
-      <section id="riesgo" className={`${s.seccion} ${s.seccionAlt} ${p.ancla}`} aria-labelledby="riesgo-titulo">
+      <section id="riesgo" className={`${s.noche} ${s.seccion} ${s.seccionNoche} ${p.ancla}`} data-noche-zona="" aria-labelledby="riesgo-titulo">
+        <FondoNoche hilo="ninguno" />
         <div className={s.contenedor}>
           <div className={i.dos}>
             <div data-aparecer>
@@ -330,7 +335,7 @@ export default async function IndustryHubPage(props: { params: Promise<Params> }
               </h2>
               <p className={s.lead}>{hub.pain}</p>
             </div>
-            <div className={i.tarjeta} data-aparecer>
+            <div className={i.tarjeta} data-aparecer data-luz="" data-inclina="4">
               <span className={i.tarjetaEtiqueta}>
                 <PublicIcon name="check" size={16} /> Con NEXARA
               </span>
@@ -348,7 +353,7 @@ export default async function IndustryHubPage(props: { params: Promise<Params> }
           {seoIndustry ? (
             <ol className={p.tres}>
               {seoIndustry.outcomes.map((o, n) => (
-                <li key={o} className={p.tresItem} data-aparecer>
+                <li key={o} className={p.tresItem} data-aparecer data-luz="" style={{ "--c": SENALES[n % 5].color } as CSSProperties}>
                   <span className={p.tresNumero}>{String(n + 1).padStart(2, "0")}</span>
                   <h3 className={p.tresTitulo}>{o}</h3>
                 </li>
@@ -394,14 +399,14 @@ export default async function IndustryHubPage(props: { params: Promise<Params> }
             </p>
           </div>
           {relacionadas.length > 0 ? (
-            <Rutas
-              columnas={4}
+            <Explorador
               ir="Ver solución"
               rutas={relacionadas.map((item) => ({
                 href: `/soluciones/${item.industry.slug}/${item.service.slug}`,
                 titulo: item.service.name,
                 texto: item.service.summary,
                 icono: visualServicio(item.service.slug).icono,
+                foto: visualServicio(item.service.slug).foto,
               }))}
             />
           ) : (

@@ -8,6 +8,8 @@ import p from "@/components/sitio/paginas.module.css";
 import n from "@/components/sitio/noche.module.css";
 import HeroPagina from "@/components/sitio/HeroPagina";
 import Flecha from "@/components/sitio/Flecha";
+import FondoNoche from "@/components/sitio/FondoNoche";
+import x from "@/components/sitio/profundo.module.css";
 import FormularioContacto from "@/components/sitio/FormularioContacto";
 import Copiar from "@/components/sitio/Copiar";
 import Preguntas, { type Pregunta } from "@/components/sitio/Preguntas";
@@ -150,7 +152,8 @@ export default function PropuestaContacto() {
         </div>
       </section>
 
-      <section id="ubicacion" className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="ubicacion-titulo">
+      <section id="ubicacion" className={`${s.noche} ${s.seccion} ${s.seccionNoche}`} data-noche-zona="" aria-labelledby="ubicacion-titulo">
+        <FondoNoche hilo="ninguno" />
         <div className={`${s.contenedor} ${p.dos}`}>
           <div data-aparecer>
             <p className={s.antetitulo}>Base de operación</p>
@@ -183,7 +186,7 @@ export default function PropuestaContacto() {
               </Link>
             </div>
           </div>
-          <div className={p.mapaCalle} data-aparecer data-luz="">
+          <div className={`${p.mapaCalle} ${x.sede}`} data-aparecer>
             {/* Sin la tarjeta ni el botón propios del mapa: la dirección y «Cómo llegar» ya están a la izquierda. */}
             <BrandMap overlay={false} />
           </div>

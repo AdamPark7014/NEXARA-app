@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -18,6 +19,8 @@ import Rutas from "@/components/sitio/TarjetasRuta";
 import MapaMexico from "@/components/sitio/MapaMexico";
 import Preguntas from "@/components/sitio/Preguntas";
 import ArteServicio from "@/components/sitio/ArteServicio";
+import FondoNoche from "@/components/sitio/FondoNoche";
+import { senal } from "@/components/sitio/senales";
 import Cierre from "@/components/sitio/Cierre";
 import Flecha from "@/components/sitio/Flecha";
 import { foto, fotoOg } from "@/components/sitio/fotos";
@@ -252,7 +255,7 @@ export default async function CoberturaCityServicePage(props: { params: Promise<
       {/* Qué incluye */}
       <section id="incluye" className={`${s.seccion} ${p.ancla}`} aria-labelledby="incluye-titulo">
         <div className={s.contenedor}>
-          <article className={p.servicio} data-aparecer>
+          <article className={p.servicio} data-aparecer style={{ "--c": senal(visual.ancla).color } as CSSProperties}>
             <div>
               <span className={p.servicioIcono}>
                 <PublicIcon name={visual.icono} size={22} />
@@ -277,7 +280,7 @@ export default async function CoberturaCityServicePage(props: { params: Promise<
                 </Link>
               </p>
             </div>
-            <div className={p.servicioArte}>
+            <div className={p.servicioArte} data-luz="" data-inclina="5">
               <ArteServicio servicio={service.slug} alt={`${service.name} instalado por NEXARA`} />
             </div>
           </article>
@@ -327,7 +330,8 @@ export default async function CoberturaCityServicePage(props: { params: Promise<
       ) : null}
 
       {/* El mismo servicio en otras ciudades */}
-      <section id="ciudades" className={`${s.seccion} ${s.seccionAlt} ${p.ancla}`} aria-labelledby="ciudades-titulo">
+      <section id="ciudades" className={`${s.noche} ${s.seccion} ${s.seccionNoche} ${p.ancla}`} data-noche-zona="" aria-labelledby="ciudades-titulo">
+        <FondoNoche hilo="ninguno" />
         <div className={`${s.contenedor} ${i.dos}`}>
           <div data-aparecer>
             <p className={s.antetitulo}>Otras ciudades</p>

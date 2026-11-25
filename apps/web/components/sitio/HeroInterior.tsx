@@ -1,6 +1,7 @@
 import s from "./sitio.module.css";
 import p from "./paginas.module.css";
 import i from "./interior.module.css";
+import v from "./vivo.module.css";
 import HeroPagina from "./HeroPagina";
 import Migas, { type Miga } from "./Migas";
 
@@ -13,8 +14,8 @@ type Props = {
   acciones?: React.ReactNode;
   /** Foto o mapa en un marco ancho bajo el texto. */
   visual?: React.ReactNode;
-  /** «foto» llena el marco; «mapa» va centrado sobre el fondo alterno. */
-  tipoVisual?: "foto" | "mapa";
+  /** «foto» llena el marco; «mapa» va centrado sobre el fondo alterno; «libre» trae su propio marco. */
+  tipoVisual?: "foto" | "mapa" | "libre";
   /** Títulos de más de ~30 caracteres (servicio × industria, servicio × ciudad) bajan un paso de tamaño. */
   tituloLargo?: boolean;
 };
@@ -23,7 +24,15 @@ type Props = {
 export default function HeroInterior({ id, migas, antetitulo, titulo, lead, acciones, visual, tipoVisual = "foto", tituloLargo }: Props) {
   const marco = tipoVisual === "mapa" ? `${i.heroVisual} ${i.heroVisualMapa}` : i.heroVisual;
   return (
-    <HeroPagina id={id} className={i.hero} visual={visual ? <div className={marco}>{visual}</div> : undefined}>
+    <HeroPagina id={id} className={i.hero} visual={!visual ? undefined : tipoVisual === "libre" ? visual : <div className={marco} data-luz="">
+            {visual}
+            {tipoVisual === "foto" ? (
+              <>
+                <span className={v.esquinas} aria-hidden="true" />
+                <span className={v.barridoCian} aria-hidden="true" />
+              </>
+            ) : null}
+          </div>}>
       {migas ? <Migas migas={migas} /> : null}
       <p className={s.antetitulo}>{antetitulo}</p>
       <h1 id={id} className={`${p.heroTitulo} ${tituloLargo ? i.tituloLargo : ""}`}>

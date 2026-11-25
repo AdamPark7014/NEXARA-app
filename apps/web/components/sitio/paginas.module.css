@@ -1239,3 +1239,136 @@
   letter-spacing: -0.03em;
   color: #fff;
 }
+
+/* Entregables: cada renglón cuelga de la pista del servicio. */
+.servicio .lista {
+  position: relative;
+  gap: 16px;
+}
+
+.servicio .lista::before {
+  content: "";
+  position: absolute;
+  inset: 12px auto 12px 8px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--c, #3aa9cc), transparent);
+}
+
+.servicio .lista li {
+  position: relative;
+  transition: translate 0.25s var(--ease-out);
+}
+
+.servicio .lista li:hover {
+  translate: 6px 0;
+}
+
+.servicio .lista li > svg {
+  box-sizing: content-box;
+  padding: 3px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--c, #3aa9cc);
+  position: relative;
+}
+
+/* Datos operativos: lectura de tablero. */
+.dato {
+  background: linear-gradient(170deg, color-mix(in srgb, var(--c, #3aa9cc) 9%, var(--tile)), var(--tile) 60%);
+}
+
+.datoIcono {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 50px;
+  height: 54px;
+  padding: 13px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--c, #3aa9cc) 55%, #070b12), #070b12);
+  color: #fff;
+}
+
+span.datoIcono {
+  padding: 0;
+}
+
+[data-noche-zona] .dato {
+  background: radial-gradient(90% 70% at 0% 0%, color-mix(in srgb, var(--c) 20%, transparent), transparent 70%), rgb(14 24 38 / 0.8);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 36%, transparent);
+}
+
+.dosFoto {
+  position: relative;
+  box-shadow: 0 0 0 1px rgb(127 208 226 / 0.3), 0 50px 100px -44px rgb(58 169 204 / 0.6);
+}
+
+/* Contacto */
+.formulario {
+  position: relative;
+}
+
+.canalIcono {
+  width: 52px;
+  height: 56px;
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+
+.canales .canal {
+  min-height: 92px;
+  border-radius: 22px;
+}
+
+.canales .canal:hover {
+  transform: translateX(6px);
+}
+
+.despuesLista {
+  position: relative;
+  gap: 24px;
+}
+
+.despuesLista::before {
+  content: "";
+  position: absolute;
+  inset: 14px auto 30px 16px;
+  width: 2px;
+  background: linear-gradient(180deg, #1fb89a, #3aa9cc 50%, #a64ca6);
+}
+
+.despuesLista li {
+  position: relative;
+  grid-template-columns: 34px 1fr;
+}
+
+.despuesLista li::before {
+  width: 34px;
+  height: 37px;
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: linear-gradient(150deg, #1fb89a, #3aa9cc);
+  color: #fff;
+}
+
+.despuesLista li:nth-child(2)::before {
+  background: linear-gradient(150deg, #3aa9cc, #6d7fc0);
+}
+
+.despuesLista li:nth-child(3)::before {
+  background: linear-gradient(150deg, #8a5fb0, #a64ca6);
+}
+
+.canales {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.canalFila {
+  border-radius: 22px;
+}
+
+/* Casi opaca: sobre las secciones de noche se veía gris. */
+.subnav {
+  background: color-mix(in srgb, var(--bg) 97%, transparent);
+}
