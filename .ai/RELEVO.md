@@ -1,5 +1,12 @@
 # RELEVO
 
+- **25-11 ~02:15 México (claude-code) — Web pública «Ensamble»: portada con el logo y los circuitos, noche NEXARA en todas las páginas y sitio que abre con el almacenamiento bloqueado. En main, sin desplegar; sin migraciones. Publicarla espera el visto bueno visual de Adam.**
+  - Base: respaldo del 22-11 11:50 UTC. Los arreglos de las ~2 h siguientes vivían en el contenedor de nube y no están en la PC; se rehicieron los visibles: gráfica a medias, aviso de cookies que tapaba botones y formulario (`data-cede-aviso`), tablero, contraste en oscuro, cierre en teléfono, barra de 64 px. Faltan los menores (pausa global, menús táctiles, plano del simulador en teléfono, textos de botones unificados).
+  - Tronaba sin almacenamiento: `LoginWelcomeBanner`, `tenant`, `install-offline-fetch`, `api-base`, `cookie-consent`, `device-identity`. Prueba: `lib/almacenamiento-bloqueado.spec.ts`.
+  - 404 raíz: no cargaba `sitio-documento.css` (título invisible); ahora lo importa el layout raíz. `trazas.ts` → `trazado.ts`: chocaba con `Trazas.tsx` en Windows y no compilaba.
+  - Verificado: compilación de producción, 2,545 pruebas de la web, 11 rutas en 1440, 390 y 360 px con y sin almacenamiento: sin errores ni desbordes.
+  - Plataformas: Web hecha · API, Android e iOS: no aplica (sitio público).
+
 - **25-11 ~02:10 México (claude-code) — Horario por día, actividades de un solo día y pago semanal: recuperado lo que el rebase del 22-11 dejó fuera de main (`e8da7d096`). Con OK de Adam para subir y desplegar. Tres migraciones aditivas.**
   - Migraciones: `actividad_serie_diaria` (corregida: la tabla es `Activity`, no `activities`), `horario_dia_productividad`, `nomina_pago_semanal`. Probadas dos veces en Postgres 17 desechable, sin diferencias con el esquema.
   - Corregido al recuperar: el 10–18 por omisión cerraba turnos de noche en cero minutos (solo manda un horario programado para ese día); `GET attendance/horarios/de` pide alcance; una serie a medias no repite días al reintentar.
