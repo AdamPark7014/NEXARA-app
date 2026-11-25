@@ -41,7 +41,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   m.semanaPago.mockResolvedValue(semana());
   m.detallePago.mockResolvedValue(detalle());
-  m.registrarPago.mockResolvedValue({ ok: true });
+  m.registrarPago.mockResolvedValue({ ok: true, id: 1, pagoId: null, aviso: null });
   m.ajustarPago.mockResolvedValue({ ok: true });
 });
 

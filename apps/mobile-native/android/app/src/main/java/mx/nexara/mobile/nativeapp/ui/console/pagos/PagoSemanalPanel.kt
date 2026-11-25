@@ -80,6 +80,7 @@ data class DetallePagoUi(
     val error: String? = null,
     val enviando: Boolean = false,
     val errorPago: String? = null,
+    val aviso: String? = null,
 )
 
 class PagoSemanalViewModel(app: Application) : AndroidViewModel(app) {
@@ -150,8 +151,15 @@ class PagoSemanalViewModel(app: Application) : AndroidViewModel(app) {
         _detalle.update { it?.copy(enviando = true, errorPago = null) }
         viewModelScope.launch {
             try {
-                repo.registrar(semana, d.userId, centavos, forma, HorariosRules.hoy().toString(), comprobante)
-                cerrar()
+                val r = repo.registrar(semana, d.userId, centavos, forma, HorariosRules.hoy().toString(), comprobante)
+                val aviso = r.aviso
+                // El pago sí quedó; si falta su póliza, se lee antes de cerrar.
+                if (aviso == null) {
+                    cerrar()
+                } else {
+                    _detalle.update { it?.copy(enviando = false, aviso = aviso) }
+                    cargarDetalle()
+                }
                 cargar()
             } catch (e: Throwable) {
                 _detalle.update { it?.copy(enviando = false, errorPago = e.toUserMessage("No se pudo registrar el pago")) }
@@ -344,6 +352,7 @@ private fun HojaDetallePago(ui: DetallePagoUi, vm: PagoSemanalViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
+                    ui.aviso?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = NxColors.Warning) }
                     if (puede && registrando) FormularioPago(d, ui, vm) else Calculo(d)
                 }
             }
@@ -415,7 +424,7 @@ private fun FormularioPago(d: PagoDetalleDto, ui: DetallePagoUi, vm: PagoSemanal
         onClick = { vm.registrar(importe, forma, comprobante) },
     )
     Text(
-        falta ?: "Queda con fecha de hoy. Puedes pagar una parte.",
+        falta ?: "Queda con fecha de hoy. Puedes pagar una parte; al completar se marca pagado en la lista.",
         style = MaterialTheme.typography.bodySmall,
         color = if (falta != null) NxColors.Warning else NxColors.Muted,
     )

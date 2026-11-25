@@ -89,6 +89,8 @@ export function etiquetaFormaPago(forma: string | null | undefined): string {
       return "Efectivo";
     case "otro":
       return "Otro";
+    case "lista":
+      return "Pagado en la lista";
     default:
       return forma?.trim() || "—";
   }
@@ -119,7 +121,7 @@ export function registrarPago(
   token: string,
   b: { semana: string; userId: number; monto: number; fecha: string; forma: FormaPagoNomina },
   comprobante?: File | null,
-) {
+): Promise<{ ok: boolean; id: number; pagoId: number | null; aviso: string | null }> {
   const form = new FormData();
   for (const [k, v] of Object.entries(b)) form.append(k, String(v));
   if (comprobante) form.append("comprobante", comprobante);

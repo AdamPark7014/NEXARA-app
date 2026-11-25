@@ -43,7 +43,7 @@ object PagoSemanalRules {
         else -> "Sin monto"
     }
 
-    fun forma(clave: String?): String = FORMAS.firstOrNull { it.first == clave }?.second ?: "Pago"
+    fun forma(clave: String?): String = if (clave == "lista") "Pagado en la lista" else FORMAS.firstOrNull { it.first == clave }?.second ?: "Pago"
 
     /** null = se puede registrar. */
     fun faltaParaPagar(importe: String, saldo: Double?): String? {

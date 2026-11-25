@@ -7,7 +7,7 @@ const RH = { id: 2, email: 'rh@ejemplo.test', roleKey: 'rh' };
 const ACTOR = { id: 1, nombre: 'Dirección' };
 const SEM = '2026-11-16';
 
-function armar(op: { total?: number; cerrada?: boolean; ocultos?: boolean; pago?: any; puedeEditar?: boolean } = {}) {
+function armar(op: { total?: number; cerrada?: boolean; ocultos?: boolean; enLista?: any[]; borrador?: any; markPagado?: any; puedeEditar?: boolean } = {}) {
   const ajustes: any[] = [];
   const registros: any[] = [];
   const fila = {
@@ -26,7 +26,9 @@ function armar(op: { total?: number; cerrada?: boolean; ocultos?: boolean; pago?
     descuentos: [{ concepto: 'Uniforme', monto: 100, aceptado: true }, { concepto: 'Falta', monto: 342, aceptado: false }],
     subtotal: 2640,
     total: op.total ?? 2540,
-    pago: op.pago ?? null,
+    horasNetasTotales: 40,
+    // La foto del cierre se queda con el estatus viejo: no debe mandar.
+    pago: { id: 9, estatus: 'Borrador', monto: 2540 },
   };
   const prisma: any = {
     nominaSemana: { upsert: jest.fn(async () => ({ id: 1 })) },
@@ -40,11 +42,21 @@ function armar(op: { total?: number; cerrada?: boolean; ocultos?: boolean; pago?
     },
     nominaPagoRegistro: {
       create: jest.fn(async ({ data }: any) => {
-        const r = { id: registros.length + 1, ...data, createdAt: new Date() };
+        const r = { id: registros.length + 1, employeePaymentId: null, ...data, createdAt: new Date() };
         registros.push(r);
         return r;
       }),
-      findMany: jest.fn(async () => registros),
+      findMany: jest.fn(async ({ where }: any) => ('employeePaymentId' in where ? registros.filter((r) => r.employeePaymentId === null) : registros)),
+      updateMany: jest.fn(async ({ where, data }: any) => {
+        registros.filter((r) => where.id.in.includes(r.id)).forEach((r) => Object.assign(r, data));
+        return { count: where.id.in.length };
+      }),
+    },
+    employeePayment: {
+      findMany: jest.fn(async () => op.enLista ?? []),
+      findFirst: jest.fn(async () => op.borrador ?? null),
+      update: jest.fn(async ({ where }: any) => ({ id: where.id })),
+      create: jest.fn(async () => ({ id: 50 })),
     },
     $executeRaw: jest.fn(async () => 1),
   };
@@ -58,7 +70,8 @@ function armar(op: { total?: number; cerrada?: boolean; ocultos?: boolean; pago?
       puedeEditar: op.puedeEditar ?? !op.cerrada,
     })),
   };
-  return { service: new NominaPagoService(prisma, control), prisma, ajustes, registros };
+  const lista: any = { markPagado: op.markPagado ?? jest.fn(async () => ({})) };
+  return { service: new NominaPagoService(prisma, control, lista), prisma, lista, ajustes, registros };
 }
 
 const pagar = (s: NominaPagoService, monto: number, extra: any = {}) =>
@@ -103,10 +116,41 @@ describe('pago semanal', () => {
     await expect(pagar(service, 10, { fecha: '2999-01-01' })).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('si ya se marcó Pagado en la lista de pagos, no se paga otra vez ni sale pendiente', async () => {
-    const { service } = armar({ pago: { id: 9, estatus: 'Pagado', monto: 2540 } });
+  it('lo pagado en la lista cuenta aunque la foto del cierre diga Borrador', async () => {
+    const enLista = [{ id: 9, userId: 5, amount: 2540, paidAt: new Date(), createdAt: new Date() }];
+    const { service } = armar({ enLista, cerrada: true });
     expect((await service.semana(CEO, 1, SEM, ACCESO)).filas[0].estado).toBe('pagado');
     await expect(pagar(service, 100)).rejects.toBeInstanceOf(ConflictException);
+    const d = await service.detalle(CEO, 1, { semana: SEM, userId: 5 }, ACCESO);
+    expect(d.movimientos).toEqual([expect.objectContaining({ tipo: 'pago', forma: 'lista', monto: 2540 })]);
+  });
+
+  it('al completar marca una sola línea en la lista, por lo pagado, y la liga a los registros', async () => {
+    const { service, prisma, lista, registros } = armar();
+    await pagar(service, 1500);
+    expect(lista.markPagado).not.toHaveBeenCalled();
+    const r = await pagar(service, 1040);
+    expect(prisma.employeePayment.create).toHaveBeenCalledTimes(1);
+    expect(Number(prisma.employeePayment.create.mock.calls[0][0].data.amount)).toBe(2540);
+    expect(prisma.employeePayment.create.mock.calls[0][0].data.status).toBe('Borrador');
+    expect(lista.markPagado).toHaveBeenCalledWith(50, 1, 1);
+    expect(registros.map((x) => x.employeePaymentId)).toEqual([50, 50]);
+    expect(r).toMatchObject({ pagoId: 50, aviso: null });
+  });
+
+  it('si el cierre ya dejó su Borrador, usa ese', async () => {
+    const { service, prisma, lista } = armar({ cerrada: true, borrador: { id: 9 } });
+    await pagar(service, 2540);
+    expect(prisma.employeePayment.create).not.toHaveBeenCalled();
+    expect(lista.markPagado).toHaveBeenCalledWith(9, 1, 1);
+  });
+
+  it('si la póliza falla, el pago queda registrado y se avisa', async () => {
+    const { service, registros } = armar({ markPagado: jest.fn(async () => { throw new Error('Periodo cerrado'); }) });
+    const r = await pagar(service, 2540);
+    expect(r.aviso).toContain('falta su póliza');
+    expect(registros).toHaveLength(1);
+    await expect(pagar(service, 1)).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('semana cerrada no se ajusta, pero sí se paga', async () => {

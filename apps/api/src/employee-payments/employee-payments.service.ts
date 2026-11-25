@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { candadoPagoSemana } from './pago-candado.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CreateEmployeePaymentDto } from './dto/create-employee-payment.dto.js';
@@ -605,6 +606,8 @@ export class EmployeePaymentsService {
       'Pago a empleado';
     const wantsPaid = status === STATUS.PAGADO;
     const tenantId = await resolveRequiredCompanyId(this.prisma, companyId);
+    // Antes de crearlo: si no, quedaría un Borrador que nadie pidió.
+    if (wantsPaid) await this.exigirSinPagosParciales(this.prisma, tenantId, { userId, periodFrom, periodTo });
 
     const created = await this.prisma.employeePayment.create({
       data: {
@@ -651,6 +654,21 @@ export class EmployeePaymentsService {
       throw new BadRequestException('No se puede editar un pago anulado');
     }
 
+    const aPagado = dto.status !== undefined && this.normalizeStatus(dto.status) === STATUS.PAGADO;
+    // Nació de la pestaña «Pago»: su importe es lo que de verdad se pagó. Se puede anotar o anular.
+    if (dto.amount !== undefined || dto.userId !== undefined || dto.periodFrom !== undefined || dto.periodTo !== undefined || (dto.status !== undefined && this.normalizeStatus(dto.status) === STATUS.BORRADOR)) {
+      const ligados = await this.prisma.nominaPagoRegistro.count({ where: { employeePaymentId: id, companyId: tenantId } });
+      const cambia =
+        (dto.amount !== undefined && Number(dto.amount) !== Number(existing.amount)) ||
+        (dto.userId !== undefined && Number(dto.userId) !== existing.userId) ||
+        (dto.periodFrom !== undefined && String(dto.periodFrom).slice(0, 10) !== existing.periodFrom.toISOString().slice(0, 10)) ||
+        (dto.periodTo !== undefined && String(dto.periodTo).slice(0, 10) !== existing.periodTo.toISOString().slice(0, 10)) ||
+        (dto.status !== undefined && existing.status === STATUS.PAGADO && this.normalizeStatus(dto.status) === STATUS.BORRADOR);
+      if (ligados && cambia) {
+        throw new ConflictException('Este pago viene de la pestaña «Pago»: no se cambia aquí. Si está mal, anúlalo y regístralo otra vez.');
+      }
+    }
+
     const data: Prisma.EmployeePaymentUpdateInput = {};
     if (dto.userId !== undefined) {
       const userId = Number(dto.userId);
@@ -678,10 +696,8 @@ export class EmployeePaymentsService {
     if (dto.note !== undefined) data.note = dto.note?.trim() || null;
     if (dto.status !== undefined) {
       const status = this.normalizeStatus(dto.status);
-      data.status = status;
-      if (status === STATUS.PAGADO) {
-        data.paidAt = existing.paidAt || new Date();
-      }
+      // «Pagado» lo pone `markPagado`, con su candado y su póliza.
+      if (status !== STATUS.PAGADO) data.status = status;
       if (status === STATUS.ANULADO) {
         data.paidAt = null;
       }
@@ -696,7 +712,7 @@ export class EmployeePaymentsService {
       include: { user: true, createdBy: true },
     });
 
-    if (dto.status !== undefined && this.normalizeStatus(dto.status) === STATUS.PAGADO && !existing.journalEntryId) {
+    if (aPagado && (existing.status !== STATUS.PAGADO || !existing.journalEntryId)) {
       return this.markPagado(id, actorId, tenantId);
     }
 
@@ -716,22 +732,45 @@ export class EmployeePaymentsService {
       throw new BadRequestException('No se puede pagar un registro anulado');
     }
 
+    // Se aparta antes de la póliza: ni dos «Marcar pagado» a la vez ni la pestaña «Pago» pagan doble.
+    const anterior = existing.status;
+    if (anterior !== STATUS.PAGADO) {
+      const apartado = await this.prisma.$transaction(async (tx) => {
+        await candadoPagoSemana(tx, tenantId, existing.periodFrom.toISOString().slice(0, 10), existing.userId);
+        await this.exigirSinPagosParciales(tx, tenantId, existing);
+        return tx.employeePayment.updateMany({
+          where: { id, companyId: tenantId, status: anterior, deletedAt: null },
+          data: { status: STATUS.PAGADO, paidAt: existing.paidAt || new Date() },
+        });
+      });
+      if (!apartado.count) throw new ConflictException('Ese pago acaba de cambiar; actualiza la lista');
+    }
+
     let journalEntryId = existing.journalEntryId;
     let contabilidadRef = existing.contabilidadRef;
     if (!journalEntryId && actorId) {
-      const entry = await this.accounting.postOperationalDisbursement({
-        kind: 'payroll',
-        entityId: id,
-        amount: Number(existing.amount),
-        date: existing.paidAt || existing.periodTo,
-        description: `Pago a empleado #${id}: ${existing.concepto || existing.note || 'Pago'}`,
-        userId: actorId,
-        // Sin la empresa, la póliza automática fallaba con 403 al contabilizarse
-        // y "marcar pagado" reventaba entero.
-        companyId: tenantId,
-      });
-      journalEntryId = entry.id;
-      contabilidadRef = entry.entryNumber;
+      try {
+        const entry = await this.accounting.postOperationalDisbursement({
+          kind: 'payroll',
+          entityId: id,
+          amount: Number(existing.amount),
+          date: existing.paidAt || existing.periodTo,
+          description: `Pago a empleado #${id}: ${existing.concepto || existing.note || 'Pago'}`,
+          userId: actorId,
+          // Sin la empresa, la póliza automática fallaba con 403 al contabilizarse
+          // y "marcar pagado" reventaba entero.
+          companyId: tenantId,
+        });
+        journalEntryId = entry.id;
+        contabilidadRef = entry.entryNumber;
+      } catch (error) {
+        if (anterior !== STATUS.PAGADO) {
+          await this.prisma.employeePayment
+            .updateMany({ where: { id, companyId: tenantId, journalEntryId: null }, data: { status: anterior, paidAt: existing.paidAt } })
+            .catch(() => undefined);
+        }
+        throw error;
+      }
     }
 
     const updated = await this.prisma.employeePayment.update({
@@ -756,6 +795,21 @@ export class EmployeePaymentsService {
       )
       .catch(() => undefined);
     return updated;
+  }
+
+  /** Con un pago a medias en la pestaña «Pago», marcarlo aquí pagaría dos veces esa parte. */
+  private async exigirSinPagosParciales(
+    tx: Prisma.TransactionClient,
+    companyId: number,
+    pago: { userId: number; periodFrom: Date; periodTo: Date },
+  ) {
+    const sueltos = await tx.nominaPagoRegistro.findMany({
+      where: { companyId, userId: pago.userId, employeePaymentId: null, semana: { inicio: pago.periodFrom, fin: pago.periodTo } },
+      select: { monto: true },
+    });
+    if (!sueltos.length) return;
+    const total = sueltos.reduce((s, r) => s + Number(r.monto), 0).toFixed(2);
+    throw new ConflictException(`Ya hay $${total} pagados en la pestaña «Pago» de esa semana. Termina de pagarlo ahí.`);
   }
 
   async remove(id: number, actorId?: number, companyId?: number | null) {

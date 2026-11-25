@@ -145,7 +145,7 @@ enum HorariosReglas {
         }
     }
 
-    static func forma(_ clave: String?) -> String { formas.first { $0.clave == clave }?.texto ?? "Pago" }
+    static func forma(_ clave: String?) -> String { clave == "lista" ? "Pagado en la lista" : formas.first { $0.clave == clave }?.texto ?? "Pago" }
 
     static func faltaParaPagar(importe: String, saldo: Double?) -> String? {
         let tope = centavos(saldo)

@@ -73,14 +73,15 @@ export default function DetallePago({
     void cargar();
   }, [cargar]);
 
-  const correr = async (fn: () => Promise<unknown>, exito: string) => {
+  const correr = async (fn: () => Promise<{ aviso?: string | null } | null | undefined>, exito: string) => {
     if (cerrojo.current) return;
     cerrojo.current = true;
     setOcupado(true);
     setError(null);
     try {
-      await fn();
-      toast.success(exito);
+      const r = await fn();
+      if (r?.aviso) toast.error(r.aviso);
+      else toast.success(exito);
       setAjuste("");
       setMotivo("");
       setArchivo(null);
@@ -295,7 +296,7 @@ export default function DetallePago({
                   }}
                 />
               </div>
-              <p className={s.nota}>Solo dirección registra pagos. Puedes pagar una parte.</p>
+              <p className={s.nota}>Solo dirección registra pagos. Puedes pagar una parte. Al completar se marca «Pagado» en la lista y se asienta su póliza.</p>
             </>
           )}
         </>

@@ -122,6 +122,11 @@ struct MovimientoPago: Decodable, Hashable {
     var autorNombre: String?
 }
 
+struct PagoRegistrado: Decodable {
+    /// El pago quedó, pero falta algo (su póliza).
+    var aviso: String?
+}
+
 struct PagoDetalle: Decodable {
     var puedeRegistrar: Bool?
     var saldo: SaldoPago?
@@ -160,7 +165,7 @@ final class PagoSemanalRepository {
         forma: String,
         fecha: String,
         comprobante: CapturedGeoPhoto?
-    ) async throws {
+    ) async throws -> String? {
         try await CoreRepository.requireOnline()
         var archivos: [(field: String, data: Data, fileName: String, mimeType: String)] = []
         if let comprobante {
@@ -178,5 +183,6 @@ final class PagoSemanalRepository {
             files: archivos
         )
         if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+        return (try? JSONDecoder().decode(PagoRegistrado.self, from: data))?.aviso
     }
 }

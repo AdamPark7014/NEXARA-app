@@ -81,4 +81,4 @@ data class PagoDetalleDto(
     val movimientos: List<MovimientoPagoDto>? = null,
 )
 
-data class PagoRegistradoDto(val ok: Boolean? = null, val id: Long? = null)
+data class PagoRegistradoDto(val ok: Boolean? = null, val id: Long? = null, val aviso: String? = null)

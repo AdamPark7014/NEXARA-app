@@ -155,6 +155,7 @@ struct DetallePagoView: View {
     @State private var camara = false
     @State private var enviando = false
     @State private var error: String?
+    @State private var aviso: String?
 
     private var puede: Bool {
         datos?.puedeRegistrar == true && HorariosReglas.centavos(datos?.saldo?.saldo) > 0
@@ -177,6 +178,12 @@ struct DetallePagoView: View {
                         .foregroundStyle(NxColors.fg)
                     if puede {
                         NxSegmented(options: ["Cómo se calculó", "Registrar pago"], selection: $vista)
+                    }
+                    if let aviso {
+                        Text(aviso)
+                            .font(NxType.bodySmall)
+                            .foregroundStyle(NxColors.warning)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     if puede && vista == 1 { formulario } else { calculo(datos) }
                 } else if let falla {
@@ -272,7 +279,7 @@ struct DetallePagoView: View {
         ) {
             registrar()
         }
-        Text(falta ?? "Queda con fecha de hoy. Puedes pagar una parte.")
+        Text(falta ?? "Queda con fecha de hoy. Puedes pagar una parte; al completar se marca pagado en la lista.")
             .font(NxType.bodySmall)
             .foregroundStyle(NxColors.muted)
     }
@@ -301,7 +308,7 @@ struct DetallePagoView: View {
         let foto = comprobante
         Task { @MainActor in
             do {
-                try await PagoSemanalRepository.shared.registrar(
+                let nota = try await PagoSemanalRepository.shared.registrar(
                     lunes: lunes,
                     userId: fila.userId,
                     centavos: centavos,
@@ -311,7 +318,13 @@ struct DetallePagoView: View {
                 )
                 enviando = false
                 onPagado()
-                dismiss()
+                // El pago sí quedó; si falta su póliza, se lee antes de cerrar.
+                if let nota {
+                    aviso = nota
+                    await cargar()
+                } else {
+                    dismiss()
+                }
             } catch {
                 enviando = false
                 self.error = error.toUserMessage(fallback: "No se pudo registrar el pago")

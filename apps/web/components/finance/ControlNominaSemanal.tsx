@@ -711,7 +711,7 @@ export default function ControlNominaSemanal({
             </span>
           </div>
         ) : null}
-        <div className={s.cardBody}>{vista === "pago" ? <PagoSemanal token={token} semana={semana} /> : contenido}</div>
+        <div className={s.cardBody}>{vista === "pago" ? <PagoSemanal token={token} semana={semana} onCambio={onPagosGenerados} /> : contenido}</div>
       </section>
 
       <div className="ui-sr-only" aria-live="polite">

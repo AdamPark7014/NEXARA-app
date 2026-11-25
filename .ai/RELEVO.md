@@ -1,5 +1,12 @@
 # RELEVO
 
+- **25-11 ~14:20 México (claude-code) — El pago semanal y la lista de pagos son uno solo: no se puede pagar doble por ningún lado. Sin migraciones.**
+  - Al completar el saldo en «Pago», queda una línea en la lista por lo que de verdad se pagó (usa el Borrador del cierre si existe), se marca «Pagado» y se asienta su póliza. Si la póliza falla, el pago queda registrado y se avisa; se reintenta marcándolo en la lista.
+  - Lo pagado en la lista cuenta en «Pago» leyendo el dato de hoy, no la foto del cierre. Con un pago a medias en «Pago», la lista no deja marcarlo. Anular en la lista libera el saldo. Un solo candado: `employee-payments/pago-candado.ts`.
+  - `markPagado` aparta el pago antes de la póliza y lo regresa si falla: dos «Marcar pagado» a la vez ya no asientan dos pólizas.
+  - Verificado con Postgres real: cinco pagos simultáneos, uno pasa; lista y «Pago» a la vez, uno pasa. Pendiente: deshacer un pago a medias mal capturado (hoy no se puede).
+  - Paridad: API hecho · Web hecho · Android hecho · iOS hecho.
+
 - **25-11 ~11:30 México (claude-code) — Pantallas de horarios y pago semanal en web, Android e iOS, con su servidor. Maqueta aprobada por Adam. Sin migraciones; sin desplegar.**
   - Web: Asistencias → «Horarios» (por semana o el de siempre; «Mi horario» para quien no tiene gente) y Control semanal → «Pago». Panel lateral común: `components/ui/Cajon`.
   - API: el sugerido es el total del Control semanal (con extra autorizada y descuentos aceptados) y lo calcula el servidor; pagar lleva candado por persona y semana y no pasa del saldo; un pago ya marcado «Pagado» en la lista no se paga otra vez; el comprobante es privado (`control-semanal/comprobante/:id`). Horarios: los avisos miran lo ya programado, `mio`, `quitar`, sin cambiar días pasados.

@@ -10,7 +10,7 @@ import s from "./pago.module.css";
 const personas = (n: number) => `${n} ${n === 1 ? "persona" : "personas"}`;
 
 /** Pestaña «Pago» del Control semanal: sugerido, ajuste, pagado y saldo de cada persona. */
-export default function PagoSemanal({ token, semana }: { token: string; semana: string }) {
+export default function PagoSemanal({ token, semana, onCambio }: { token: string; semana: string; onCambio?: () => void }) {
   const [datos, setDatos] = useState<SemanaPago | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState<{ userId: number; nombre: string; vista: "calculo" | "registrar" } | null>(null);
@@ -195,7 +195,10 @@ export default function PagoSemanal({ token, semana }: { token: string; semana: 
           nombre={abierto.nombre}
           vistaInicial={abierto.vista}
           onCerrar={() => setAbierto(null)}
-          onCambio={() => void cargar()}
+          onCambio={() => {
+            void cargar();
+            onCambio?.();
+          }}
         />
       ) : null}
     </div>

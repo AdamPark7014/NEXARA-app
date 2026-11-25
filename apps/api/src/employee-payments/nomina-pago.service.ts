@@ -11,7 +11,7 @@ import { createReadStream } from 'node:fs';
 import { mkdir, stat, unlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { extname, join } from 'node:path';
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -20,7 +20,9 @@ import { parseWorkDate, workDateColumn, workDateKey } from '../common/time/workd
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 import { resolveUploadsDir } from '../common/uploads-path.js';
 import { ControlNominaService, ESTADO_SEMANA, type FilaRespuesta } from './control-nomina.service.js';
-import { domingoDe, fechaValida } from './control-nomina.js';
+import { conceptoPagoSemana, domingoDe, fechaValida } from './control-nomina.js';
+import { EmployeePaymentsService } from './employee-payments.service.js';
+import { REGISTRO_VIGENTE, candadoPagoSemana } from './pago-candado.js';
 import {
   comoSeCalculoDeFila,
   estadoDePago,
@@ -33,7 +35,9 @@ import {
 type Viewer = { id: number; roleKey?: string | null; email?: string | null; isSuperAdmin?: boolean };
 type Actor = { id: number; nombre?: string | null };
 type Acceso = { verMontos: boolean; puedeEditar: boolean };
-type Cliente = Pick<Prisma.TransactionClient, 'nominaPagoAjuste' | 'nominaPagoRegistro'>;
+type Cliente = Pick<Prisma.TransactionClient, 'nominaPagoAjuste' | 'nominaPagoRegistro' | 'employeePayment'>;
+/** Lo que suma y resta de una persona en la semana. `lista`: lo pagado solo en «Pagos a empleados». */
+type Movimientos = { ajustes: number[]; pagos: number[]; lista: number[] };
 
 /** Archivo ya leído en memoria por multer. */
 export type ArchivoComprobante = { originalname?: string; mimetype?: string; size?: number; buffer?: Buffer };
@@ -54,9 +58,12 @@ export function extensionComprobante(b: Buffer): string | null {
 
 @Injectable()
 export class NominaPagoService {
+  private readonly logger = new Logger('NominaPago');
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly control: ControlNominaService,
+    private readonly lista: EmployeePaymentsService,
     @Optional() private readonly audit?: AuditService,
   ) {}
 
@@ -69,13 +76,10 @@ export class NominaPagoService {
     const tenantId = requireCompanyId(companyId);
     const datos = await this.control.consultar(viewer, tenantId, semana, acceso);
     const ver = !datos.montosOcultos;
-    const movs =
-      datos.semana.id && ver
-        ? await this.movimientosPorPersona(tenantId, datos.semana.id)
-        : new Map<number, { ajustes: number[]; pagos: number[] }>();
+    const ids = datos.filas.map((f) => f.userId);
+    const movs = ver ? await this.movimientos(this.prisma, tenantId, datos.semana.id, datos.semana.inicio, ids) : new Map<number, Movimientos>();
     const filas = datos.filas.map((f) => {
-      const m = movs.get(f.userId) ?? { ajustes: [], pagos: [] };
-      const saldo = ver ? this.saldoDe(f, m.ajustes, m.pagos) : null;
+      const saldo = ver ? this.saldoDe(f, movs.get(f.userId)) : null;
       return {
         userId: f.userId,
         nombre: f.nombre,
@@ -113,11 +117,20 @@ export class NominaPagoService {
     const tenantId = requireCompanyId(companyId);
     const { datos, fila } = await this.filaVisible(viewer, tenantId, q.semana, q.userId, acceso);
     const where = { companyId: tenantId, semanaId: datos.semana.id ?? 0, userId: fila.userId };
-    const [ajustes, pagos] = await Promise.all([
+    const [ajustes, pagos, enLista] = await Promise.all([
       this.prisma.nominaPagoAjuste.findMany({ where, orderBy: { createdAt: 'asc' }, include: { autor: { select: { nombre: true } } } }),
-      this.prisma.nominaPagoRegistro.findMany({ where, orderBy: { createdAt: 'asc' }, include: { creadoPor: { select: { nombre: true } } } }),
+      this.prisma.nominaPagoRegistro.findMany({
+        where: { ...where, ...REGISTRO_VIGENTE },
+        orderBy: { createdAt: 'asc' },
+        include: { creadoPor: { select: { nombre: true } } },
+      }),
+      this.pagosDeLista(this.prisma, tenantId, datos.semana.inicio, [fila.userId]),
     ]);
-    const saldo = this.saldoDe(fila, ajustes.map((a) => Number(a.monto)), pagos.map((p) => Number(p.monto)));
+    const saldo = this.saldoDe(fila, {
+      ajustes: ajustes.map((a) => Number(a.monto)),
+      pagos: pagos.map((p) => Number(p.monto)),
+      lista: enLista.map((p) => Number(p.amount)),
+    });
     return {
       semana: datos.semana.inicio,
       fin: datos.semana.fin,
@@ -150,6 +163,16 @@ export class NominaPagoService {
           autorNombre: p.creadoPor?.nombre ?? null,
           at: p.createdAt.toISOString(),
         })),
+        ...enLista.map((p) => ({
+          id: `l${p.id}`,
+          tipo: 'pago' as const,
+          monto: Number(p.amount),
+          forma: 'lista',
+          fecha: workDateKey(p.paidAt ?? p.createdAt),
+          conComprobante: false,
+          autorNombre: null,
+          at: (p.paidAt ?? p.createdAt).toISOString(),
+        })),
       ],
     };
   }
@@ -170,9 +193,9 @@ export class NominaPagoService {
 
     const semanaId = await this.asegurarSemana(tenantId, datos.semana.inicio);
     const ajuste = await this.prisma.$transaction(async (tx) => {
-      await this.candado(tx, tenantId, semanaId, fila.userId);
-      const m = await this.movimientosDe(tx, tenantId, semanaId, fila.userId);
-      const despues = this.saldoDe(fila, [...m.ajustes, monto], m.pagos);
+      await candadoPagoSemana(tx, tenantId, datos.semana.inicio, fila.userId);
+      const m = await this.movimientosDe(tx, tenantId, semanaId, datos.semana.inicio, fila.userId);
+      const despues = this.saldoDe(fila, { ...m, ajustes: [...m.ajustes, monto] });
       if (despues.final < 0) throw new BadRequestException('El ajuste deja el pago en negativo');
       if (despues.saldo < 0) throw new BadRequestException('Ya se pagó más de lo que quedaría con ese ajuste');
       return tx.nominaPagoAjuste.create({
@@ -211,22 +234,20 @@ export class NominaPagoService {
     if (!fechaValida(fecha) || fecha > hoy) throw new BadRequestException('La fecha del pago no es válida');
 
     const { datos, fila } = await this.filaVisible(viewer, tenantId, body.semana, body.userId, acceso);
-    if (fila.pago?.estatus === 'Pagado') {
-      throw new ConflictException(`El pago #${fila.pago.id} de esa semana ya está marcado como Pagado`);
-    }
     const semanaId = await this.asegurarSemana(tenantId, datos.semana.inicio);
     const comprobante = archivo ? await this.guardarComprobante(tenantId, archivo) : null;
     let registro: { id: number };
+    let porMarcar: number | null = null;
     try {
-      registro = await this.prisma.$transaction(async (tx) => {
-        // Doble toque o dos pestañas: el segundo espera al primero y ya ve el saldo nuevo.
-        await this.candado(tx, tenantId, semanaId, fila.userId);
-        const m = await this.movimientosDe(tx, tenantId, semanaId, fila.userId);
-        const saldo = this.saldoDe(fila, m.ajustes, m.pagos).saldo;
+      ({ registro, porMarcar } = await this.prisma.$transaction(async (tx) => {
+        // Doble toque, dos pestañas o la lista de pagos: el segundo espera al primero y ya ve el saldo nuevo.
+        await candadoPagoSemana(tx, tenantId, datos.semana.inicio, fila.userId);
+        const m = await this.movimientosDe(tx, tenantId, semanaId, datos.semana.inicio, fila.userId);
+        const saldo = this.saldoDe(fila, m).saldo;
         if (monto > saldo + 0.004) {
           throw new ConflictException(saldo > 0 ? `Solo faltan $${saldo.toFixed(2)} por pagar` : 'Esa persona ya no tiene saldo por pagar');
         }
-        return tx.nominaPagoRegistro.create({
+        const nuevo = await tx.nominaPagoRegistro.create({
           data: {
             semanaId,
             companyId: tenantId,
@@ -236,16 +257,29 @@ export class NominaPagoService {
             forma: v.forma,
             comprobanteUrl: comprobante,
             creadoPorId: actor.id || null,
-            employeePaymentId: fila.pago?.id ?? null,
           },
+          select: { id: true },
         });
-      });
+        // Con el último pago queda una sola línea en la lista, por lo que de verdad se pagó.
+        const termino = Math.round((saldo - monto) * 100) <= 0;
+        return { registro: nuevo, porMarcar: termino ? await this.ligarALista(tx, tenantId, semanaId, datos.semana.inicio, fila, fecha, actor) : null };
+      }));
     } catch (e) {
       if (comprobante) await unlink(join(resolveUploadsDir(CARPETA, String(tenantId)), comprobante)).catch(() => undefined);
       throw e;
     }
     await this.auditar('NominaPagoRegistro', registro.id, { userId: fila.userId, monto, forma: v.forma, fecha, semana: datos.semana.inicio, comprobante: Boolean(comprobante) }, actor.id, tenantId);
-    return { ok: true, id: registro.id };
+    let aviso: string | null = null;
+    if (porMarcar != null) {
+      try {
+        await this.lista.markPagado(porMarcar, actor.id, tenantId);
+      } catch (e) {
+        // El dinero ya salió y quedó registrado: no se deshace. La póliza se reintenta desde la lista.
+        this.logger.warn(`Póliza pendiente del pago #${porMarcar}: ${(e as Error)?.message ?? e}`);
+        aviso = `El pago quedó registrado, pero falta su póliza. Márcalo pagado en la lista (pago #${porMarcar}).`;
+      }
+    }
+    return { ok: true, id: registro.id, pagoId: porMarcar, aviso };
   }
 
   /** El comprobante solo sale por aquí, con el mismo alcance; `/uploads` no sirve esa carpeta. */
@@ -276,40 +310,98 @@ export class NominaPagoService {
     return { datos, fila };
   }
 
-  private saldoDe(fila: FilaRespuesta, ajustes: readonly number[], pagos: readonly number[]): SaldoPagoSemanal {
-    const s = saldoPagoSemanal({ sugerido: fila.total ?? 0, ajustes, pagos });
-    // Pagado por la lista de «Pagos a empleados»: no vuelve a salir como pendiente.
-    if (fila.pago?.estatus === 'Pagado') return { ...s, pagado: Math.max(s.pagado, s.final), saldo: Math.min(0, s.saldo) };
-    return s;
+  private saldoDe(fila: FilaRespuesta, m?: Movimientos): SaldoPagoSemanal {
+    return saldoPagoSemanal({
+      sugerido: fila.total ?? 0,
+      ajustes: m?.ajustes ?? [],
+      pagos: [...(m?.pagos ?? []), ...(m?.lista ?? [])],
+    });
   }
 
-  private async movimientosDe(db: Cliente, companyId: number, semanaId: number, userId: number) {
-    const where = { companyId, semanaId, userId };
-    const ajustes = await db.nominaPagoAjuste.findMany({ where, select: { monto: true } });
-    const pagos = await db.nominaPagoRegistro.findMany({ where, select: { monto: true } });
-    return { ajustes: ajustes.map((a) => Number(a.monto)), pagos: pagos.map((p) => Number(p.monto)) };
+  private async movimientosDe(db: Cliente, companyId: number, semanaId: number, lunes: string, userId: number): Promise<Movimientos> {
+    return (await this.movimientos(db, companyId, semanaId, lunes, [userId])).get(userId) ?? { ajustes: [], pagos: [], lista: [] };
   }
 
-  private async movimientosPorPersona(companyId: number, semanaId: number) {
-    const where = { companyId, semanaId };
-    const [ajustes, pagos] = await Promise.all([
-      this.prisma.nominaPagoAjuste.findMany({ where, select: { userId: true, monto: true } }),
-      this.prisma.nominaPagoRegistro.findMany({ where, select: { userId: true, monto: true } }),
+  private async movimientos(db: Cliente, companyId: number, semanaId: number | null, lunes: string, userIds: number[]) {
+    const where = { companyId, semanaId: semanaId ?? 0, userId: { in: userIds } };
+    const [ajustes, pagos, lista] = await Promise.all([
+      db.nominaPagoAjuste.findMany({ where, select: { userId: true, monto: true } }),
+      db.nominaPagoRegistro.findMany({ where: { ...where, ...REGISTRO_VIGENTE }, select: { userId: true, monto: true } }),
+      this.pagosDeLista(db, companyId, lunes, userIds),
     ]);
-    const out = new Map<number, { ajustes: number[]; pagos: number[] }>();
+    const out = new Map<number, Movimientos>();
     const de = (id: number) => {
-      const m = out.get(id) ?? { ajustes: [], pagos: [] };
+      const m = out.get(id) ?? { ajustes: [], pagos: [], lista: [] };
       out.set(id, m);
       return m;
     };
     for (const a of ajustes) de(a.userId).ajustes.push(Number(a.monto));
     for (const p of pagos) de(p.userId).pagos.push(Number(p.monto));
+    for (const l of lista) de(l.userId).lista.push(Number(l.amount));
     return out;
   }
 
-  private async candado(tx: Prisma.TransactionClient, companyId: number, semanaId: number, userId: number) {
-    const clave = `nomina-pago:${companyId}:${semanaId}:${userId}`;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${clave}))`;
+  /**
+   * Lo pagado solo en «Pagos a empleados» para esa semana, leído ahora (la foto del cierre se queda con
+   * el estatus de ese día). Los que nacieron de aquí tienen registros y ya se cuentan por ellos.
+   */
+  private pagosDeLista(db: Cliente, companyId: number, lunes: string, userIds: number[]) {
+    return db.employeePayment.findMany({
+      where: {
+        companyId,
+        userId: { in: userIds },
+        deletedAt: null,
+        status: 'Pagado',
+        periodFrom: workDateColumn(parseWorkDate(lunes)),
+        periodTo: workDateColumn(parseWorkDate(domingoDe(lunes))),
+        nominaPagos: { none: {} },
+      },
+      select: { id: true, userId: true, amount: true, paidAt: true, createdAt: true },
+      orderBy: { id: 'asc' },
+    });
+  }
+
+  /** Junta los registros sueltos en el Borrador de la semana (o en uno nuevo) y devuelve cuál marcar pagado. */
+  private async ligarALista(
+    tx: Prisma.TransactionClient,
+    companyId: number,
+    semanaId: number,
+    lunes: string,
+    fila: FilaRespuesta,
+    fecha: string,
+    actor: Actor,
+  ): Promise<number> {
+    const sueltos = await tx.nominaPagoRegistro.findMany({
+      where: { companyId, semanaId, userId: fila.userId, employeePaymentId: null },
+      select: { id: true, monto: true },
+    });
+    const amount = new Prisma.Decimal(sueltos.reduce((s, r) => s + Math.round(Number(r.monto) * 100), 0)).div(100);
+    const periodo = { periodFrom: workDateColumn(parseWorkDate(lunes)), periodTo: workDateColumn(parseWorkDate(domingoDe(lunes))) };
+    // Mediodía de México: el día del pago no se recorre al leerlo.
+    const paidAt = new Date(`${fecha}T18:00:00.000Z`);
+    const borrador = await tx.employeePayment.findFirst({
+      where: { companyId, userId: fila.userId, deletedAt: null, status: 'Borrador', ...periodo, nominaPagos: { none: {} } },
+      orderBy: { id: 'asc' },
+      select: { id: true },
+    });
+    const pago = borrador
+      ? await tx.employeePayment.update({ where: { id: borrador.id }, data: { amount, paidAt }, select: { id: true } })
+      : await tx.employeePayment.create({
+          data: {
+            userId: fila.userId,
+            companyId,
+            ...periodo,
+            totalMinutes: Math.round(fila.horasNetasTotales * 60) + fila.extrasMinutosAprobados,
+            amount,
+            concepto: conceptoPagoSemana(lunes).slice(0, 255),
+            status: 'Borrador',
+            paidAt,
+            createdById: actor.id || null,
+          },
+          select: { id: true },
+        });
+    await tx.nominaPagoRegistro.updateMany({ where: { id: { in: sueltos.map((r) => r.id) }, companyId }, data: { employeePaymentId: pago.id } });
+    return pago.id;
   }
 
   private async asegurarSemana(companyId: number, lunes: string): Promise<number> {
