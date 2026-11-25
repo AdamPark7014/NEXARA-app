@@ -246,6 +246,9 @@ jobs:
           echo " - $DEST_USERDATA"
           # Expose UUID for subsequent steps
           echo "PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+          # El nombre se lee del perfil cargado: al renovarlo cambia y no hay que tocar este archivo.
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print Name' "$PLIST_OUT")
+          echo "PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
 
       - name: Build and import Distribution signing certificate (.p12)
         run: |
@@ -326,7 +329,7 @@ jobs:
           set -euo pipefail
           python3 "$GITHUB_WORKSPACE/scripts/ios_bind_app_signing.py" \
             "apps/mobile-native/ios/NexaraApp.xcodeproj/project.pbxproj" \
-            "NexaraApp" "AHNW9K8745" "$PROFILE_UUID" "NEXARA App Store" "Apple Distribution"
+            "NexaraApp" "AHNW9K8745" "$PROFILE_UUID" "$PROFILE_NAME" "Apple Distribution"
           PBXPROJ="apps/mobile-native/ios/NexaraApp.xcodeproj/project.pbxproj"
           grep -q "PROVISIONING_PROFILE = \\\"${PROFILE_UUID}\\\";" "$PBXPROJ" || { echo "ERROR: PROVISIONING_PROFILE UUID not found in pbxproj"; exit 1; }
 
@@ -345,7 +348,7 @@ jobs:
               <key>provisioningProfiles</key>
               <dict>
                 <key>mx.nexara.mobile.NexaraApp</key>
-                <string>NEXARA App Store</string>
+                <string>__PERFIL__</string>
               </dict>
               <key>teamID</key>
               <string>AHNW9K8745</string>
@@ -356,6 +359,7 @@ jobs:
             </dict>
           </plist>
           PLIST
+          /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:mx.nexara.mobile.NexaraApp ${PROFILE_NAME}" "$EXPORT_PLIST"
           cat "$EXPORT_PLIST"
 
       - name: Apply version/build inputs to Info.plist (optional)
