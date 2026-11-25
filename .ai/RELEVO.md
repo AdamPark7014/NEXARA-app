@@ -1,5 +1,9 @@
 # RELEVO
 
+- **25-11 ~10:30 México (claude-code) — Repositorio nuevo: historia sin coautores de IA y sin credenciales.**
+  - Cambiaron todos los identificadores de commit (main viejo abbdcfe5e = 530db7f28 aquí). Nadie debe empujar desde un clon anterior: clonar de nuevo y reaplicar lo pendiente como parche.
+  - Salieron de la historia los Excel de usuarios, los seeds viejos con personas y los secretos escritos. El mapa viejo → nuevo y el respaldo están fuera del repo.
+
 - **25-11 ~10:15 México (claude-code) — Web pública rediseñada completa (todas las secciones e interiores, pedido de Adam). En main, sin desplegar; sin migraciones; espera su visto bueno visual.**
   - `components/sitio`: `EquipoVivo`, `MapaInteractivo`, `Industrias`, `Visor`, `Ampliar`, `Problemas`, `Recorrido`, `Interaccion` (`data-luz`, `data-inclina`), `pausa.ts` (`html[data-pausa]`, botón en el pie), `Explorador`, `IndiceGuia`; estilos en `vivo.module.css`, `profundo.module.css` y bloques «Lo vivo». Tablero: tocar una cámara la agranda. Contacto: elegir servicios escribe el primer renglón del mensaje; el POST no cambia. Legal: portada común, texto intacto.
   - Verificado: compilación de producción; 14 rutas en 1440, 1024, 390 y 360 px con y sin almacenamiento, sin errores ni desbordes; «reducir movimiento» y pausa detienen todo; teclado; formulario hasta el POST interceptado; 1,610 pruebas de sitio y lib (la suite web completa se corrió antes de los interiores: 2,560 + 8 del ERP por tiempo, que pasan solas).
