@@ -1,5 +1,13 @@
 # RELEVO
 
+- **25-11 ~03:40 México (claude-code) — El seed ya no toca cuentas existentes y la lista de personas sale del repo. API y `deploy/nexara.sh`; sin migraciones; SIN DESPLEGAR.**
+  - Antes: `prisma db seed` reescribía contraseña, rol, menú, jefe, bloqueo y estado de las cuentas de la plantilla, y sin variables ponía una contraseña inservible. Reproducido en base desechable.
+  - Ahora, tres comandos separados sobre `prisma/seed-seguro.ts`: `prisma db seed` solo agrega roles y departamentos; `npm run seed:cuentas` da de alta las que falten; `npm run cuentas:administrar` (alinear, retirar, contrasena-inicial) cambia las pedidas. Revisa todo antes de escribir, una transacción con candado, `--simular`, y en una base en uso pide `SEED_AUTORIZAR_CUENTAS=<base>@<host>` (y `--solo` para cambiar).
+  - Personas: JSON local en `SEED_PLANTILLA` (`C:\dev\secrets\nexara\seeds`), sin contraseñas. Salió `seed-demo-users.ts`, que además no compilaba.
+  - `nexara.sh seed` acepta `--simular` y se niega con una imagen anterior: **no sembrar en el servidor hasta desplegar esto.**
+  - Verificado: 28 pruebas + 20 contra Postgres desechable (`SEED_PRUEBAS_URL`, se saltan en CI), 8 errores provocados detectados, 18 casos con los comandos reales y copia con forma de imagen (no en Docker ni Node 22). API 6,942 de 6,943 (la roja es `vence-al-terminar-su-dia`, rutas con `\` en Windows). Web 2,566 de 2,568 con la máquina cargada; las 2 de clientes pasan solas. Tipos y build en verde.
+  - Plataformas: API hecho · Web, Android e iOS no aplican (sin cambio de contrato).
+
 - **25-11 ~02:30 México (claude-code) — Luis (Director de Operaciones) ya abre «Evidencias» en la web. Sin migraciones; web DESPLEGADA 25-11 como 97436aeb4 + este arreglo, sin Ensamble (vuelta atrás: nexara-web:prev).**
   - Causa: `ACTIVIDAD_PROPIA_PAGE_PATHS` abría `/erp/actividades/:id` pero no sus pestañas; el guard de AppShell regresaba a la pizarra. Igual para coord_admin, coord_ventas, vendedor, disenador, rh y contabilidad. La API sigue decidiendo qué actividad ve cada quien.
   - Plataformas: Web hecha · API, Android e iOS no aplican (la regla de páginas es solo web).

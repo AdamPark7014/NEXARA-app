@@ -140,3 +140,6 @@ personal.json
 /.tmp-*
 /compile-out.txt
 .ai/tmp-*
+
+# Listas de personas para sembrar: solo locales (C:\dev\secrets\nexara\seeds). El repo es público.
+apps/api/prisma/plantilla*.json

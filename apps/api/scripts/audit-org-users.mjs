@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Audita usuarios en DB vs organigrama oficial (seed-demo-users.ts).
+ * Audita usuarios en DB vs organigrama oficial (la lista de abajo).
  *
  * Uso local:
  *   cd apps/api && node scripts/audit-org-users.mjs
@@ -11,7 +11,6 @@
  */
 import { PrismaClient } from '@prisma/client';
 
-/** Debe coincidir con DEMO_USERS en prisma/seed-demo-users.ts */
 const OFFICIAL = [
   { email: 'gerencia@nexara.com.mx', roleKey: 'ceo', employeeNumber: 'NX-001' },
   { email: 'developer@nexara.com.mx', roleKey: 'ceo', employeeNumber: 'NX-002' },
@@ -112,7 +111,7 @@ async function main() {
       console.log(`⚠️  ${u.email}: ${issues.join(' · ')}`);
     }
   }
-  if (!drift) console.log('✅ Todos alineados con seed-demo-users.ts');
+  if (!drift) console.log('✅ Todos alineados con el organigrama de este script');
 
   section('6) Resumen por roleKey (solo organigrama)');
   const officialUsers = users.filter((u) => OFFICIAL_EMAILS.has((u.email ?? '').toLowerCase()));

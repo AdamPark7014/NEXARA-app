@@ -26,6 +26,8 @@
     "prisma:status": "prisma migrate status",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
+    "seed:cuentas": "ts-node -P ./prisma/tsconfig.seed.json ./prisma/seed-core-roster.ts",
+    "cuentas:administrar": "ts-node -P ./prisma/tsconfig.seed.json ./prisma/administrar-cuentas.ts",
     "seed:play-reviewer": "ts-node -P ./prisma/tsconfig.seed.json ./prisma/seed-play-reviewer.ts",
     "seed:play-demo": "ts-node -P ./prisma/tsconfig.seed.json ./prisma/seed-play-demo-data.ts",
     "seed:plantillas": "ts-node --transpile-only -P ./prisma/tsconfig.seed.json ./prisma/seed-nexara-plantillas.ts",
@@ -109,6 +111,6 @@
     "yn": "^3.1.1"
   },
   "prisma": {
-    "seed": "ts-node ./prisma/seed-core-roster.ts"
+    "seed": "ts-node -P ./prisma/tsconfig.seed.json ./prisma/seed-estructura.ts"
   }
 }

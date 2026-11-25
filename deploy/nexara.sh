@@ -58,7 +58,14 @@ case "$cmd" in
     compose run --rm -T api sh -c "cd /app/apps/api && npx prisma migrate deploy"
     ;;
   seed)
-    compose exec -T api sh -c "cd /app/apps/api && npx prisma db seed"
+    # Solo agrega roles y departamentos que falten; no crea ni cambia cuentas. `seed --simular` no escribe.
+    case "${1:-}" in
+      "") extra="" ;;
+      --simular) extra=" -- --simular" ;;
+      *) echo "Opción desconocida: $1 (solo --simular)"; exit 1 ;;
+    esac
+    # Una imagen anterior al 25-11-2026 trae el seed que reescribía cuentas: ahí no se corre.
+    compose exec -T api sh -c "cd /app/apps/api && { test -f prisma/seed-estructura.ts || { echo 'La imagen trae el seed viejo, que reescribe cuentas: despliega antes.'; exit 1; }; } && npx prisma db seed${extra}"
     ;;
   cleanup-users)
     cat "$REPO_ROOT/apps/api/scripts/cleanup-ghost-users.sql" | psql_db

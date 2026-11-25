@@ -1,0 +1,82 @@
+{
+  "cuentas": [
+    {
+      "nombre": "Persona Uno",
+      "email": "direccion@prueba.example",
+      "roleKey": "ceo",
+      "departmentName": "Dirección General",
+      "employeeNumber": "PR-001",
+      "puesto": "Dirección",
+      "managerEmail": null,
+      "moduleAccess": {
+        "chat": "on",
+        "asistencias": "on"
+      }
+    },
+    {
+      "nombre": "Persona Dos",
+      "email": "operaciones@prueba.example",
+      "roleKey": "coord_operaciones",
+      "departmentName": "Operaciones",
+      "employeeNumber": "PR-002",
+      "puesto": "Coordinación",
+      "managerEmail": "direccion@prueba.example",
+      "moduleAccess": {
+        "chat": "on",
+        "asistencias": "on"
+      }
+    },
+    {
+      "nombre": "Persona Tres",
+      "email": "administracion@prueba.example",
+      "roleKey": "administrativo",
+      "departmentName": "Administración",
+      "employeeNumber": "PR-003",
+      "puesto": "Administración",
+      "managerEmail": "direccion@prueba.example"
+    },
+    {
+      "nombre": "Persona Cuatro",
+      "email": "soporte@prueba.example",
+      "roleKey": "ing_soporte",
+      "departmentName": "Sistemas",
+      "employeeNumber": "PR-004",
+      "puesto": "Soporte",
+      "managerEmail": "operaciones@prueba.example",
+      "moduleAccess": {
+        "chat": "on",
+        "asistencias": "on"
+      }
+    },
+    {
+      "nombre": "Persona Cinco",
+      "email": "campo1@prueba.example",
+      "roleKey": "ing_campo",
+      "departmentName": "Ingeniería",
+      "employeeNumber": "PR-005",
+      "puesto": "Campo",
+      "managerEmail": "operaciones@prueba.example"
+    },
+    {
+      "nombre": "Persona Seis",
+      "email": "campo2@prueba.example",
+      "roleKey": "ing_campo",
+      "departmentName": "Ingeniería",
+      "employeeNumber": "PR-006",
+      "puesto": "Campo",
+      "managerEmail": "operaciones@prueba.example"
+    },
+    {
+      "nombre": "Persona Siete",
+      "email": "obra@prueba.example",
+      "roleKey": "arquitecto",
+      "departmentName": "Obra",
+      "employeeNumber": "PR-007",
+      "puesto": "Obra",
+      "managerEmail": "direccion@prueba.example"
+    }
+  ],
+  "retiradas": [
+    "baja@prueba.example"
+  ]
+}
