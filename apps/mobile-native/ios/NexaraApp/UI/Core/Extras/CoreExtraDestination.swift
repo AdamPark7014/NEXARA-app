@@ -35,7 +35,7 @@ struct CoreExtraDestination: View {
         case .aprobaciones:
             AprobacionesView()
         case .pagosEmpleados:
-            PagosEmpleadosView()
+            PagosEmpleadosConSemana()
         }
     }
 

@@ -11,6 +11,8 @@ import {
   Post,
   Query,
   Res,
+  UploadedFile,
+  UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -21,7 +23,8 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { ModulePolicyService } from '../common/tenant/module-policy.service.js';
 import { esSuperAdmin } from '../common/tenant/module-policy.js';
 import { ControlNominaService } from './control-nomina.service.js';
-import { NominaPagoService } from './nomina-pago.service.js';
+import { NominaPagoService, type ArchivoComprobante } from './nomina-pago.service.js';
+import { FileInterceptor } from '../common/files/interceptores-subida.js';
 import { nombreArchivoControl } from './control-nomina-excel.js';
 import { esContadoraNomina, esRhNomina } from './nomina-alcance.js';
 import {
@@ -206,41 +209,77 @@ export class ControlNominaController {
     return this.service.reabrir(this.actor(user), companyId, body);
   }
 
-  /** PATCH …/pago — ajusta el pago sugerido (monto ± y motivo). Semana abierta. */
+  /** GET …/pago?semana — sugerido, ajuste, pagado y saldo de cada persona. */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({
+    anyPermissions: [PERMISSIONS.CONTABILIDAD_VIEW, PERMISSIONS.CONTABILIDAD_MANAGE, PERMISSIONS.HR_MANAGE],
+  })
+  @Get('pago')
+  async pagoSemana(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null, @Query('semana') semana?: string) {
+    if (!semana) throw new BadRequestException('semana es obligatoria');
+    return this.pagos.semana(this.viewer(user), companyId, semana, await this.acceso(user, companyId));
+  }
+
+  /** PATCH …/pago — ajusta el pago (monto ± y motivo). Semana abierta. */
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.CONTABILIDAD_MANAGE, PERMISSIONS.HR_MANAGE] })
   @Patch('pago')
   async ajustarPago(
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
-    @Body() body: { semana: string; userId: number; monto: number; motivo: string; pagoSugerido?: number },
+    @Body() body: { semana: string; userId: number; monto: number; motivo: string },
   ) {
     await this.gate(user, companyId);
-    return this.pagos.ajustarPago(this.viewer(user), this.actor(user), companyId, body);
+    if (!body?.semana) throw new BadRequestException('semana es obligatoria');
+    return this.pagos.ajustar(this.viewer(user), this.actor(user), companyId, body, await this.acceso(user, companyId));
   }
 
-  /** POST …/registrar-pago — solo CEO; forma + comprobante opcional; parcialidades. */
+  /** POST …/registrar-pago — solo dirección; JSON o multipart con `comprobante`; parcialidades. */
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Post('registrar-pago')
+  @UseInterceptors(FileInterceptor('comprobante', { limits: { fileSize: 10 * 1024 * 1024, files: 1 } }))
   async registrarPago(
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
-    @Body()
-    body: {
-      semana: string;
-      userId: number;
-      monto: number;
-      fecha?: string;
-      forma: string;
-      comprobanteUrl?: string | null;
-    },
+    @Body() body: { semana: string; userId: number | string; monto: number | string; fecha?: string; forma: string },
+    @UploadedFile() archivo?: ArchivoComprobante,
   ) {
     await this.gate(user, companyId);
-    return this.pagos.registrarPago(this.viewer(user), this.actor(user), companyId, body);
+    if (!body?.semana) throw new BadRequestException('semana es obligatoria');
+    return this.pagos.registrar(
+      this.viewer(user),
+      this.actor(user),
+      companyId,
+      { ...body, userId: Number(body.userId), monto: Number(body.monto) },
+      await this.acceso(user, companyId),
+      archivo ?? null,
+    );
   }
 
-  /** GET …/como-se-calculo?semana&userId — renglones + saldo + movimientos. */
+  /** GET …/comprobante/:id — el archivo, solo con el mismo alcance que el pago. */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({
+    anyPermissions: [PERMISSIONS.CONTABILIDAD_VIEW, PERMISSIONS.CONTABILIDAD_MANAGE, PERMISSIONS.HR_MANAGE],
+  })
+  @Get('comprobante/:id')
+  async comprobante(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    await this.gate(user, companyId);
+    const a = await this.pagos.comprobante(this.viewer(user), companyId, Number(id), await this.acceso(user, companyId));
+    res.header('Content-Type', a.mime);
+    res.header('Content-Disposition', `inline; filename="${a.nombre}"`);
+    res.header('Cache-Control', 'private, no-store');
+    res.header('X-Content-Type-Options', 'nosniff');
+    a.flujo.on('error', () => res.destroy());
+    a.flujo.pipe(res);
+  }
+
+  /** GET …/como-se-calculo?semana&userId — renglones, saldo y movimientos. */
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({
     anyPermissions: [PERMISSIONS.CONTABILIDAD_VIEW, PERMISSIONS.CONTABILIDAD_MANAGE, PERMISSIONS.HR_MANAGE],
@@ -256,7 +295,6 @@ export class ControlNominaController {
     const uid = Number(userId);
     if (!uid) throw new BadRequestException('userId es obligatorio');
     await this.gate(user, companyId);
-    return this.pagos.saldoYComoSeCalculo(this.viewer(user), companyId, { semana, userId: uid });
+    return this.pagos.detalle(this.viewer(user), companyId, { semana, userId: uid }, await this.acceso(user, companyId));
   }
-
 }

@@ -545,6 +545,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     // a exigir el usuario 1 (403 al resto, aunque otro rol ya tuviera la ruta).
     { path: '/api/activities/*', methods: ['DELETE'], scope: 'approve' },
     // Faltas justificadas: solo Christian (el servicio lo vuelve a exigir por correo).
+    // Horarios del equipo: quién puede programar a quién lo decide el servicio (jerarquía, RH y dirección).
+    { path: '/api/attendance/horarios/**', methods: ['GET', 'POST'], scope: 'write' },
     { path: '/api/attendance/justificaciones', methods: ['GET', 'POST'], scope: 'approve' },
     { path: '/api/attendance/justificaciones/*', methods: ['DELETE'], scope: 'approve' },
     // Corregir la hora de una checada: dirección y RH (el servicio lo vuelve a exigir).

@@ -81,7 +81,7 @@ import mx.nexara.mobile.nativeapp.ui.console.more.KpisEquipoScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreHubScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.ProyectoDetalleScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.ProyectosScreen
-import mx.nexara.mobile.nativeapp.ui.console.pagos.PagosEmpleadosScreen
+import mx.nexara.mobile.nativeapp.ui.console.pagos.PagosEmpleadosConSemana
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.vehiculos.VehiculosScreen
@@ -854,7 +854,7 @@ fun ConsoleNavHost(
             // (solo dirección lo tiene); el permiso de verdad y hasta dónde llega
             // el alcance los decide el API, y su 403 se enseña tal cual.
             nxComposable(ConsoleRoutes.PagosEmpleados, style = NxNavAnimStyle.Push) {
-                if (CoreExtraModule.PAGOS_EMPLEADOS in extras) PagosEmpleadosScreen()
+                if (CoreExtraModule.PAGOS_EMPLEADOS in extras) PagosEmpleadosConSemana()
             }
             // Aprobaciones: aquí sí se decide. Comprueba el módulo igual que el
             // resto de «Más»; quién puede firmar **qué paso** lo decide el API

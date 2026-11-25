@@ -1,5 +1,12 @@
 # RELEVO
 
+- **25-11 ~11:30 México (claude-code) — Pantallas de horarios y pago semanal en web, Android e iOS, con su servidor. Maqueta aprobada por Adam. Sin migraciones; sin desplegar.**
+  - Web: Asistencias → «Horarios» (por semana o el de siempre; «Mi horario» para quien no tiene gente) y Control semanal → «Pago». Panel lateral común: `components/ui/Cajon`.
+  - API: el sugerido es el total del Control semanal (con extra autorizada y descuentos aceptados) y lo calcula el servidor; pagar lleva candado por persona y semana y no pasa del saldo; un pago ya marcado «Pagado» en la lista no se paga otra vez; el comprobante es privado (`control-semanal/comprobante/:id`). Horarios: los avisos miran lo ya programado, `mio`, `quitar`, sin cambiar días pasados.
+  - Android: Asistencias → Horarios y Pagos a empleados → Semana. iOS: lo mismo.
+  - Pendiente: probar con un usuario real; registrar un pago aquí no marca «Pagado» en la lista ni asienta póliza; publicar las apps.
+  - Paridad: API hecho · Web hecho · Android hecho · iOS hecho (programar varios días y ajustar el pago, solo en web: se hacen en computadora).
+
 - **25-11 ~10:30 México (claude-code) — Repositorio nuevo: historia sin coautores de IA y sin credenciales.**
   - Cambiaron todos los identificadores de commit (main viejo abbdcfe5e = 797f5b57a aquí). Nadie debe empujar desde un clon anterior: clonar de nuevo y reaplicar lo pendiente como parche.
   - `google-services.json` y `GoogleService-Info.plist` ya no se versionan (llaves de Google). Copias en secrets/nexara/firebase: sin la de Android no se genera un release; TestFlight usa el secreto GOOGLE_SERVICE_INFO_PLIST_BASE64.

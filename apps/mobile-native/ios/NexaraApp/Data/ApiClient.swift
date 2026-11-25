@@ -204,6 +204,8 @@ final class ApiClient {
         }
         // Deshacer la salida vale 10 minutos: encolado, caería cuando ya no aplica.
         if path.hasSuffix("/salida/deshacer") { return true }
+        // Cambiar la salida de alguien es de hoy: encolado, llegaría cuando ya se fue.
+        if path.hasPrefix("attendance/horarios") { return true }
         // Mover el paso atrás con fotos encoladas las dejaría en el paso equivocado.
         if path.hasSuffix("/volver-paso") { return true }
         // Aplicar un formato necesita la respuesta: dice cuáles actividades quedaron.

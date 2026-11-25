@@ -110,9 +110,10 @@ import {
   postDescuentoControl,
   reabrirSemanaControl,
 } from "@/lib/control-nomina-api";
+import PagoSemanal from "@/components/nomina-pago/PagoSemanal";
 import s from "./ControlNominaSemanal.module.css";
 
-type Vista = "entradas" | "nomina";
+type Vista = "entradas" | "nomina" | "pago";
 
 export type ControlNominaSemanalProps = {
   token: string;
@@ -651,10 +652,11 @@ export default function ControlNominaSemanal({
             items={[
               { id: "entradas", label: "Entradas y salidas" },
               { id: "nomina", label: "Nómina" },
+              { id: "pago", label: "Pago" },
             ]}
           />
         </div>
-        {vigente && filas.length > 0 ? (
+        {vista !== "pago" && vigente && filas.length > 0 ? (
           <div className={s.toolbar} role="search" aria-label="Filtros del control">
             <div className={s.toolbarSearch}>
               <SearchInput
@@ -709,7 +711,7 @@ export default function ControlNominaSemanal({
             </span>
           </div>
         ) : null}
-        <div className={s.cardBody}>{contenido}</div>
+        <div className={s.cardBody}>{vista === "pago" ? <PagoSemanal token={token} semana={semana} /> : contenido}</div>
       </section>
 
       <div className="ui-sr-only" aria-live="polite">

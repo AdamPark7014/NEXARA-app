@@ -1,246 +1,168 @@
-/**
- * Cliente de attendance/horarios (Partes A–C).
- * Contrato: erpFetch(path, token, init?) como control-nomina-api / asistencia-confiable-api.
- */
+/** Horarios por día: cliente de `attendance/horarios` y sus formatos. */
 import { erpFetch } from "@/lib/erp-api";
 
 export const HORARIOS_BASE = "attendance/horarios";
 
-export type FuenteHorario = "horario_dia" | "work_schedule" | "default" | "plantilla_turno";
-
 export type HorarioCitado = {
-  fuente?: FuenteHorario;
-  fecha?: string;
+  fuente?: string;
   horaEntrada: string;
   horaSalida: string;
-  graciaMin?: number;
-  jornadaCitadaMin?: number;
-  plantillaTurnoId?: number | null;
-  motivo?: string | null;
-  tipo?: string;
   cruzaMedianoche?: boolean;
+  motivo?: string | null;
 };
 
-export type PlantillaTurno = {
-  id: number;
-  nombre?: string;
-  horaEntrada: string;
-  horaSalida: string;
-  tipo?: string;
-  color?: string | null;
-  graciaMin?: number | null;
-  clave?: string;
-};
-
-export type ParametrosProductividad = {
-  vigenteDesde: string;
-  rangoNormalInicio: string;
-  rangoNormalFin: string;
-  graciaMin: number;
-  pesoPuntualidad: number;
-  pesoAprovechamiento: number;
-  pesoEficiencia: number;
-  topeBonoPct: number;
-  factorExtra: number;
-  topeExtraSemanaMin: number;
-  franjaNocturnaInicio: string;
-  franjaNocturnaFin: string;
-  nota?: string | null;
-};
-
-export type ResumenJornada = {
-  retardoMin: number;
-  minutosLaborados: number;
-  minutosOrdinarios: number;
-  minutosExtra: number;
-  minutosNocturnos?: number;
-  salidaAnticipadaMin?: number;
-  faltaParcial?: boolean;
-};
-
-export type ProductividadDia = {
-  indice: number;
-  puntualidad: number;
-  aprovechamiento: number;
-  eficiencia: number;
-  desglose?: unknown;
-  texto?: string;
-};
-
-export type ResultadoProgramar = {
-  ok: boolean;
-  creados?: number;
-  requiereConfirmacion?: boolean;
-  avisos?: {
-    solapes?: unknown[];
-    descansoCorto?: unknown[];
-    diasSeguidos?: unknown[];
-    extraSemana?: unknown[];
-  };
-};
-
-export type ItemHorarioLista = {
-  userId: number;
+export type DiaHorario = {
   fecha: string;
   horario: HorarioCitado;
-  fila?: unknown;
+  /** Hay un horario puesto para ese día. */
+  programado: boolean;
+  trabaja: boolean;
+  esDescansoHabitual: boolean;
+  extraMin: number;
 };
 
-export type RespuestaParametros = {
-  vigente: ParametrosProductividad;
-  historial: ParametrosProductividad[];
-  notaLft?: string;
-  default?: ParametrosProductividad;
+export type PersonaSemana = {
+  id: number;
+  nombre: string;
+  puesto: string | null;
+  puedeProgramar: boolean;
+  entradaHoyAt: string | null;
+  jornadaAbierta: boolean;
+  extraMin: number;
+  dias: DiaHorario[];
 };
 
-export type RespuestaResumen = {
-  horario: HorarioCitado;
-  resumen: ResumenJornada;
-  productividad: ProductividadDia;
-  parametros: ParametrosProductividad;
+export type SemanaHorarios = { from: string; to: string; hoy: string; topeExtraSemanaMin: number; personas: PersonaSemana[] };
+
+export type DiaMio = DiaHorario & { loPuso: string | null; ajuste: "programar" | "extender" | "recortar" | null };
+export type MiHorario = { hoy: string; entradaHoyAt: string | null; jornadaAbierta: boolean; dias: DiaMio[] };
+
+export type PlantillaTurno = { id: number; nombre: string; horaEntrada: string; horaSalida: string };
+
+type Aviso = { userId: number; nombre?: string };
+export type AvisosProgramacion = {
+  solapes: Array<Aviso & { fechaA: string; fechaB: string }>;
+  descansoCorto: Array<Aviso & { fechaA: string; fechaB: string; horasDescanso: number }>;
+  masDe6Seguidos: Array<Aviso & { desde: string; hasta: string; dias: number }>;
+  extraSobreTope: Array<Aviso & { semana: string; minutosExtraEst: number; tope: number }>;
 };
 
-const json = (body: unknown) => JSON.stringify(body);
+export type ResultadoProgramar = { ok: boolean; creados: number; requiereConfirmacion?: boolean; avisos: AvisosProgramacion };
+
+export type Programacion = {
+  userIds: number[];
+  fechas: string[];
+  horaEntrada: string;
+  horaSalida: string;
+  plantillaTurnoId?: number | null;
+  motivo?: string | null;
+};
 
 /** `10:00–18:00` */
 export function formatearRangoHorario(entrada: string, salida: string): string {
   const a = (entrada ?? "").trim();
   const b = (salida ?? "").trim();
-  if (!a || !b) return "";
-  return `${a.slice(0, 5)}–${b.slice(0, 5)}`;
+  return a && b ? `${a.slice(0, 5)}–${b.slice(0, 5)}` : "";
 }
 
 /** `7 h 40` · `3 h` · `20 min` · `0 min` */
 export function minutosAHorasTexto(minutos: number): string {
   const n = Math.max(0, Math.round(Number(minutos) || 0));
-  if (n === 0) return "0 min";
   const h = Math.floor(n / 60);
   const m = n % 60;
-  if (h === 0) return `${m} min`;
-  if (m === 0) return `${h} h`;
-  return `${h} h ${m}`;
+  if (!h) return `${m} min`;
+  return m ? `${h} h ${m}` : `${h} h`;
 }
 
-export function etiqFuenteHorario(fuente?: string | null): string {
-  switch (fuente) {
-    case "horario_dia":
-      return "Del día";
-    case "work_schedule":
-      return "Plantilla fija";
-    case "plantilla_turno":
-      return "Turno";
-    case "default":
-      return "10:00–18:00";
-    default:
-      return (fuente && String(fuente).trim()) || "—";
-  }
+const enUtc = (f: string) => new Date(`${f}T12:00:00Z`);
+const DIA_CORTO = new Intl.DateTimeFormat("es-MX", { weekday: "short", timeZone: "UTC" });
+const DIA_LARGO = new Intl.DateTimeFormat("es-MX", { weekday: "long", timeZone: "UTC" });
+const MES = new Intl.DateTimeFormat("es-MX", { month: "long", timeZone: "UTC" });
+
+/** «Mié 25» */
+export function diaCorto(f: string): string {
+  const t = DIA_CORTO.format(enUtc(f)).replace(".", "");
+  return `${t.charAt(0).toUpperCase()}${t.slice(1)} ${Number(f.slice(8, 10))}`;
 }
 
-export async function listarHorarios(
-  token: string,
-  q: { from: string; to: string; userIds?: number[] },
-): Promise<{ items: ItemHorarioLista[]; from: string; to: string }> {
-  const params = new URLSearchParams({ from: q.from.slice(0, 10), to: q.to.slice(0, 10) });
-  if (q.userIds?.length) params.set("userIds", q.userIds.join(","));
-  const raw = await erpFetch<{ items?: ItemHorarioLista[]; from?: string; to?: string }>(
-    `${HORARIOS_BASE}?${params}`,
-    token,
-  );
-  return {
-    items: Array.isArray(raw?.items) ? raw.items : [],
-    from: raw?.from ?? q.from.slice(0, 10),
-    to: raw?.to ?? q.to.slice(0, 10),
-  };
+/** «miércoles 25» */
+export function diaLargo(f: string): string {
+  return `${DIA_LARGO.format(enUtc(f))} ${Number(f.slice(8, 10))}`;
 }
 
-export async function horarioDe(
-  token: string,
-  q: { userId: number; fecha: string },
-): Promise<{ userId: number; fecha: string; horario: HorarioCitado }> {
-  const params = new URLSearchParams({
-    userId: String(q.userId),
-    fecha: q.fecha.slice(0, 10),
-  });
-  return erpFetch(`${HORARIOS_BASE}/de?${params}`, token);
+/** «23 al 29 de noviembre» */
+export function tituloSemana(desde: string, hasta: string): string {
+  const a = Number(desde.slice(8, 10));
+  const b = Number(hasta.slice(8, 10));
+  const ma = MES.format(enUtc(desde));
+  const mb = MES.format(enUtc(hasta));
+  return ma === mb ? `${a} al ${b} de ${mb}` : `${a} de ${ma} al ${b} de ${mb}`;
 }
 
-export function programarHorarios(
-  token: string,
-  body: {
-    userIds: number[];
-    fechas: string[];
-    horaEntrada?: string;
-    horaSalida?: string;
-    plantillaTurnoId?: number | null;
-    motivo?: string | null;
-    forzarSolapes?: boolean;
-  },
-): Promise<ResultadoProgramar> {
-  return erpFetch(`${HORARIOS_BASE}/programar`, token, { method: "POST", body: json(body) });
+export function sumarDias(f: string, n: number): string {
+  const d = enUtc(f);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 }
 
-export function extenderHorario(
-  token: string,
-  body: { userId: number; fecha: string; hasta: string; motivo?: string | null },
-) {
-  return erpFetch(`${HORARIOS_BASE}/extender`, token, { method: "POST", body: json(body) });
+export function lunesDe(f: string): string {
+  return sumarDias(f, -((enUtc(f).getUTCDay() + 6) % 7));
 }
 
-export function recortarHorario(
-  token: string,
-  body: { userId: number; fecha: string; hasta: string; motivo?: string | null },
-) {
-  return erpFetch(`${HORARIOS_BASE}/recortar`, token, { method: "POST", body: json(body) });
+/** Hoy en México, `AAAA-MM-DD`. */
+export function hoyMx(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City" }).format(new Date());
 }
 
-export async function listarPlantillas(
-  token: string,
-): Promise<{ items: PlantillaTurno[]; omision: PlantillaTurno[] }> {
-  const raw = await erpFetch<{ items?: PlantillaTurno[]; omision?: PlantillaTurno[] }>(
-    `${HORARIOS_BASE}/plantillas`,
-    token,
-  );
-  return {
-    items: Array.isArray(raw?.items) ? raw.items : [],
-    omision: Array.isArray(raw?.omision) ? raw.omision : [],
-  };
+/** Los avisos en palabras. */
+export function avisosEnPalabras(a?: AvisosProgramacion | null): Array<{ clave: string; titulo: string; detalle: string }> {
+  if (!a) return [];
+  const quien = (x: Aviso) => x.nombre || "Esta persona";
+  return [
+    ...a.solapes.map((x) => ({
+      clave: `s${x.userId}${x.fechaA}${x.fechaB}`,
+      titulo: `A ${quien(x)} se le enciman dos turnos`,
+      detalle: `El del ${diaLargo(x.fechaA)} y el del ${diaLargo(x.fechaB)}.`,
+    })),
+    ...a.descansoCorto.map((x) => ({
+      clave: `d${x.userId}${x.fechaA}`,
+      titulo: `${quien(x)} descansa solo ${minutosAHorasTexto(x.horasDescanso * 60)}`,
+      detalle: `Entre el turno del ${diaLargo(x.fechaA)} y el del ${diaLargo(x.fechaB)}.`,
+    })),
+    ...a.masDe6Seguidos.map((x) => ({
+      clave: `m${x.userId}${x.desde}`,
+      titulo: `${quien(x)} trabaja ${x.dias} días seguidos`,
+      detalle: `Del ${diaLargo(x.desde)} al ${diaLargo(x.hasta)}.`,
+    })),
+    ...a.extraSobreTope.map((x) => ({
+      clave: `e${x.userId}${x.semana}`,
+      titulo: `${quien(x)} pasa el tope de ${minutosAHorasTexto(x.tope)} extra`,
+      detalle: `Llevaría ${minutosAHorasTexto(x.minutosExtraEst)} en la semana. Se pagan solo si se autorizan.`,
+    })),
+  ];
 }
 
-export function obtenerParametros(token: string, fecha?: string): Promise<RespuestaParametros> {
-  const q = fecha ? `?${new URLSearchParams({ fecha: fecha.slice(0, 10) })}` : "";
-  return erpFetch(`${HORARIOS_BASE}/parametros${q}`, token);
+const enviar = <T,>(token: string, ruta: string, body: unknown) =>
+  erpFetch<T>(`${HORARIOS_BASE}/${ruta}`, token, { method: "POST", body: JSON.stringify(body) });
+
+export function semanaHorarios(token: string, from: string, to: string): Promise<SemanaHorarios> {
+  return erpFetch(`${HORARIOS_BASE}?${new URLSearchParams({ from, to })}`, token);
 }
 
-export function guardarParametros(
-  token: string,
-  body: Partial<ParametrosProductividad> & { vigenteDesde: string },
-) {
-  return erpFetch(`${HORARIOS_BASE}/parametros`, token, { method: "POST", body: json(body) });
+export function miHorario(token: string, from: string, to: string): Promise<MiHorario> {
+  return erpFetch(`${HORARIOS_BASE}/mio?${new URLSearchParams({ from, to })}`, token);
 }
 
-export function resumenHorarioDia(
-  token: string,
-  body: {
-    userId: number;
-    fecha: string;
-    entradaReal?: string | null;
-    salidaReal?: string | null;
-    minutosProductivos?: number;
-    actividades?: Array<{ realMin: number; estimadoMin: number; titulo?: string }>;
-    esFestivo?: boolean;
-    esDiaDescanso?: boolean;
-  },
-): Promise<RespuestaResumen> {
-  return erpFetch(`${HORARIOS_BASE}/resumen`, token, { method: "POST", body: json(body) });
+export async function plantillasTurno(token: string): Promise<PlantillaTurno[]> {
+  const r = await erpFetch<{ items?: PlantillaTurno[] }>(`${HORARIOS_BASE}/plantillas`, token);
+  return Array.isArray(r?.items) ? r.items : [];
 }
 
-/** Cuenta avisos de programación para la UI de confirmación. */
-export function contarAvisosProgramacion(avisos?: ResultadoProgramar["avisos"]): number {
-  if (!avisos) return 0;
-  return (
-    (avisos.solapes?.length ?? 0) +
-    (avisos.descansoCorto?.length ?? 0) +
-    (avisos.diasSeguidos?.length ?? 0) +
-    (avisos.extraSemana?.length ?? 0)
-  );
-}
+export const revisarProgramacion = (token: string, p: Programacion) =>
+  enviar<ResultadoProgramar>(token, "programar", { ...p, soloRevisar: true });
+
+export const programarHorarios = (token: string, p: Programacion, avisosVistos: boolean) =>
+  enviar<ResultadoProgramar>(token, "programar", { ...p, forzarSolapes: avisosVistos });
+
+export const quitarHorario = (token: string, b: { userId: number; fecha: string }) =>
+  enviar<{ ok: boolean; quitados: number }>(token, "quitar", b);

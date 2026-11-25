@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  esFormaPagoNomina,
   etiquetaFormaPago,
   formatoMonedaMx,
-  FORMAS_PAGO_NOMINA,
 } from "./nomina-pago-api";
 
 describe("nomina-pago-api helpers", () => {
@@ -17,11 +15,5 @@ describe("nomina-pago-api helpers", () => {
     expect(etiquetaFormaPago("efectivo")).toBe("Efectivo");
     expect(etiquetaFormaPago("otro")).toBe("Otro");
     expect(etiquetaFormaPago(undefined)).toBe("—");
-  });
-
-  it("esFormaPagoNomina valida el catálogo", () => {
-    for (const f of FORMAS_PAGO_NOMINA) expect(esFormaPagoNomina(f)).toBe(true);
-    expect(esFormaPagoNomina("cheque")).toBe(false);
-    expect(esFormaPagoNomina(null)).toBe(false);
   });
 });

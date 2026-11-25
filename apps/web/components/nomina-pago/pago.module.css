@@ -1,0 +1,192 @@
+.cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 16px 20px 20px;
+}
+
+.marco {
+  overflow-x: auto;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla th,
+.tabla td {
+  padding: 10px 12px;
+  border-top: 1px solid var(--ui-border-subtle);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.tabla thead th {
+  border-top: 0;
+  background: var(--ui-surface-2);
+  color: var(--ui-fg-2);
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-label);
+  white-space: nowrap;
+}
+
+.tabla tbody th,
+.tabla tbody td {
+  background: var(--ui-surface);
+}
+
+.tabla tbody th {
+  color: var(--ui-fg);
+  font-weight: 400;
+  white-space: normal;
+}
+
+.tabla tfoot th,
+.tabla tfoot td {
+  background: var(--ui-surface-2);
+  font-weight: 600;
+}
+
+.tabla .n {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.fuerte,
+.nombre {
+  font-weight: 600;
+}
+
+.nombre,
+.meta {
+  display: block;
+}
+
+.meta {
+  font-size: var(--ui-fs-meta);
+  font-weight: 400;
+  color: var(--ui-fg-3);
+}
+
+.acciones {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.resumen {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.resumen > :last-child {
+  text-align: right;
+}
+
+.grande {
+  margin: 0;
+  color: var(--ui-fg);
+  font-family: var(--ui-font-display);
+  font-size: var(--ui-fs-stat);
+  font-weight: var(--ui-fw-stat);
+  line-height: var(--ui-lh-stat);
+  font-variant-numeric: tabular-nums;
+}
+
+.renglones {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.renglones li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+
+.renglones li > :last-child {
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.totalRenglon {
+  font-weight: 600;
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--ui-fs-label);
+  color: var(--ui-fg-2);
+}
+
+.etiqueta {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-label);
+}
+
+.archivo {
+  width: 100%;
+  min-height: 44px;
+  font: inherit;
+  font-size: var(--ui-fs-label);
+}
+
+/* Teléfono: cada persona es una ficha con sus cifras debajo del nombre. */
+@media (max-width: 820px) {
+  .tabla thead {
+    display: none;
+  }
+
+  .tabla,
+  .tabla tbody,
+  .tabla tfoot,
+  .tabla tr,
+  .tabla th,
+  .tabla td {
+    display: block;
+  }
+
+  .tabla tr {
+    padding: 12px 0;
+    border-top: 1px solid var(--ui-border-subtle);
+  }
+
+  .tabla th,
+  .tabla td,
+  .tabla .n {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3px 0;
+    border: 0;
+    text-align: left;
+  }
+
+  .tabla th {
+    display: block;
+  }
+
+  .tabla td[data-l]::before {
+    content: attr(data-l);
+    font-weight: 400;
+    color: var(--ui-fg-3);
+  }
+
+  .tabla tfoot tr {
+    padding: 12px;
+    background: var(--ui-surface-2);
+  }
+
+  .tabla tfoot td:empty {
+    display: none;
+  }
+}

@@ -264,6 +264,8 @@ export type AvisosProgramacion = {
  */
 export function avisosProgramacion(p: {
   turnos: readonly TurnoProgramado[];
+  /** Lo que ya está citado alrededor (no se guarda): sirve para medir descanso, racha y extra de la semana. */
+  contexto?: readonly TurnoProgramado[];
   topeExtraSemanaMin?: number;
   rangoNormal?: { inicio: string; fin: string };
 }): AvisosProgramacion {
@@ -271,8 +273,14 @@ export function avisosProgramacion(p: {
   const rango = p.rangoNormal ?? { inicio: HORARIO_DEFAULT.entrada, fin: HORARIO_DEFAULT.salida };
   const tope = p.topeExtraSemanaMin ?? 9 * 60;
 
+  const clave = (u: number, f: string) => `${u}:${f}`;
+  const nuevos = new Set(p.turnos.map((t) => clave(t.userId, t.fecha)));
+  const toca = (u: number, ...fechas: string[]) => fechas.some((f) => nuevos.has(clave(u, f)));
+  const semanasNuevas = new Set(p.turnos.map((t) => clave(t.userId, lunesDe(t.fecha))));
+
   const porPersona = new Map<number, TurnoProgramado[]>();
-  for (const t of p.turnos) {
+  const contexto = (p.contexto ?? []).filter((t) => !nuevos.has(clave(t.userId, t.fecha)));
+  for (const t of [...p.turnos, ...contexto]) {
     if (!horaValida(t.horaEntrada) || !horaValida(t.horaSalida)) continue;
     const list = porPersona.get(t.userId) ?? [];
     list.push(t);
@@ -289,7 +297,7 @@ export function avisosProgramacion(p: {
       for (let j = i + 1; j < intervalos.length; j++) {
         const a = intervalos[i];
         const b = intervalos[j];
-        if (a.fin > b.inicio && b.fin > a.inicio) {
+        if (a.fin > b.inicio && b.fin > a.inicio && toca(userId, ordenados[i].fecha, ordenados[j].fecha)) {
           out.solapes.push({
             userId,
             fechaA: ordenados[i].fecha,
@@ -304,7 +312,7 @@ export function avisosProgramacion(p: {
       const fin = intervalos[i].fin;
       const ini = intervalos[i + 1].inicio;
       const horas = (ini - fin) / (60 * 60 * 1000);
-      if (horas >= 0 && horas < 8) {
+      if (horas >= 0 && horas < 8 && toca(userId, ordenados[i].fecha, ordenados[i + 1].fecha)) {
         out.descansoCorto.push({
           userId,
           fechaA: ordenados[i].fecha,
@@ -321,7 +329,10 @@ export function avisosProgramacion(p: {
     for (let i = 1; i < dias.length; i++) {
       if (sumaDias(dias[i - 1], 1) === dias[i]) {
         racha += 1;
-        if (racha > 6) {
+        const ultimo = sumaDias(dias[i], 1) !== dias[i + 1];
+        const tramo = dias.slice(i - racha + 1, i + 1);
+        // Una sola vez por racha, cuando termina, y solo si un turno nuevo la forma.
+        if (racha > 6 && ultimo && toca(userId, ...tramo)) {
           out.masDe6Seguidos.push({
             userId,
             desde,
@@ -345,7 +356,7 @@ export function avisosProgramacion(p: {
       porSemana.set(clave, (porSemana.get(clave) ?? 0) + extra);
     }
     for (const [semana, minutosExtraEst] of porSemana) {
-      if (minutosExtraEst > tope) {
+      if (minutosExtraEst > tope && semanasNuevas.has(`${userId}:${semana}`)) {
         out.extraSobreTope.push({
           userId,
           semana,
@@ -395,6 +406,12 @@ export function sumaDias(fecha: string, n: number): string {
   const t = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
   t.setUTCDate(t.getUTCDate() + n);
   return t.toISOString().slice(0, 10);
+}
+
+/** Minutos de un turno que caen fuera del rango normal (la extra prevista, si se autoriza). */
+export function extraPrevista(entrada: string, salida: string, descansa = false, rango: { inicio: string; fin: string } = { inicio: HORARIO_DEFAULT.entrada, fin: HORARIO_DEFAULT.salida }): number {
+  const total = minutosEntreHm(entrada, salida);
+  return descansa ? total : Math.max(0, total - minutosDentroDeRango(entrada, salida, rango.inicio, rango.fin));
 }
 
 /** Lunes de la semana ISO-ish (UTC por la fecha civil). */

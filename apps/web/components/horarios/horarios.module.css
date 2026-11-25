@@ -1,210 +1,317 @@
-/* Horarios / productividad — solo tokens --ui-* */
-
-.wrap {
-  display: grid;
-  gap: var(--ui-space-3, 12px);
-  color: var(--ui-fg);
-  font-variant-numeric: tabular-nums;
-}
-
-.ficha {
-  display: grid;
-  gap: 6px;
+.pila {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   min-width: 0;
 }
 
-.rango {
-  font-size: var(--ui-font-size-sm, 13px);
+.barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.grupo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.semana {
+  font-size: var(--ui-fs-section);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.marco {
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-elev-1);
+}
+
+.tabla {
+  width: 100%;
+  min-width: 940px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla th {
+  padding: 12px 8px;
+  background: var(--ui-surface-2);
+  color: var(--ui-fg-2);
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-label);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tabla tbody th {
+  background: var(--ui-surface);
   color: var(--ui-fg);
+  font-size: var(--ui-fs-body);
+  white-space: normal;
+}
+
+.tabla th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 168px;
+  padding-left: 20px;
+}
+
+.tabla thead th.hoy {
+  color: var(--ui-brand-text);
+}
+
+.tabla td,
+.tabla tbody th {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  border-top: 1px solid var(--ui-border-subtle);
+  vertical-align: middle;
+}
+
+.tabla td {
+  background: var(--ui-surface);
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.nombre {
+  display: block;
+  font-weight: 600;
 }
 
 .meta {
-  font-size: var(--ui-font-size-xs, 12px);
-  color: var(--ui-fg-3, var(--ui-muted));
+  display: block;
+  font-size: var(--ui-fs-meta);
+  font-weight: 400;
+  color: var(--ui-fg-3);
 }
 
-.acciones {
+.alerta {
+  color: var(--ui-warning-text);
+}
+
+.dia {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
-.inlineEdit {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  align-items: end;
-}
-
-@media (max-width: 480px) {
-  .inlineEdit {
-    grid-template-columns: 1fr;
-  }
-}
-
-.panel {
-  display: grid;
-  gap: var(--ui-space-4, 16px);
-  padding: var(--ui-space-4, 16px);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-card, 14px);
-  background: var(--ui-elev-1, var(--ui-bg));
-}
-
-.panelHead {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.titulo {
-  margin: 0;
-  font-size: var(--ui-font-size-lg, 18px);
-  font-weight: 650;
-  letter-spacing: -0.01em;
-}
-
-.sub {
-  margin: 4px 0 0;
-  font-size: var(--ui-font-size-sm, 13px);
-  color: var(--ui-fg-3, var(--ui-muted));
-}
-
-.grid2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.grid3 {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-@media (max-width: 820px) {
-  .grid2,
-  .grid3 {
-    grid-template-columns: 1fr;
-  }
-}
-
-.listaPersonas {
-  display: grid;
-  gap: 8px;
-  max-height: 220px;
-  overflow: auto;
-  padding: 8px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control, 8px);
-  background: var(--ui-bg);
-}
-
-.personaCheck {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
   min-height: 44px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  background: none;
+  color: var(--ui-fg-3);
+  font: inherit;
+  font-size: var(--ui-fs-meta);
+  line-height: 1.35;
+  text-align: left;
+  white-space: nowrap;
 }
 
-.plantillas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.plantilla {
-  min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control, 8px);
-  background: var(--ui-bg);
-  color: var(--ui-fg);
+button.dia {
   cursor: pointer;
 }
 
-.plantilla[data-activa="true"] {
-  border-color: var(--ui-accent, var(--ui-primary));
-  box-shadow: inset 0 0 0 1px var(--ui-accent, var(--ui-primary));
+button.dia:hover {
+  background: var(--ui-hover);
 }
 
-.capas {
-  display: grid;
-  gap: 10px;
+.dia small {
+  display: block;
+  max-width: 100px;
+  overflow: hidden;
+  font-size: var(--ui-fs-caption);
+  text-overflow: ellipsis;
 }
 
-.capa {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
-  border-left: 3px solid var(--ui-border);
-  background: var(--ui-bg);
-  border-radius: 0 var(--ui-radius-control, 8px) var(--ui-radius-control, 8px) 0;
+.dia[data-tipo="programado"],
+button.dia[data-tipo="programado"]:hover {
+  border-color: var(--ui-brand-soft-2);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+  font-weight: 600;
 }
 
-.capa[data-capa="planeado"] {
-  border-left-color: var(--ui-info, #3b82f6);
-}
-.capa[data-capa="real"] {
-  border-left-color: var(--ui-success, #10b981);
-}
-.capa[data-capa="pagable"] {
-  border-left-color: var(--ui-warning, #f59e0b);
+.dia[data-tipo="noche"],
+button.dia[data-tipo="noche"]:hover {
+  border-color: var(--ui-info-border);
+  background: var(--ui-info-bg);
+  color: var(--ui-info-text);
+  font-weight: 600;
 }
 
-.capaTitulo {
-  font-size: var(--ui-font-size-xs, 12px);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--ui-fg-3, var(--ui-muted));
+.dia:focus-visible,
+.ficha:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: var(--ui-focus-offset);
 }
 
-.ejes {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-@media (max-width: 480px) {
-  .ejes {
-    grid-template-columns: 1fr;
-  }
-}
-
-.eje {
-  padding: 10px 12px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control, 8px);
-  background: var(--ui-elev-1, var(--ui-bg));
-}
-
-.ejeValor {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.notaLft {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: var(--ui-radius-control, 8px);
-  background: var(--ui-bg-subtle, var(--ui-bg));
-  border: 1px dashed var(--ui-border);
-  font-size: var(--ui-font-size-sm, 13px);
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--ui-border-subtle);
+  font-size: var(--ui-fs-meta);
   color: var(--ui-fg-2);
 }
 
-.footerAcciones {
+.muestra {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -2px;
+}
+
+.muestra[data-tipo="programado"] {
+  background: var(--ui-brand-soft-2);
+}
+
+.muestra[data-tipo="noche"] {
+  background: var(--ui-info);
+}
+
+/* Teléfono: una tarjeta por persona con sus días debajo. */
+.tarjetas {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tarjeta {
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+}
+
+.tarjetaDias {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 8px;
+}
+
+@media (max-width: 820px) {
+  .marco {
+    display: none;
+  }
+
+  .tarjetas {
+    display: flex;
+  }
+}
+
+.bloque {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.etiqueta {
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-label);
+}
+
+.fichas {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  justify-content: flex-end;
 }
 
-.pct {
+.personas {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ficha {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-label);
+  cursor: pointer;
+}
+
+.ficha[aria-pressed="true"] {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+.ficha:disabled {
+  color: var(--ui-fg-4);
+  cursor: not-allowed;
+}
+
+.horas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--ui-fs-label);
+  color: var(--ui-fg-2);
+}
+
+.hoyTarjeta {
+  padding: 20px;
+}
+
+.grande {
+  margin: 0;
+  color: var(--ui-fg);
+  font-family: var(--ui-font-display);
+  font-size: var(--ui-fs-stat);
+  font-weight: var(--ui-fw-stat);
+  font-variant-numeric: tabular-nums;
+}
+
+.lista {
+  margin: 0;
+  padding: 4px 20px;
+  list-style: none;
+}
+
+.lista li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 0;
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.lista li:first-child {
+  border-top: 0;
+}
+
+.lista li > :last-child {
+  font-weight: 600;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }

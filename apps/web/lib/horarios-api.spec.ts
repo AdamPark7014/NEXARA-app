@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  contarAvisosProgramacion,
-  etiqFuenteHorario,
+  avisosEnPalabras,
+  diaLargo,
   formatearRangoHorario,
+  lunesDe,
   minutosAHorasTexto,
+  tituloSemana,
 } from "./horarios-api";
 
 describe("horarios-api helpers", () => {
@@ -20,23 +22,21 @@ describe("horarios-api helpers", () => {
     expect(minutosAHorasTexto(460)).toBe("7 h 40");
   });
 
-  it("etiqFuenteHorario traduce las fuentes conocidas", () => {
-    expect(etiqFuenteHorario("horario_dia")).toBe("Del día");
-    expect(etiqFuenteHorario("work_schedule")).toBe("Plantilla fija");
-    expect(etiqFuenteHorario("plantilla_turno")).toBe("Turno");
-    expect(etiqFuenteHorario("default")).toBe("10:00–18:00");
-    expect(etiqFuenteHorario(null)).toBe("—");
+  it("semanas y días en español, también al cruzar de mes", () => {
+    expect(tituloSemana("2026-11-23", "2026-11-29")).toBe("23 al 29 de noviembre");
+    expect(tituloSemana("2026-11-30", "2026-12-06")).toBe("30 de noviembre al 6 de diciembre");
+    expect(lunesDe("2026-11-29")).toBe("2026-11-23");
+    expect(diaLargo("2026-11-25")).toBe("miércoles 25");
   });
 
-  it("contarAvisosProgramacion suma arreglos", () => {
-    expect(contarAvisosProgramacion(undefined)).toBe(0);
-    expect(
-      contarAvisosProgramacion({
-        solapes: [1],
-        descansoCorto: [1, 2],
-        diasSeguidos: [],
-        extraSemana: [1],
-      }),
-    ).toBe(4);
+  it("avisosEnPalabras dice quién y por qué", () => {
+    expect(avisosEnPalabras(null)).toEqual([]);
+    const r = avisosEnPalabras({
+      solapes: [],
+      descansoCorto: [{ userId: 5, nombre: "Rubén", fechaA: "2026-11-26", fechaB: "2026-11-27", horasDescanso: 1.5 }],
+      masDe6Seguidos: [],
+      extraSobreTope: [{ userId: 5, nombre: "Rubén", semana: "2026-11-23", minutosExtraEst: 840, tope: 540 }],
+    });
+    expect(r.map((x) => x.titulo)).toEqual(["Rubén descansa solo 1 h 30", "Rubén pasa el tope de 9 h extra"]);
   });
 });

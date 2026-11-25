@@ -24,7 +24,6 @@ export class HorarioController {
   }
 
   /** GET /api/attendance/horarios?from&to&userIds=1,2 */
-  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_VIEW] })
   @Get()
   listar(
     @Req() req: any,
@@ -45,6 +44,25 @@ export class HorarioController {
     );
   }
 
+  /** GET /api/attendance/horarios/mio?from&to — cualquiera, solo lo suyo. */
+  @Get('mio')
+  mio(
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const hoy = workDateKey(new Date());
+    const desde = (from ?? hoy).slice(0, 10);
+    return this.horario.mio(this.actor(req), { from: desde, to: (to ?? desde).slice(0, 10) }, companyId);
+  }
+
+  /** POST /api/attendance/horarios/quitar { userId, fecha } — vuelve al horario de siempre. */
+  @Post('quitar')
+  quitar(@Req() req: any, @Body() body: any, @CurrentCompanyId() companyId: number | null) {
+    return this.horario.quitar(this.actor(req), body ?? {}, companyId);
+  }
+
   /** GET /api/attendance/horarios/de?userId&fecha — resuelve horarioDe */
   @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_VIEW] })
   @Get('de')
@@ -61,28 +79,24 @@ export class HorarioController {
   }
 
   /** POST /api/attendance/horarios/programar */
-  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_MANAGE] })
   @Post('programar')
   programar(@Req() req: any, @Body() body: any, @CurrentCompanyId() companyId: number | null) {
     return this.horario.programar(this.actor(req), body ?? {}, companyId);
   }
 
   /** POST /api/attendance/horarios/extender { userId, fecha, hasta, motivo? } */
-  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_MANAGE] })
   @Post('extender')
   extender(@Req() req: any, @Body() body: any, @CurrentCompanyId() companyId: number | null) {
     return this.horario.extenderORecortar(this.actor(req), { ...(body ?? {}), tipo: 'extender' }, companyId);
   }
 
   /** POST /api/attendance/horarios/recortar { userId, fecha, hasta, motivo? } */
-  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_MANAGE] })
   @Post('recortar')
   recortar(@Req() req: any, @Body() body: any, @CurrentCompanyId() companyId: number | null) {
     return this.horario.extenderORecortar(this.actor(req), { ...(body ?? {}), tipo: 'recortar' }, companyId);
   }
 
   /** GET /api/attendance/horarios/plantillas */
-  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_VIEW] })
   @Get('plantillas')
   plantillas(@CurrentCompanyId() companyId: number | null) {
     return this.horario.plantillas(companyId);

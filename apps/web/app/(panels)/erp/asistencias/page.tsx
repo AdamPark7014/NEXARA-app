@@ -33,6 +33,7 @@ import {
   ModuleToolbar,
   PersonCell,
   SearchInput,
+  Segmented,
   SkeletonRows,
   Stat,
   StatRow,
@@ -90,6 +91,8 @@ import styles from "./asistencias.module.css";
 
 // Pantallas pesadas que solo se ven al abrir su pestaña: se cargan entonces, no en cada visita.
 const ChecadasRechazadas = dynamic(() => import("@/components/asistencias/ChecadasRechazadas"), { ssr: false });
+const SemanaHorarios = dynamic(() => import("@/components/horarios/SemanaHorarios"), { ssr: false });
+const MiHorario = dynamic(() => import("@/components/horarios/MiHorario"), { ssr: false });
 const HorariosEquipo = dynamic(() => import("@/components/asistencias/HorariosEquipo"), { ssr: false });
 const RegistroAsistido = dynamic(() => import("@/components/asistencias/RegistroAsistido"), { ssr: false });
 const GuardiasPanel = dynamic(() => import("@/components/asistencias/GuardiasPanel"), { ssr: false });
@@ -286,9 +289,11 @@ export default function ErpAsistenciasPage() {
   useEffect(() => {
     const inicial = new URLSearchParams(window.location.search).get("tab");
     if (inicial === "comidas" || inicial === "equipo" || inicial === "guardias" || inicial === "festivos") setTab(inicial);
-    else if ((inicial === "rechazos" || inicial === "horarios") && isManager) setTab(inicial);
+    else if (inicial === "horarios") setTab(inicial);
+    else if (inicial === "rechazos" && isManager) setTab(inicial);
     else if (inicial === "trayectoria" && canLiveGps) setTab(inicial);
   }, [canLiveGps, isManager]);
+  const [vistaHorario, setVistaHorario] = useState<"semana" | "siempre">("semana");
   const [dateFilter, setDateFilter] = useState(todayIso());
   // Un tramo sin cierre solo «sigue» si el día que se ve es hoy.
   const esHoy = dateFilter === todayIso();
@@ -1089,13 +1094,29 @@ export default function ErpAsistenciasPage() {
   } else if (tab === "rechazos" && isManager) {
     before = barraFecha;
     contenido = <ChecadasRechazadas token={token} desde={dateFilter} hasta={dateFilter} />;
-  } else if (tab === "horarios" && isManager) {
-    contenido = (
-      <HorariosEquipo
-        token={token}
-        personas={mapped.map((m) => ({ id: m.userId, nombre: m.nombre, puesto: m.roleName ?? m.department }))}
+  } else if (tab === "horarios" && !isManager) {
+    contenido = <MiHorario token={token} />;
+  } else if (tab === "horarios") {
+    before = (
+      <Segmented
+        ariaLabel="Qué horario ver"
+        items={[
+          { id: "semana", label: "Por semana" },
+          { id: "siempre", label: "El de siempre" },
+        ]}
+        value={vistaHorario}
+        onChange={setVistaHorario}
       />
     );
+    contenido =
+      vistaHorario === "semana" ? (
+        <SemanaHorarios token={token} />
+      ) : (
+        <HorariosEquipo
+          token={token}
+          personas={mapped.map((m) => ({ id: m.userId, nombre: m.nombre, puesto: m.roleName ?? m.department }))}
+        />
+      );
   } else if (tab === "guardias") {
     contenido = <GuardiasPanel token={token} />;
   } else if (tab === "festivos") {
@@ -1197,9 +1218,9 @@ export default function ErpAsistenciasPage() {
     ...(isManager
       ? [
           { id: "rechazos" as const, label: "Checadas rechazadas" },
-          { id: "horarios" as const, label: "Horarios" },
         ]
       : []),
+    { id: "horarios", label: isManager ? "Horarios" : "Mi horario" },
     // Mapa del equipo y recorridos: solo dirección.
     ...(canLiveGps ? [{ id: "trayectoria" as const, label: "Recorrido del día" }] : []),
     { id: "guardias", label: "Guardias" },
@@ -1218,7 +1239,9 @@ export default function ErpAsistenciasPage() {
         : tab === "rechazos"
           ? "Quién intentó checar y no pudo, y por qué."
           : tab === "horarios"
-            ? "El horario de cada persona de tu equipo."
+            ? isManager
+              ? "A qué hora entra y sale cada persona, día por día."
+              : "A qué hora entras y sales hoy y los próximos días."
             : tab === "guardias"
               ? "Quién trabaja cada sábado y domingo de las próximas semanas."
               : tab === "festivos"

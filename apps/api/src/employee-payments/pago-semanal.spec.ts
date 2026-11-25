@@ -2,8 +2,6 @@ import {
   saldoPagoSemanal,
   validarAjustePago,
   validarRegistroPagoCeo,
-  comoSeCalculoRenglones,
-  snapshotParametrosAlCerrar,
   esFormaPagoNomina,
 } from './pago-semanal';
 
@@ -31,38 +29,5 @@ describe('pago-semanal', () => {
     expect(
       validarRegistroPagoCeo({ esCeo: true, monto: 50, forma: 'transferencia', comprobanteUrl: null }).ok,
     ).toBe(true);
-  });
-
-  it('como se calculó arma renglones ordinarias, extra y ajuste', () => {
-    const r = comoSeCalculoRenglones({
-      horasOrdinarias: 40,
-      tarifaHora: 100,
-      horasExtra: 2,
-      factorExtra: 2,
-      bonoProductividad: 0,
-      descuentos: 50,
-      ajusteManual: -100,
-      ajusteMotivo: 'Acuerdo de la semana',
-      ajusteAutor: 'Dirección',
-    });
-    expect(r.find((x) => x.clave === 'ordinarias')?.monto).toBe(4000);
-    expect(r.find((x) => x.clave === 'extra')?.monto).toBe(400);
-    expect(r.find((x) => x.clave === 'descuentos')?.monto).toBe(-50);
-    expect(r.find((x) => x.clave === 'ajuste')?.monto).toBe(-100);
-  });
-
-  it('snapshot de parámetros al cerrar conserva factor y rango', () => {
-    const s = snapshotParametrosAlCerrar({
-      vigenteDesde: '2026-01-01',
-      factorExtra: 2,
-      rangoNormalInicio: '10:00',
-      rangoNormalFin: '18:00',
-      ruido: 'ignorar',
-    });
-    expect(s.factorExtra).toBe(2);
-    expect(s.rangoNormalInicio).toBe('10:00');
-    expect(s.cerradoAt).toEqual(expect.any(String));
-    expect(esFormaPagoNomina('transferencia')).toBe(true);
-    expect(esFormaPagoNomina('bitcoin')).toBe(false);
   });
 });

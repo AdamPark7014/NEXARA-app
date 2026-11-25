@@ -8,6 +8,7 @@ import SwiftUI
 enum AsistenciasTab: String, CaseIterable, Identifiable {
     case equipo
     case comidas
+    case horarios
     case trayectoria
 
     var id: String { rawValue }
@@ -113,7 +114,7 @@ final class AttendanceVM: ObservableObject {
     }
 
     var tabs: [AsistenciasTab] {
-        canSeeTrajectory ? AsistenciasTab.allCases : [.equipo, .comidas]
+        canSeeTrajectory ? AsistenciasTab.allCases : [.equipo, .comidas, .horarios]
     }
 
     /// Quien no ve equipo solo tiene su jornada en esta pestaña: se llama como lo que muestra.
@@ -121,6 +122,7 @@ final class AttendanceVM: ObservableObject {
         switch tab {
         case .equipo: return canManageTeam ? "Equipo del día" : "Mi jornada"
         case .comidas: return "Comidas"
+        case .horarios: return canManageTeam ? "Horarios" : "Mi horario"
         case .trayectoria: return "Trayectoria"
         }
     }
@@ -543,9 +545,12 @@ struct AttendanceView: View {
             .background(NxColors.surface)
 
             // El día vale para las tres pestañas: vive una sola vez, fuera de la lista.
-            AsistenciasSelectorFecha(fecha: vm.dateString, onFecha: { vm.setFecha($0) })
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+            // Horarios enseña hoy y lo que sigue: no depende del día elegido.
+            if vm.tab != .horarios {
+                AsistenciasSelectorFecha(fecha: vm.dateString, onFecha: { vm.setFecha($0) })
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+            }
 
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -570,7 +575,7 @@ struct AttendanceView: View {
                 }
             case .trayectoria:
                 await vm.loadTrajectory()
-            case .comidas:
+            case .comidas, .horarios:
                 break
             }
         }
@@ -669,6 +674,8 @@ struct AttendanceView: View {
             .refreshable { await vm.refresh(initial: false) }
         case .comidas:
             ComidasView(fecha: AttendanceClock.date(fromDay: vm.dateString))
+        case .horarios:
+            HorariosView(checa: vm.canRegisterSelf, gestiona: vm.canManageTeam)
         case .trayectoria:
             ScrollView {
                 AsistenciasTrayectoriaSection(vm: vm)

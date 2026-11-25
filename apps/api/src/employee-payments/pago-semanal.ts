@@ -91,80 +91,66 @@ export function validarRegistroPagoCeo(p: {
   return { ok: true, forma: p.forma };
 }
 
-export function comoSeCalculoRenglones(p: {
-  horasOrdinarias: number;
-  tarifaHora: number;
-  horasExtra: number;
-  factorExtra: number;
-  bonoProductividad: number;
-  descuentos: number;
-  ajusteManual: number;
-  ajusteMotivo?: string | null;
-  ajusteAutor?: string | null;
-}): RenglonComoSeCalculo[] {
-  const renglones: RenglonComoSeCalculo[] = [];
-  const ordinarias = redondear2(p.horasOrdinarias * p.tarifaHora);
-  renglones.push({
-    clave: 'ordinarias',
-    titulo: 'Horas ordinarias',
-    monto: ordinarias,
-    detalle: `${p.horasOrdinarias} h × $${p.tarifaHora}/h`,
-  });
-  const extra = redondear2(p.horasExtra * p.tarifaHora * p.factorExtra);
-  if (p.horasExtra > 0 || extra !== 0) {
-    renglones.push({
-      clave: 'extra',
-      titulo: 'Horas extra',
-      monto: extra,
-      detalle: `${p.horasExtra} h × $${p.tarifaHora}/h × factor ${p.factorExtra}`,
-    });
-  }
-  if (p.bonoProductividad) {
-    renglones.push({
-      clave: 'bono',
-      titulo: 'Bono de productividad',
-      monto: redondear2(p.bonoProductividad),
-      detalle: 'Según parámetros de productividad vigentes al cerrar',
-    });
-  }
-  if (p.descuentos) {
-    renglones.push({
-      clave: 'descuentos',
-      titulo: 'Descuentos',
-      monto: -Math.abs(redondear2(p.descuentos)),
-      detalle: 'Descuentos de la semana',
-    });
-  }
-  if (p.ajusteManual) {
-    const quien = (p.ajusteAutor ?? '').trim();
-    const motivo = (p.ajusteMotivo ?? '').trim();
-    renglones.push({
-      clave: 'ajuste',
-      titulo: 'Ajuste manual',
-      monto: redondear2(p.ajusteManual),
-      detalle: [motivo || 'Ajuste', quien ? `por ${quien}` : null].filter(Boolean).join(' · '),
-    });
-  }
-  return renglones;
+export type EstadoPago = 'sin_monto' | 'por_pagar' | 'parcial' | 'pagado';
+
+export function estadoDePago(s: SaldoPagoSemanal): EstadoPago {
+  if (s.final <= 0 && s.pagado <= 0) return 'sin_monto';
+  if (s.saldo <= 0) return 'pagado';
+  return s.pagado > 0 ? 'parcial' : 'por_pagar';
 }
 
-/** Foto de parámetros al cerrar la semana (no muta el historial vigente). */
-export function snapshotParametrosAlCerrar(
-  params: Record<string, unknown> | null | undefined,
-): Record<string, unknown> {
-  const src = params && typeof params === 'object' ? params : {};
-  const pick = (k: string) => (k in src ? src[k] : undefined);
-  return {
-    vigenteDesde: pick('vigenteDesde') ?? null,
-    rangoNormalInicio: pick('rangoNormalInicio') ?? '10:00',
-    rangoNormalFin: pick('rangoNormalFin') ?? '18:00',
-    graciaMin: pick('graciaMin') ?? 15,
-    pesoPuntualidad: pick('pesoPuntualidad') ?? 0.3,
-    pesoAprovechamiento: pick('pesoAprovechamiento') ?? 0.4,
-    pesoEficiencia: pick('pesoEficiencia') ?? 0.3,
-    topeBonoPct: pick('topeBonoPct') ?? 100,
-    factorExtra: pick('factorExtra') ?? 2,
-    topeExtraSemanaMin: pick('topeExtraSemanaMin') ?? 540,
-    cerradoAt: new Date().toISOString(),
-  };
+/** Lo que hace falta de la fila del Control semanal para explicar su total. */
+export type FilaParaExplicar = {
+  sueldoPeriodo: number | null;
+  sueldoPeriodoExplicacion: string;
+  viaticos: number | null;
+  extrasMonto: number | null;
+  extrasMinutosAprobados: number;
+  festivosMonto: number | null;
+  festivosTrabajados: ReadonlyArray<{ nombre: string }>;
+  descuentos: ReadonlyArray<{ concepto: string; monto: number; aceptado: boolean }>;
+  subtotal: number | null;
+  total: number | null;
+};
+
+const horasTexto = (min: number) => {
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  return m ? `${h} h ${m} min` : `${h} h`;
+};
+
+/**
+ * Renglones que suman exactamente el total del Control semanal. Si el detalle está reservado (la
+ * contadora en modo «totales» no recibe subtotal), un solo renglón con el neto.
+ */
+export function comoSeCalculoDeFila(f: FilaParaExplicar): RenglonComoSeCalculo[] {
+  if (f.subtotal == null) {
+    return [{ clave: 'total', titulo: 'Total de la semana', monto: redondear2(f.total ?? 0), detalle: 'Detalle reservado a RH y dirección' }];
+  }
+  const out: RenglonComoSeCalculo[] = [
+    { clave: 'sueldo', titulo: 'Sueldo de la semana', monto: redondear2(f.sueldoPeriodo ?? 0), detalle: f.sueldoPeriodoExplicacion },
+  ];
+  if (f.extrasMonto) {
+    out.push({
+      clave: 'extra',
+      titulo: 'Horas extra autorizadas',
+      monto: redondear2(f.extrasMonto),
+      detalle: `${horasTexto(f.extrasMinutosAprobados)}. Las primeras 9 h al doble, las demás al triple`,
+    });
+  }
+  if (f.festivosMonto) {
+    out.push({
+      clave: 'festivos',
+      titulo: 'Festivo trabajado',
+      monto: redondear2(f.festivosMonto),
+      detalle: f.festivosTrabajados.map((x) => x.nombre).join(', '),
+    });
+  }
+  if (f.viaticos) out.push({ clave: 'viaticos', titulo: 'Viáticos', monto: redondear2(f.viaticos), detalle: 'Los de la semana' });
+  f.descuentos
+    .filter((d) => d.aceptado)
+    .forEach((d, i) =>
+      out.push({ clave: `descuento-${i}`, titulo: d.concepto, monto: -Math.abs(redondear2(d.monto)), detalle: 'Descuento aceptado' }),
+    );
+  return out;
 }

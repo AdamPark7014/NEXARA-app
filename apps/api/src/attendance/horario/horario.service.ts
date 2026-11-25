@@ -9,12 +9,16 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { ChatService } from '../../chat/chat.service.js';
 import { requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import { parseWorkDate, workDateColumn, workDateKey } from '../../common/time/workday.js';
+import { sinChecador } from '../../common/platform-accounts.js';
 import {
   avisosProgramacion,
+  extraPrevista,
   horaValida,
+  minutosEntreHm,
   PLANTILLAS_TURNO_OMISION,
   resolverHorario,
   sumaDias,
+  type AvisosProgramacion,
   type HorarioCitado,
   type TurnoProgramado,
 } from './horario-de.js';
@@ -154,65 +158,120 @@ export class HorarioService {
     return this.horarioDe(userId, fecha, tenantId);
   }
 
-  async listar(
-    actor: Actor,
-    q: { userIds?: number[]; from: string; to: string },
-    companyId: number | null,
-  ) {
+  /**
+   * La semana (o el rango, hasta 31 días) del equipo que esta persona puede ver: horario citado de cada
+   * día, si descansa, la extra prevista y, hoy, a qué hora entró.
+   */
+  async listar(actor: Actor, q: { userIds?: number[]; from: string; to: string }, companyId: number | null) {
     const tenantId = requireCompanyId(companyId);
-    const personas = await this.cargarPersonas(tenantId);
-    const ids = (q.userIds?.length ? q.userIds : personas.map((p) => p.id)).filter((id) =>
-      puedeVerHorario(actor, id, personas),
-    );
-    const from = workDateColumn(parseWorkDate(q.from));
-    const to = workDateColumn(parseWorkDate(q.to));
-    const filas = await this.db.horarioDia.findMany({
-      where: { companyId: tenantId, userId: { in: ids }, fecha: { gte: from, lte: to } },
-      include: { plantillaTurno: true, creadoPor: { select: { id: true, nombre: true } } },
-      orderBy: [{ userId: 'asc' }, { fecha: 'asc' }],
-    });
-    const schedules = await this.prisma.workSchedule.findMany({
-      where: { companyId: tenantId, userId: { in: ids } },
-    });
-    const byWs = new Map(schedules.map((s) => [s.userId, s]));
-    const byDia = new Map<string, (typeof filas)[number]>();
-    for (const f of filas) byDia.set(`${f.userId}:${f.fecha.toISOString().slice(0, 10)}`, f);
+    const fechas = this.rango(q.from, q.to);
+    const todas = await this.cargarPersonas(tenantId);
+    const pedidos = q.userIds?.length ? new Set(q.userIds) : null;
+    const personas = todas
+      .filter((p) => (!pedidos || pedidos.has(p.id)) && puedeVerHorario(actor, p.id, todas) && !sinChecador(p))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    const ids = personas.map((p) => p.id);
+    const { porDia, porPersona } = await this.horariosDe(tenantId, ids, fechas[0], fechas[fechas.length - 1]);
+    const hoy = workDateKey(new Date());
+    const jornadas = fechas.includes(hoy)
+      ? await this.prisma.attendanceDay.findMany({
+          where: { companyId: tenantId, userId: { in: ids }, date: workDateColumn(parseWorkDate(hoy)) },
+          select: { userId: true, lastEntryAt: true, isOpen: true },
+        })
+      : [];
+    const jornada = new Map(jornadas.map((x) => [x.userId, x]));
+    const params = (await this.parametros(tenantId, fechas[0])).vigente;
+    const rangoNormal = { inicio: params.rangoNormalInicio, fin: params.rangoNormalFin };
 
-    const items: Array<{ userId: number; fecha: string; horario: HorarioCitado; fila: unknown }> = [];
-    for (const userId of ids) {
-      for (let d = q.from; d <= q.to; d = sumaDias(d, 1)) {
-        const fila = byDia.get(`${userId}:${d}`) ?? null;
-        items.push({
-          userId,
-          fecha: d,
-          horario: resolverHorario({
-            fecha: d,
-            dia: fila,
-            workSchedule: byWs.get(userId) ?? null,
-            plantillaTurno: fila?.plantillaTurno
-              ? {
-                  id: fila.plantillaTurno.id,
-                  horaEntrada: fila.plantillaTurno.horaEntrada,
-                  horaSalida: fila.plantillaTurno.horaSalida,
-                  tipo: fila.plantillaTurno.tipo,
-                  graciaMin: fila.plantillaTurno.graciaMin,
-                }
-              : null,
-          }),
-          fila: fila
-            ? {
-                id: fila.id,
-                motivo: fila.motivo,
-                ajustes: fila.ajustes,
-                avisos: fila.avisos,
-                creadoPor: fila.creadoPor,
-                plantillaTurnoId: fila.plantillaTurnoId,
-              }
-            : null,
+    return {
+      from: fechas[0],
+      to: fechas[fechas.length - 1],
+      hoy,
+      topeExtraSemanaMin: params.topeExtraSemanaMin,
+      personas: personas.map((p) => {
+        const dias = fechas.map((fecha) => {
+          const d = this.diaDe(fecha, porDia.get(`${p.id}:${fecha}`) ?? null, porPersona.get(p.id) ?? null);
+          return {
+            ...d,
+            extraMin: d.trabaja ? extraPrevista(d.horario.horaEntrada, d.horario.horaSalida, d.esDescansoHabitual, rangoNormal) : 0,
+          };
         });
-      }
+        const j = jornada.get(p.id);
+        return {
+          id: p.id,
+          nombre: p.nombre,
+          puesto: p.puesto ?? null,
+          avatarUrl: p.avatarUrl ?? null,
+          puedeProgramar: puedeProgramarHorario(actor, p.id, todas).ok,
+          entradaHoyAt: j?.lastEntryAt ? j.lastEntryAt.toISOString() : null,
+          jornadaAbierta: Boolean(j?.isOpen),
+          extraMin: dias.reduce((a, d) => a + d.extraMin, 0),
+          dias,
+        };
+      }),
+    };
+  }
+
+  /** Lo propio, para «Mi horario»: hoy y los días que siguen. */
+  async mio(actor: Actor, q: { from: string; to: string }, companyId: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const fechas = this.rango(q.from, q.to);
+    const { porDia, porPersona } = await this.horariosDe(tenantId, [actor.id], fechas[0], fechas[fechas.length - 1]);
+    const params = (await this.parametros(tenantId, fechas[0])).vigente;
+    const rangoNormal = { inicio: params.rangoNormalInicio, fin: params.rangoNormalFin };
+    const dias = fechas.map((fecha) => {
+      const fila = porDia.get(`${actor.id}:${fecha}`) ?? null;
+      const d = this.diaDe(fecha, fila, porPersona.get(actor.id) ?? null);
+      const ultimo = Array.isArray(fila?.ajustes) ? (fila.ajustes[fila.ajustes.length - 1] as AjusteHorario | undefined) : undefined;
+      return {
+        ...d,
+        extraMin: d.trabaja ? extraPrevista(d.horario.horaEntrada, d.horario.horaSalida, d.esDescansoHabitual, rangoNormal) : 0,
+        loPuso: ultimo?.porNombre ?? null,
+        ajuste: ultimo?.tipo ?? null,
+      };
+    });
+    const hoy = workDateKey(new Date());
+    const j = await this.prisma.attendanceDay.findFirst({
+      where: { companyId: tenantId, userId: actor.id, date: workDateColumn(parseWorkDate(hoy)) },
+      select: { lastEntryAt: true, isOpen: true },
+    });
+    return { hoy, entradaHoyAt: j?.lastEntryAt ? j.lastEntryAt.toISOString() : null, jornadaAbierta: Boolean(j?.isOpen), dias };
+  }
+
+  private rango(from: string, to: string): string[] {
+    if (!esFecha(from) || !esFecha(to) || to < from) throw new BadRequestException('Rango de fechas no válido (AAAA-MM-DD)');
+    const out: string[] = [];
+    for (let d = from; d <= to; d = sumaDias(d, 1)) {
+      out.push(d);
+      if (out.length > 31) throw new BadRequestException('El rango no puede pasar de 31 días');
     }
-    return { items, from: q.from, to: q.to };
+    return out;
+  }
+
+  private async horariosDe(companyId: number, ids: number[], from: string, to: string) {
+    const [filas, schedules] = await Promise.all([
+      this.db.horarioDia.findMany({
+        where: {
+          companyId,
+          userId: { in: ids },
+          fecha: { gte: workDateColumn(parseWorkDate(from)), lte: workDateColumn(parseWorkDate(to)) },
+        },
+      }),
+      this.prisma.workSchedule.findMany({ where: { companyId, userId: { in: ids } } }),
+    ]);
+    const porDia = new Map<string, any>();
+    for (const f of filas) porDia.set(`${f.userId}:${f.fecha.toISOString().slice(0, 10)}`, f);
+    const porPersona = new Map<number, any>(schedules.map((x: any) => [x.userId, x]));
+    return { porDia, porPersona };
+  }
+
+  /** Día citado: programado, el de siempre, o descanso (fin de semana o los días de su horario). */
+  private diaDe(fecha: string, fila: any, ws: any) {
+    const horario = resolverHorario({ fecha, dia: fila, workSchedule: ws });
+    const dow = new Date(`${fecha}T00:00:00Z`).getUTCDay();
+    const habituales: number[] = Array.isArray(ws?.dias) && ws.dias.length ? ws.dias : [1, 2, 3, 4, 5];
+    const esDescansoHabitual = !habituales.includes(dow);
+    return { fecha, horario, programado: Boolean(fila), esDescansoHabitual, trabaja: Boolean(fila) || !esDescansoHabitual };
   }
 
   async programar(
@@ -224,16 +283,23 @@ export class HorarioService {
       horaSalida?: string;
       plantillaTurnoId?: number | null;
       motivo?: string | null;
+      /** Ya vio los avisos y decide programar así. */
       forzarSolapes?: boolean;
+      /** Solo calcula los avisos; no guarda. */
+      soloRevisar?: boolean;
     },
     companyId: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
     const personas = await this.cargarPersonas(tenantId);
-    const userIds = [...new Set((body.userIds ?? []).map(Number).filter((n) => Number.isFinite(n) && n > 0))];
-    const fechas = [...new Set((body.fechas ?? []).map((f) => String(f).slice(0, 10)))];
+    const userIds = [...new Set((body.userIds ?? []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+    const fechas = [...new Set((body.fechas ?? []).map((f) => String(f).slice(0, 10)))].sort();
     if (!userIds.length) throw new BadRequestException('Indica al menos una persona');
     if (!fechas.length) throw new BadRequestException('Indica al menos un día');
+    if (userIds.length > 100 || fechas.length > 31) throw new BadRequestException('Son demasiados turnos de una vez');
+    const hoy = workDateKey(new Date());
+    if (fechas.some((f) => !esFecha(f))) throw new BadRequestException('Las fechas van como AAAA-MM-DD');
+    if (fechas[0] < hoy) throw new BadRequestException('No se programan días que ya pasaron');
 
     let horaEntrada = horaValida(body.horaEntrada);
     let horaSalida = horaValida(body.horaSalida);
@@ -246,32 +312,18 @@ export class HorarioService {
       horaEntrada = horaEntrada ?? plantilla.horaEntrada;
       horaSalida = horaSalida ?? plantilla.horaSalida;
     }
-    if (!horaEntrada || !horaSalida) {
-      throw new BadRequestException('horaEntrada y horaSalida (HH:MM) o plantillaTurnoId son obligatorios');
-    }
+    if (!horaEntrada || !horaSalida) throw new BadRequestException('Indica a qué hora entra y a qué hora sale');
+    if (horaEntrada === horaSalida) throw new BadRequestException('La entrada y la salida no pueden ser la misma hora');
 
-    for (const id of userIds) {
-      if (!personas.some((p) => p.id === id)) throw new ForbiddenException('No puedes programar el horario de esa persona');
-      const dec = puedeProgramarHorario(actor, id, personas);
-      if (!dec.ok) {
-        throw new ForbiddenException(
-          dec.motivo === 'si_mismo'
-            ? 'Nadie puede cambiarse el horario a sí mismo'
-            : 'No puedes programar el horario de esa persona',
-        );
-      }
-    }
+    for (const id of userIds) this.exigirPrograma(actor, id, personas, 'No puedes programar el horario de esa persona');
 
     const turnos: TurnoProgramado[] = [];
-    for (const userId of userIds) {
-      for (const fecha of fechas) turnos.push({ userId, fecha, horaEntrada, horaSalida });
-    }
-    const avisos = avisosProgramacion({ turnos });
-    if (avisos.solapes.length && !body.forzarSolapes) {
-      return { ok: false, requiereConfirmacion: true, avisos, creados: 0 };
-    }
+    for (const userId of userIds) for (const fecha of fechas) turnos.push({ userId, fecha, horaEntrada, horaSalida });
+    const avisos = await this.avisosDe(tenantId, turnos, personas);
+    const hayAvisos = Object.values(avisos).some((l) => l.length > 0);
+    if (body.soloRevisar) return { ok: true, creados: 0, avisos };
+    if (hayAvisos && !body.forzarSolapes) return { ok: false, requiereConfirmacion: true, avisos, creados: 0 };
 
-    let creados = 0;
     for (const t of turnos) {
       await this.upsertDia({
         actor,
@@ -281,14 +333,70 @@ export class HorarioService {
         horaEntrada: t.horaEntrada,
         horaSalida: t.horaSalida,
         plantillaTurnoId: plantilla?.id ?? null,
-        motivo: body.motivo ?? null,
+        motivo: limpio(body.motivo),
         tipo: 'programar',
-        avisos,
+        avisos: soloDe(avisos, t.userId),
       });
-      creados += 1;
       await this.avisarPersona(actor, t.userId, t.fecha, t.horaEntrada, t.horaSalida, tenantId);
     }
-    return { ok: true, creados, avisos };
+    return { ok: true, creados: turnos.length, avisos };
+  }
+
+  /** Vuelve al horario de siempre: quita lo programado para ese día. */
+  async quitar(actor: Actor, body: { userId?: number; fecha?: string }, companyId: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const userId = Number(body.userId);
+    const fecha = String(body.fecha ?? '').slice(0, 10);
+    if (!esFecha(fecha)) throw new BadRequestException('fecha AAAA-MM-DD');
+    if (fecha < workDateKey(new Date())) throw new BadRequestException('No se cambian días que ya pasaron');
+    const personas = await this.cargarPersonas(tenantId);
+    this.exigirPrograma(actor, userId, personas, 'No puedes cambiar el horario de esa persona');
+    const r = await this.db.horarioDia.deleteMany({
+      where: { companyId: tenantId, userId, fecha: workDateColumn(parseWorkDate(fecha)) },
+    });
+    if (r.count) {
+      const { porDia, porPersona } = await this.horariosDe(tenantId, [userId], fecha, fecha);
+      const d = this.diaDe(fecha, porDia.get(`${userId}:${fecha}`) ?? null, porPersona.get(userId) ?? null);
+      if (d.trabaja) await this.avisarPersona(actor, userId, fecha, d.horario.horaEntrada, d.horario.horaSalida, tenantId);
+    }
+    return { ok: true, quitados: r.count };
+  }
+
+  private exigirPrograma(actor: Actor, userId: number, personas: readonly PersonaArbol[], mensaje: string) {
+    const dec = puedeProgramarHorario(actor, userId, personas);
+    if (dec.ok && personas.some((p) => p.id === userId)) return;
+    throw new ForbiddenException(!dec.ok && dec.motivo === 'si_mismo' ? 'Nadie puede cambiarse el horario a sí mismo' : mensaje);
+  }
+
+  /** Avisos de los turnos nuevos contra lo ya citado una semana antes y después. */
+  private async avisosDe(companyId: number, turnos: TurnoProgramado[], personas: readonly PersonaLista[]): Promise<AvisosProgramacion> {
+    const fechas = turnos.map((t) => t.fecha).sort();
+    const ids = [...new Set(turnos.map((t) => t.userId))];
+    const desde = sumaDias(fechas[0], -7);
+    const hasta = sumaDias(fechas[fechas.length - 1], 7);
+    const { porDia, porPersona } = await this.horariosDe(companyId, ids, desde, hasta);
+    const contexto: TurnoProgramado[] = [];
+    for (const userId of ids) {
+      for (let f = desde; f <= hasta; f = sumaDias(f, 1)) {
+        const d = this.diaDe(f, porDia.get(`${userId}:${f}`) ?? null, porPersona.get(userId) ?? null);
+        if (d.trabaja) contexto.push({ userId, fecha: f, horaEntrada: d.horario.horaEntrada, horaSalida: d.horario.horaSalida });
+      }
+    }
+    const params = (await this.parametros(companyId, fechas[0])).vigente;
+    const av = avisosProgramacion({
+      turnos,
+      contexto,
+      topeExtraSemanaMin: params.topeExtraSemanaMin,
+      rangoNormal: { inicio: params.rangoNormalInicio, fin: params.rangoNormalFin },
+    });
+    const nombre = new Map(personas.map((p) => [p.id, p.nombre]));
+    const con = <T extends { userId: number }>(l: T[]) => l.map((x) => ({ ...x, nombre: nombre.get(x.userId) ?? '' }));
+    return {
+      solapes: con(av.solapes),
+      descansoCorto: con(av.descansoCorto),
+      masDe6Seguidos: con(av.masDe6Seguidos),
+      extraSobreTope: con(av.extraSobreTope),
+    };
   }
 
   async extenderORecortar(
@@ -311,28 +419,18 @@ export class HorarioService {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) throw new BadRequestException('fecha AAAA-MM-DD');
     if (!hasta) throw new BadRequestException('Indica la hora (HH:MM)');
 
-    if (!personas.some((p) => p.id === userId)) throw new ForbiddenException('No puedes ajustar el horario de esa persona');
-    const dec = puedeProgramarHorario(actor, userId, personas);
-    if (!dec.ok) {
-      throw new ForbiddenException(
-        dec.motivo === 'si_mismo'
-          ? 'Nadie puede cambiarse el horario a sí mismo'
-          : 'No puedes ajustar el horario de esa persona',
-      );
-    }
+    if (fecha < workDateKey(new Date())) throw new BadRequestException('No se cambian días que ya pasaron');
+    this.exigirPrograma(actor, userId, personas, 'No puedes ajustar el horario de esa persona');
 
     const actual = await this.horarioDe(userId, fecha, tenantId);
-    const diaCol = workDateColumn(parseWorkDate(fecha));
-    const attDay = await this.prisma.attendanceDay.findUnique({
-      where: { companyId_userId_date: { companyId: tenantId, userId, date: diaCol } },
-    });
-    // Si ya checó entrada, no se mueve la hora de entrada (solo la salida citada).
-    if (attDay?.lastEntryAt && body.tipo === 'recortar') {
-      // recortar/extender solo tocan salida
-    }
-
+    // Solo se mueve la salida citada; la hora de entrada no cambia.
     const horaEntrada = actual.horaEntrada;
     const horaSalida = hasta;
+    if (horaEntrada === horaSalida) throw new BadRequestException('La entrada y la salida no pueden ser la misma hora');
+    const antes = minutosEntreHm(actual.horaEntrada, actual.horaSalida);
+    const ahora = minutosEntreHm(horaEntrada, horaSalida);
+    if (body.tipo === 'extender' && ahora <= antes) throw new BadRequestException(`Para extender, la salida va después de las ${actual.horaSalida}`);
+    if (body.tipo === 'recortar' && ahora >= antes) throw new BadRequestException(`Para terminar antes, la salida va antes de las ${actual.horaSalida}`);
 
     await this.upsertDia({
       actor,
@@ -343,10 +441,10 @@ export class HorarioService {
       horaSalida,
       plantillaTurnoId: actual.plantillaTurnoId,
       motivo:
-        body.motivo ??
+        limpio(body.motivo) ??
         (body.tipo === 'extender' ? `Extender hasta ${hasta}` : `Terminar antes a las ${hasta}`),
       tipo: body.tipo,
-      avisos: avisosProgramacion({ turnos: [{ userId, fecha, horaEntrada, horaSalida }] }),
+      avisos: await this.avisosDe(tenantId, [{ userId, fecha, horaEntrada, horaSalida }], personas),
       previa: { horaEntrada: actual.horaEntrada, horaSalida: actual.horaSalida },
     });
 
@@ -603,10 +701,21 @@ export class HorarioService {
     }
   }
 
-  private async cargarPersonas(companyId: number): Promise<PersonaArbol[]> {
+  private async cargarPersonas(companyId: number): Promise<PersonaLista[]> {
     return this.prisma.user.findMany({
       where: { isActive: true, companyMemberships: { some: { companyId } } },
-      select: { id: true, managerId: true, email: true, roleKey: true },
+      select: { id: true, nombre: true, puesto: true, avatarUrl: true, managerId: true, email: true, roleKey: true },
     });
   }
 }
+
+type PersonaLista = PersonaArbol & { nombre: string; puesto?: string | null; avatarUrl?: string | null };
+
+const esFecha = (f: string) => /^\d{4}-\d{2}-\d{2}$/.test(f) && !Number.isNaN(Date.parse(`${f}T00:00:00Z`));
+const limpio = (t?: string | null) => (t ?? '').trim().slice(0, 500) || null;
+const soloDe = (a: AvisosProgramacion, userId: number): AvisosProgramacion => ({
+  solapes: a.solapes.filter((x) => x.userId === userId),
+  descansoCorto: a.descansoCorto.filter((x) => x.userId === userId),
+  masDe6Seguidos: a.masDe6Seguidos.filter((x) => x.userId === userId),
+  extraSobreTope: a.extraSobreTope.filter((x) => x.userId === userId),
+});

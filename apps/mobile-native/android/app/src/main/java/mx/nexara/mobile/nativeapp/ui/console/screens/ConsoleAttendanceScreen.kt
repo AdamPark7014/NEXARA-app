@@ -604,6 +604,7 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
 private const val TAB_EQUIPO = "equipo"
 private const val TAB_COMIDAS = "comidas"
 private const val TAB_TRAYECTORIA = "trayectoria"
+private const val TAB_HORARIOS = "horarios"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -627,6 +628,7 @@ fun ConsoleAttendanceScreen(
         // Quien no ve equipo solo tiene su jornada en esta pestaña: se llama como lo que muestra.
         add(TAB_EQUIPO to if (vm.viewMode.canManageTeam) "Equipo del día" else "Mi jornada")
         add(TAB_COMIDAS to "Comidas")
+        add(TAB_HORARIOS to if (vm.viewMode.canManageTeam) "Horarios" else "Mi horario")
         if (vm.puedeVerTrayectoria) add(TAB_TRAYECTORIA to "Trayectoria")
     }
     val indice = pestanas.indexOfFirst { it.first == tab }.coerceAtLeast(0)
@@ -680,16 +682,25 @@ fun ConsoleAttendanceScreen(
         // El día vale para las tres pestañas, así que vive una sola vez y fuera
         // de la lista: si viviera dentro, al desplazarse se llevaría por delante
         // el calendario abierto.
-        SelectorFecha(
-            fecha = state.fecha,
-            onFecha = vm::setFecha,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
+        // Horarios enseña hoy y lo que sigue: no depende del día elegido.
+        if (tab != TAB_HORARIOS) {
+            SelectorFecha(
+                fecha = state.fecha,
+                onFecha = vm::setFecha,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
 
         when (tab) {
             TAB_COMIDAS -> mx.nexara.mobile.nativeapp.ui.console.comidas.ComidasPanel(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 fecha = state.fecha,
+            )
+
+            TAB_HORARIOS -> mx.nexara.mobile.nativeapp.ui.console.horarios.HorariosPanel(
+                checa = vm.viewMode.canRegisterSelf,
+                gestiona = vm.viewMode.canManageTeam,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
             )
 
             TAB_TRAYECTORIA -> TrayectoriaTab(
