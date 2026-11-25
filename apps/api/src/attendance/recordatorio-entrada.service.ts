@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -10,6 +10,7 @@ import { workDateColumn, workDateKey, workDayBounds } from '../common/time/workd
 import { horaAviso } from '../notifications/notification-push-meta.js';
 import { resolveAccessScheduleKey } from '../integra/access-schedule-defaults.js';
 import { horarioDePersona, type HorarioKpi } from '../me/kpis-equipo.js';
+import { HorarioService } from './horario/horario.service.js';
 import { esSabadoODomingo } from '../guardias/guardias-reglas.js';
 import { primerNombre } from '../celebrations/celebraciones.js';
 import {
@@ -53,6 +54,7 @@ export class RecordatorioEntradaService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly push: PushDispatchService,
+    @Optional() private readonly horarioSvc?: HorarioService,
   ) {}
 
   @Cron('* * * * *', { name: 'asistencia-recordatorio-entrada' })
@@ -102,8 +104,21 @@ export class RecordatorioEntradaService {
         orgRoleKey: u.role?.orgRoleKey ?? null,
         tipoContrato: u.tipoContrato,
       });
-      const horario = horarioDePersona(plantilla, u.horario ?? null);
       const empresa = empresaDe(u);
+      let horario = horarioDePersona(plantilla, u.horario ?? null);
+      if (this.horarioSvc && empresa != null) {
+        try {
+          const citado = await this.horarioSvc.horarioDeTolerante(u.id, workDateKey(ahora), empresa);
+          horario = {
+            ...horario,
+            entrada: citado.horaEntrada,
+            salida: citado.horaSalida,
+            graciaMin: citado.graciaMin,
+          };
+        } catch {
+          /* tabla ausente: 10-18 / WorkSchedule */
+        }
+      }
       const festivo = empresa != null ? (festivoDe.get(empresa) ?? null) : null;
       const posible: DiaDeLaPersona = {
         fecha,

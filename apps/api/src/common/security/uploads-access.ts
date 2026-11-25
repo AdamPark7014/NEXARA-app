@@ -18,7 +18,7 @@ export { SESSION_COOKIE_NAME };
  * Subdirectorios que nunca se sirven por `/uploads`, ni con sesión: el audio de las juntas
  * solo lo lee el propio API para transcribirlo (`meetings/grabacion.service.ts`).
  */
-export const PRIVATE_UPLOAD_PREFIXES = ['grabaciones-reuniones', 'sat-descargas'];
+export const PRIVATE_UPLOAD_PREFIXES = ['grabaciones-reuniones', 'sat-descargas', 'nomina-comprobantes'];
 
 /** True si la ruta cae (aunque venga codificada) bajo un subdirectorio privado. */
 export function isPrivateUploadPath(rawPath: string): boolean {

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, Optional, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -40,6 +40,7 @@ import {
   validarPeriodo,
   type PeriodoValidado,
 } from './actividad-periodo.js';
+import { validarUnSoloDia } from './actividad-un-solo-dia.js';
 import {
   assertCanCancel,
   cleanMotivo,
@@ -264,9 +265,19 @@ export class ActivitiesService {
       evidencePhotoRequired?: number;
       assignmentCharge?: string;
     };
-    // Periodo de varios días: la fecha máxima y la entrega pasan a ser el fin de su último día.
+    // Periodo: la fecha máxima y la entrega pasan a ser el fin de su último día.
+    // Desde 20-11 solo se admite un día laboral; el desglose multi-día crea N altas.
     const leido = validarPeriodo(periodoInicio, periodoFin);
     if (leido.error) throw new BadRequestException(leido.error);
+    const unDia = validarUnSoloDia({
+      periodoInicio,
+      periodoFin,
+      fechaInicio: rest.fechaInicio,
+      fechaMaxima: (createActivityDto as { fechaMaxima?: unknown }).fechaMaxima,
+      fechaEntregaEsperada: (createActivityDto as { fechaEntregaEsperada?: unknown }).fechaEntregaEsperada,
+      tiempoEstimadoMin: (createActivityDto as { tiempoEstimadoMin?: number | null }).tiempoEstimadoMin ?? null,
+    });
+    if (!unDia.ok) throw new UnprocessableEntityException(unDia.error);
     const conPeriodo = leido.periodo ? camposDePeriodo(leido.periodo, rest.fechaInicio ?? null) : {};
 
     const activity = await db.activity.create({
@@ -1361,6 +1372,21 @@ export class ActivitiesService {
         ? validarPeriodo(pIni ?? previo?.inicio ?? null, pFin ?? previo?.fin ?? null)
         : { periodo: previo };
       if (leido.error) throw new BadRequestException(leido.error);
+      // Solo se valida un solo día al crear/alargar; un periodo viejo multi-día se conserva hasta partirlo.
+      const unDiaUp = validarUnSoloDia({
+        periodoInicio: tocaPeriodo ? (leido.periodo?.inicio ?? null) : null,
+        periodoFin: tocaPeriodo ? (leido.periodo?.fin ?? null) : null,
+        fechaInicio: updateActivityDto.fechaInicio ?? prev?.fechaInicio,
+        fechaMaxima: updateActivityDto.fechaMaxima ?? prev?.fechaMaxima,
+        fechaEntregaEsperada: updateActivityDto.fechaEntregaEsperada ?? prev?.fechaEntregaEsperada,
+        tiempoEstimadoMin:
+          updateActivityDto.tiempoEstimadoMin !== undefined
+            ? updateActivityDto.tiempoEstimadoMin
+            : (prev?.tiempoEstimadoMin ?? null),
+      });
+      if (!unDiaUp.ok && (tocaPeriodo || updateActivityDto.fechaInicio != null || updateActivityDto.fechaMaxima != null || updateActivityDto.fechaEntregaEsperada != null || updateActivityDto.tiempoEstimadoMin !== undefined)) {
+        throw new UnprocessableEntityException(unDiaUp.error);
+      }
       if (leido.periodo) {
         const campos = camposDePeriodo(leido.periodo, updateActivityDto.fechaInicio ?? prev?.fechaInicio ?? null);
         // El inicio se revisa si lo mandaron o si se tocó el periodo: se conserva si cae dentro,

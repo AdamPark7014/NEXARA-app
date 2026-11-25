@@ -34,6 +34,7 @@ import {
   type Corregido,
 } from './nombres.js';
 import { SUBTIPOS_TAREA, TIPOS_ACTIVIDAD, TIPOS_SERVICIO, subtipoEquivalente, type TipoActividad } from './tipos-actividad.js';
+import { expandirPropuestasMultiDia } from './asistente-desglose-dias.js';
 
 export { SUBTIPOS_TAREA, TIPOS_ACTIVIDAD, TIPOS_SERVICIO, tiposQueCrea, tiposQueRecibe, type TipoActividad } from './tipos-actividad.js';
 
@@ -897,9 +898,12 @@ export type ContextoPropuesta = {
 /** Todas las propuestas de una instrucción (el servicio y el eval mandan exactamente lo mismo). */
 export function construirPropuestas(acciones: AccionPlan[], catalogos: CatalogosNexara, contexto: ContextoPropuesta): PropuestaActividad[] {
   const elegidas = new Map<string, PersonaAsignable>();
-  return accionesPorPersona(acciones, catalogos.personas)
+  const base = accionesPorPersona(acciones, catalogos.personas)
     .slice(0, 10)
     .map((accion) => construirPropuesta(accion, catalogos, { ...contexto, elegidas }));
+  // Varios días → N actividades de un día (cantidad/tiempo por día), no un periodo multi-día.
+  // Sin recorte: cortar aquí perdería días de trabajo sin avisar.
+  return expandirPropuestasMultiDia(base);
 }
 
 /** Convierte una acción del plan en una propuesta lista para confirmar. */
@@ -1225,8 +1229,7 @@ export function construirPropuesta(accion: AccionPlan, catalogos: CatalogosNexar
     fechaInicio: fechaInicio ?? undefined,
     fechaEntregaEsperada: fechaLimite ?? undefined,
     fechaMaxima: fechaLimite ?? undefined,
-    periodoInicio: agenda.hasta ? agenda.dia : undefined,
-    periodoFin: agenda.hasta ?? undefined,
+    // Sin periodo multi-día: construirPropuestas lo desglosa con expandirPropuestasMultiDia.
     assignmentCharge: encargo,
     clientId: cliente?.id,
     projectId: proyecto?.id,

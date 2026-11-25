@@ -27,8 +27,10 @@
  * - Inactividad = laboradas − productivas; nunca negativa.
  * - Retardo = misma regla que los avisos y RH: oficina y contratista entran 10:00 (salen 18:00),
  *   15 min de gracia; los minutos tarde se cuentan desde la hora de entrada.
- * - Tiempo extra = lo laborado por encima de 8 h en un día laborable (L–V) o todo
- *   lo laborado en un día de descanso. Sin horario (24/7, visitante) no hay extra.
+ * - Tiempo extra = lo laborado fuera del rango normal 10:00–18:00 (aunque el horario
+ *   citado caiga ahí). Excepción: festivo con horario propio → lo laborado sobre esa
+ *   jornada. Retardo = contra el horario citado del día. Sin horario (24/7) no hay
+ *   extra ni retardo.
  * - Cumplimiento «en tiempo y forma» (07-10, Adam: «los que cumplen más en tiempo y forma son
  *   Daniela y Luis» y el ranking por productividad los dejaba abajo): entregas a tiempo contra
  *   su límite (el mismo del semáforo, medido con la hora en que la persona ENTREGÓ, no con la
@@ -45,6 +47,8 @@
  *   está justificado». Un día laborable no trabajado (sin checar, o checó y no hizo nada) y sin
  *   justificar multiplica el cumplimiento por días trabajados ÷ días que debía trabajar.
  */
+import { resumenJornada } from '../attendance/horario/resumen-jornada.js';
+import { productividadDia } from '../attendance/horario/productividad.js';
 import { horaCierreAutomatico } from '../attendance/asistencia-confiable.js';
 import { expectedEndHm, expectedStartHm, RETARDO_GRACE_MINUTES } from '../attendance/attendance-hybrid.match.js';
 import {
@@ -1368,8 +1372,15 @@ export type DiaKpi = {
   minutosLaborados: number;
   minutosProductivos: number;
   minutosInactivos: number;
-  productividadPct: number | null;
-  /** Tiempo con una actividad, cada una contada solo hasta su tiempo máximo del día. */
+    productividadPct: number | null;
+  /** Tres ejes (puntualidad / aprovechamiento / eficiencia); no se compensan en silencio. */
+  ejesProductividad?: {
+    puntualidad: number;
+    aprovechamiento: number;
+    eficiencia: number;
+    indice: number;
+    desglose: string;
+  } | null; /** Tiempo con una actividad, cada una contada solo hasta su tiempo máximo del día. */
   minutosOcupados: number;
   /** Trabajó: 30 min o más con una actividad corriendo, o entregó algo ese día. */
   trabajado: boolean;
@@ -1686,13 +1697,59 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
     const minutosOcupados = Math.min(minutosDeTramos(intersectaTramos(tramosOcupados, laborables)), minutosLaborados);
     const trabajado = minutosProductivos >= MIN_TRABAJO_DIA_MIN || diasConEntrega.has(fecha);
     const sinTrabajo = laborable && !trabajado && terminado(fecha) && !justificadas.has(fecha);
-    const r = laborable ? retardoDeEntrada(primera.entrada, horarioHoy, tz) : { retardo: false, minutosTarde: 0 };
+    // Extra = fuera de 10–18; en festivo con horario propio = sobre su jornada.
+    // Retardo = contra horario citado (Adam, 20-11-2026).
+    const resumen =
+      horarioHoy.entrada && horarioHoy.salida
+        ? resumenJornada({
+            horario: {
+              fecha,
+              horaEntrada: horarioHoy.entrada,
+              horaSalida: horarioHoy.salida,
+              graciaMin: horarioHoy.graciaMin,
+            },
+            entradaReal: primera.entrada,
+            salidaReal: ultima.salida ?? ultima.fin,
+            comidas: comidaTramos.map((c) => ({ inicio: new Date(c.inicio), fin: new Date(c.fin) })),
+            esDiaDescanso: !laborable,
+            esFestivo: !!festivo?.trabaja,
+          })
+        : null;
+    const r =
+      !laborable || !horarioHoy.entrada
+        ? { retardo: false, minutosTarde: 0 }
+        : resumen
+          ? { retardo: resumen.retardoMin > 0, minutosTarde: resumen.retardoMin }
+          : retardoDeEntrada(primera.entrada, horarioHoy, tz);
+    const festivoConHorario = !!(festivo?.trabaja && festivo.entrada && festivo.salida);
     const minutosExtra =
       horarioHoy.jornadaOrdinariaMin == null
         ? null
-        : laborable
+        : festivoConHorario
           ? Math.max(0, minutosLaborados - horarioHoy.jornadaOrdinariaMin)
-          : minutosLaborados;
+          : !laborable
+            ? minutosLaborados // día de descanso suyo: todo lo checado es extra
+            : resumen
+              ? resumen.minutosExtra
+              : Math.max(0, minutosLaborados - horarioHoy.jornadaOrdinariaMin);
+    const ejes =
+      resumen && minutosLaborados > 0
+        ? (() => {
+            const p = productividadDia({
+              minutosLaborados,
+              minutosProductivos,
+              retardoMin: resumen.retardoMin,
+              jornadaCitadaMin: resumen.capas.planeado.jornadaCitadaMin,
+            });
+            return {
+              puntualidad: p.puntualidad.pct,
+              aprovechamiento: p.aprovechamiento.pct,
+              eficiencia: p.eficiencia.pct,
+              indice: p.indice,
+              desglose: p.desglose,
+            };
+          })()
+        : null;
 
     // Solo se paga lo que un jefe aprobó. Sin fila, el extra está pendiente de mirar.
     const decision = extraPorDia.get(fecha) ?? null;
@@ -1717,6 +1774,7 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
       minutosProductivos,
       minutosInactivos,
       productividadPct: pct(minutosProductivos, minutosLaborados),
+      ejesProductividad: ejes,
       minutosOcupados,
       trabajado,
       sinTrabajo,

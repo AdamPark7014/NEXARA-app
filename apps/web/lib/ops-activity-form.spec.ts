@@ -198,11 +198,13 @@ describe('buildActivityPayload · lo que se manda al API', () => {
 describe('periodo de la actividad', () => {
   const base = { ...EMPTY_ACTIVITY_FORM, projectId: '11', responsableId: '8', fecha: '2026-09-16' };
 
-  it('del día elegido al día de fin, con la etapa del proyecto', () => {
-    const payload = buildActivityPayload({ ...base, periodoFin: '2026-09-25', projectMilestoneId: '101' }, project, {});
-    expect(payload.periodoInicio).toBe('2026-09-16');
-    expect(payload.periodoFin).toBe('2026-09-25');
-    expect(payload.projectMilestoneId).toBe(101);
+  it('periodo multi-día ya no viaja: solo mismo día o desglose', () => {
+    const multi = buildActivityPayload({ ...base, periodoFin: '2026-09-25', projectMilestoneId: '101' }, project, {});
+    expect(multi).not.toHaveProperty('periodoInicio');
+    expect(multi.projectMilestoneId).toBe(101);
+    const mismo = buildActivityPayload({ ...base, periodoFin: '2026-09-16', projectMilestoneId: '101' }, project, {});
+    expect(mismo.periodoInicio).toBe('2026-09-16');
+    expect(mismo.periodoFin).toBe('2026-09-16');
   });
 
   it('sin día de fin es de un solo momento: al crear no manda periodo', () => {

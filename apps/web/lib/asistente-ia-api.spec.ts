@@ -96,9 +96,9 @@ describe("asistente IA en la pizarra", () => {
       fechaInicio: "2026-10-24T16:30:00.000Z",
       fechaEntregaEsperada: "2026-10-24T16:30:00.000Z",
       fechaMaxima: "2026-10-24T16:30:00.000Z",
-      periodoInicio: "2026-10-24",
-      periodoFin: "2026-10-28",
     });
+    expect(varios.periodoInicio).toBeUndefined();
+    expect(varios.periodoFin).toBeUndefined();
     // Quitar el día deja la actividad sin fechas.
     const sinDia = payloadFinal(lista, { dia: "" });
     expect(sinDia.fechaInicio).toBeUndefined();

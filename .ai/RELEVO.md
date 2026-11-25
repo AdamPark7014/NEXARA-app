@@ -1,5 +1,12 @@
 # RELEVO
 
+- **25-11 ~02:10 México (claude-code) — Horario por día, actividades de un solo día y pago semanal: recuperado lo que el rebase del 22-11 dejó fuera de main (`e8da7d096`). Con OK de Adam para subir y desplegar. Tres migraciones aditivas.**
+  - Migraciones: `actividad_serie_diaria` (corregida: la tabla es `Activity`, no `activities`), `horario_dia_productividad`, `nomina_pago_semanal`. Probadas dos veces en Postgres 17 desechable, sin diferencias con el esquema.
+  - Corregido al recuperar: el 10–18 por omisión cerraba turnos de noche en cero minutos (solo manda un horario programado para ese día); `GET attendance/horarios/de` pide alcance; una serie a medias no repite días al reintentar.
+  - La hora extra cuenta todo lo trabajado fuera de 10:00–18:00 (Adam, 20-11); se paga solo con autorización.
+  - No se trajo: pantallas web de horarios y pago (eran maquetas), contabilidad, vehículos (`vehiculo_actividad_opcional`), integra, bandeja, mesa de viáticos. Respaldo en `C:/dev/datos/proyectos-claude/nexara/respaldo-horarios-nomina` y `refs/respaldo/horarios-nomina-e8da7d096`.
+  - Paridad: API hecho · Web actividades de un solo día hecho, horarios y pago pendientes · Android e iOS solo el aviso de un solo día; horarios y pago pendientes.
+
 - **25-11 ~02:00 México (claude-code) — Las 2 pruebas en rojo del candado de jornada y los errores del portal de clientes. Sin desplegar; sin migraciones.**
   - Candado: evidencia capturada dentro de una jornada ya cerrada se acepta al llegar tarde; cada 409 queda en la bitácora. No es la copia de `e8da7d096`: esa buscaba `AttendanceDay.lastEntryAt`, que al cerrar queda en null (no servía con datos reales), y aceptaba cualquier escritura. Esta lee las checadas y solo vale para `POST activity-evidence/*`.
   - Portal (cliente y sucursal): tickets y solicitudes que no cargan dicen el error con Reintentar, no «No hay…»; los contadores muestran «—».

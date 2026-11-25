@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -9,6 +9,8 @@ import { isNonEmployeeEmail, sinChecador } from '../../common/platform-accounts.
 import { runScheduledJob } from '../../common/cron/run-scheduled-job.js';
 import { resolveAccessScheduleKey } from '../../integra/access-schedule-defaults.js';
 import { horarioDePersona } from '../../me/kpis-equipo.js';
+import { HorarioService } from '../horario/horario.service.js';
+import { workDateKey } from '../../common/time/workday.js';
 import { minutoDelDia } from '../recordatorio-entrada.js';
 import { avisoDeComidaQueToca, textoAvisoDeComida, ventanaDeComida } from './ventana-comida.js';
 
@@ -22,6 +24,7 @@ export class LunchBreaksCronService {
   constructor(
     private prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    @Optional() private readonly horarioSvc?: HorarioService,
   ) {}
 
   /**
@@ -83,10 +86,17 @@ export class LunchBreaksCronService {
 
     for (const u of usuarios) {
       if (isNonEmployeeEmail(u.email) || sinChecador(u) || /\.invalid$/i.test(String(u.email ?? '').trim())) continue;
-      const horario = horarioDePersona(
+      let horario = horarioDePersona(
         resolveAccessScheduleKey({ isActive: true, roleKey: u.roleKey, orgRoleKey: u.role?.orgRoleKey ?? null, tipoContrato: u.tipoContrato }),
         u.horario ?? null,
       );
+      const companyId = empresaDe.get(u.id);
+      if (this.horarioSvc && companyId != null) {
+        try {
+          const citado = await this.horarioSvc.horarioDeTolerante(u.id, workDateKey(ahora), companyId);
+          horario = { ...horario, entrada: citado.horaEntrada, salida: citado.horaSalida, graciaMin: citado.graciaMin };
+        } catch { /* fallback */ }
+      }
       // Dirección (24/7) no registra comida con horario.
       if (!horario.entrada) continue;
       const ventana = ventanaDeComida(horario);

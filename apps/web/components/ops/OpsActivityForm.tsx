@@ -40,6 +40,7 @@ import {
 } from "@/lib/herramientas-checklist";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
+import { desglosarPorDias, MENSAJE_UN_SOLO_DIA, type DiaDesglose } from "@/lib/actividad-un-solo-dia";
 import {
   activitySubmitLabel,
   buildActivityPayload,
@@ -50,6 +51,7 @@ import {
   hora12Texto,
   horaDeEntrada,
   horaQuizaPm,
+  pideVariosDiasSinDesglose,
   type ActivityFormState,
   type ActivityProjectMode,
 } from "@/lib/ops-activity-form";
@@ -262,6 +264,10 @@ export default function OpsActivityForm({
   const [etapas, setEtapas] = useState<EtapaPropuesta[] | null>(null);
   const [ventanaProyecto, setVentanaProyecto] = useState<{ inicio: string | null; fin: string | null } | null>(null);
   const [periodoAuto, setPeriodoAuto] = useState(true);
+  const [desgloseActivo, setDesgloseActivo] = useState(false);
+  const [desgloseDias, setDesgloseDias] = useState<DiaDesglose[]>([]);
+  /** Serie en curso: si un día falla, al reintentar no se repiten los ya creados. */
+  const serieRef = useRef<{ clave: string; creadas: Map<number, number> } | null>(null);
 
   // «Qué hay que fotografiar»: se definen al crear y se mandan en cuanto existe la actividad.
   // La API pide gestión de actividades para definirlos; editar va en el detalle de la actividad.
@@ -696,6 +702,11 @@ export default function OpsActivityForm({
         return;
       }
     }
+    const variosDias = pideVariosDiasSinDesglose(form);
+    if (variosDias && !desgloseActivo) {
+      setError(variosDias);
+      return;
+    }
     if (puedeDefinirCampos && campos.length > 0) {
       setCamposIntentado(true);
       if (hayErrores(erroresCampos)) {
@@ -728,6 +739,39 @@ export default function OpsActivityForm({
         await updateActivity(token, activityId, payload);
         setSuccess(tone === "core" ? "Actividad actualizada" : "OT actualizada");
         onSuccess?.(activityId);
+      } else if (desgloseActivo && desgloseDias.length > 0 && !isEdit) {
+        const serie = (serieRef.current ??= { clave: `serie-${Date.now().toString(36)}`, creadas: new Map() });
+        const serieClave = serie.clave;
+        let lastId = 0;
+        for (const dia of desgloseDias) {
+          const yaHecha = serie.creadas.get(dia.dia);
+          if (yaHecha) {
+            lastId = yaHecha;
+            continue;
+          }
+          const diaPayload = {
+            ...payload,
+            titulo: dia.titulo,
+            indicaciones: [payload.indicaciones, dia.alcance].filter(Boolean).join("\n"),
+            tiempoEstimadoMin: dia.tiempoEstimadoMin,
+            fechaInicio: new Date(`${dia.fecha}T${form.hora || HORA_INICIO_POR_OMISION}:00`).toISOString(),
+            fechaMaxima: new Date(`${dia.fecha}T${form.horaCompromiso || "18:00"}:00`).toISOString(),
+            fechaEntregaEsperada: new Date(`${dia.fecha}T${form.horaCompromiso || "18:00"}:00`).toISOString(),
+            periodoInicio: dia.fecha,
+            periodoFin: dia.fecha,
+            serieClave,
+            serieDia: dia.dia,
+            serieTotal: dia.total,
+          };
+          const created = selfAssign
+            ? await createMyActivity(token, diaPayload)
+            : await createActivity(token, diaPayload);
+          lastId = Number(created?.id) || lastId;
+          if (created?.id) serie.creadas.set(dia.dia, Number(created.id));
+        }
+        serieRef.current = null;
+        setSuccess(`Se crearon ${desgloseDias.length} actividades (día 1…${desgloseDias.length})`);
+        onSuccess?.(lastId);
       } else {
         const yaCreada = creadaRef.current;
         const newId =
@@ -1698,15 +1742,31 @@ export default function OpsActivityForm({
                   required={requireSchedule}
                 />
               </Field>
-              <Field label="Al (último día, si dura varios)" optional>
+              <Field label="Al (solo mismo día; varios días → desglose)" optional>
                 <DateInput
                   id="oaf-al"
-                  value={form.periodoFin}
+                  value={form.periodoFin && form.fecha && form.periodoFin !== form.fecha ? form.fecha : form.periodoFin}
                   min={form.fecha || undefined}
-                  invalid={periodoMal}
+                  max={form.fecha || undefined}
+                  invalid={periodoMal || Boolean(form.periodoFin && form.fecha && form.periodoFin > form.fecha)}
                   onChange={(e) => {
                     setPeriodoAuto(false);
-                    setForm({ ...form, periodoFin: e.target.value });
+                    const fin = e.target.value;
+                    // Ya no se permite periodo multi-día: si eligen otro día, se abre el desglose.
+                    if (form.fecha && fin && fin > form.fecha) {
+                      setDesgloseActivo(true);
+                      setDesgloseDias(
+                        desglosarPorDias({
+                          trabajo: form.titulo || "Actividad",
+                          desde: form.fecha,
+                          diasLaborables: Math.max(2, Math.ceil((Date.parse(`${fin}T00:00:00Z`) - Date.parse(`${form.fecha}T00:00:00Z`)) / 86_400_000) + 1),
+                          tiempoTotalMin: form.tiempoEstimadoMin ? Number(form.tiempoEstimadoMin) : null,
+                        }),
+                      );
+                      setForm({ ...form, periodoFin: "" });
+                      return;
+                    }
+                    setForm({ ...form, periodoFin: fin });
                   }}
                   aria-describedby={`${periodoId}-resumen`}
                 />
@@ -1773,12 +1833,88 @@ export default function OpsActivityForm({
               </Field>
             ) : null}
             <p id={`${periodoId}-resumen`} className={periodoMal ? `${s.resumen} ${s.resumenMal}` : s.resumen}>
-              {form.periodoFin && form.fecha
-                ? form.periodoFin < form.fecha
-                  ? "El último día no puede ser anterior al primero."
-                  : `${resumenDelRango({ inicio: form.fecha, fin: form.periodoFin })}. Se queda en la pizarra cada día hasta terminarla y no cuenta como atrasada antes del último día.`
-                : "Sin último día es de un solo momento (día y hora). Si el trabajo dura varios días, pon hasta cuándo: así no hay que cargarla cada día."}
+              {desgloseActivo
+                ? `Trabajo de varios días: se crearán ${desgloseDias.length || "N"} actividades diarias (editable abajo).`
+                : form.periodoFin && form.fecha && form.periodoFin === form.fecha
+                  ? "Mismo día: una sola actividad."
+                  : MENSAJE_UN_SOLO_DIA}
             </p>
+            <label className={s.resumen} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={desgloseActivo}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  setDesgloseActivo(on);
+                  if (on) {
+                    setDesgloseDias(
+                      desglosarPorDias({
+                        trabajo: form.titulo || "Actividad",
+                        desde: form.fecha || new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" }),
+                        diasLaborables: Math.max(2, desgloseDias.length || 2),
+                        tiempoTotalMin: form.tiempoEstimadoMin ? Number(form.tiempoEstimadoMin) : null,
+                      }),
+                    );
+                    setForm({ ...form, periodoFin: "" });
+                  } else {
+                    setDesgloseDias([]);
+                  }
+                }}
+              />
+              Trabajo de varios días (crea una actividad por día laboral)
+            </label>
+            {desgloseActivo && desgloseDias.length > 0 ? (
+              <div className={s.resumen} style={{ display: "grid", gap: 8 }}>
+                <p>
+                  {desgloseDias.length} días ·{" "}
+                  {desgloseDias.reduce((s, d) => s + d.cantidad, 0)} unidades ·{" "}
+                  {Math.round(desgloseDias.reduce((s, d) => s + d.tiempoEstimadoMin, 0) / 60)} h
+                </p>
+                {desgloseDias.map((d, i) => (
+                  <div key={d.fecha} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 6rem 6rem", gap: 6 }}>
+                    <Input
+                      aria-label={`Título día ${d.dia}`}
+                      value={d.titulo}
+                      onChange={(e) => {
+                        const next = [...desgloseDias];
+                        next[i] = { ...d, titulo: e.target.value };
+                        setDesgloseDias(next);
+                      }}
+                    />
+                    <Input
+                      aria-label={`Alcance día ${d.dia}`}
+                      value={d.alcance}
+                      onChange={(e) => {
+                        const next = [...desgloseDias];
+                        next[i] = { ...d, alcance: e.target.value };
+                        setDesgloseDias(next);
+                      }}
+                    />
+                    <Input
+                      aria-label={`Fecha día ${d.dia}`}
+                      type="date"
+                      value={d.fecha}
+                      onChange={(e) => {
+                        const next = [...desgloseDias];
+                        next[i] = { ...d, fecha: e.target.value };
+                        setDesgloseDias(next);
+                      }}
+                    />
+                    <Input
+                      aria-label={`Minutos día ${d.dia}`}
+                      type="number"
+                      min={1}
+                      value={d.tiempoEstimadoMin}
+                      onChange={(e) => {
+                        const next = [...desgloseDias];
+                        next[i] = { ...d, tiempoEstimadoMin: Math.max(1, Number(e.target.value) || 1) };
+                        setDesgloseDias(next);
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {form.fecha && form.responsableId ? (
               <AvisoGuardia
                 token={token}

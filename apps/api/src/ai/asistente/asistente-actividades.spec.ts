@@ -387,16 +387,29 @@ describe('asistente de actividades', () => {
   });
 
   describe('agenda: inicio contra plazo', () => {
-    it('«para el viernes» empieza hoy y vence el viernes (periodo, como «Al» del formulario)', () => {
+    it('«para el viernes» marca hasta en la agenda; el payload ya no lleva periodo multi-día', () => {
       const p = construirPropuesta({ ...base, fecha: null, hora: null, fechaLimite: '2026-10-16' }, catalogos, ctx);
       expect(p.agenda).toEqual({ dia: '2026-10-12', hora: '10:00', hasta: '2026-10-16', horaDicha: false, diaDicho: true, compromiso: null });
+      expect(p.payload.periodoInicio).toBeUndefined();
+      expect(p.payload.periodoFin).toBeUndefined();
       expect(p.payload).toMatchObject({
-        periodoInicio: '2026-10-12',
-        periodoFin: '2026-10-16',
         fechaInicio: '2026-10-12T16:00:00.000Z',
       });
       expect(p.resumen).toContain('vence vie 16 oct');
       expect(p.avisos).toEqual([]);
+    });
+
+    it('construirPropuestas desglosa varios días en N actividades de un día', () => {
+      const out = construirPropuestas(
+        [{ ...base, titulo: 'Instalar cámaras', fecha: '2026-10-12', hora: '10:00', fechaLimite: '2026-10-16', elementos: [{ nombre: 'Cámara', cantidad: 50 }] }],
+        catalogos,
+        ctx,
+      );
+      expect(out.length).toBeGreaterThan(1);
+      expect(out.every((p) => !p.agenda?.hasta)).toBe(true);
+      expect(out.every((p) => p.payload.periodoInicio === undefined && p.payload.periodoFin === undefined)).toBe(true);
+      expect(out[0]!.payload.serieDia).toBe(1);
+      expect(out[0]!.payload.serieTotal).toBe(out.length);
     });
 
     it('«para hoy» es un solo momento: ahora, y vence al terminar el día', () => {
@@ -619,7 +632,10 @@ describe('asistente de actividades', () => {
         prioridad: 'Alta',
       });
       const p = construirPropuesta(plan.acciones[0], catalogos, ctx);
-      expect(p.payload).toMatchObject({ ticketType: 'CORRECTIVO', periodoInicio: '2026-10-13', periodoFin: '2026-10-16' });
+      expect(p.payload).toMatchObject({ ticketType: 'CORRECTIVO' });
+      expect(p.payload.periodoInicio).toBeUndefined();
+      expect(p.payload.periodoFin).toBeUndefined();
+      expect(p.agenda?.hasta).toBe('2026-10-16');
       expect(planDeSalida(null)).toEqual({ acciones: [], aclaracion: null });
     });
 

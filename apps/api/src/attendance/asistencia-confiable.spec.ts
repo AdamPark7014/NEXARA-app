@@ -278,6 +278,22 @@ describe('cierre automático de la salida olvidada', () => {
     const entrada = new Date('2026-09-18T05:50:00Z'); // 23:50 mx
     expect(horaCierreAutomatico(entrada).getTime()).toBeGreaterThanOrEqual(entrada.getTime());
   });
+
+  it('con horario citado 06:00–12:00 cierra a la salida + gracia (no 23:30)', () => {
+    const entrada = new Date('2026-09-17T12:00:00Z'); // 06:00 mx
+    const cierre = horaCierreAutomatico(entrada, undefined, {
+      horaEntrada: '06:00',
+      horaSalida: '12:00',
+      graciaMin: 0,
+    });
+    // 12:00 mx del 17 = 18:00 UTC
+    expect(cierre.toISOString()).toBe('2026-09-17T18:00:00.000Z');
+  });
+
+  it('sin horario sigue el comportamiento histórico (entrada 09:00 → 18:00)', () => {
+    const entrada = new Date('2026-09-17T15:00:00Z');
+    expect(horaCierreAutomatico(entrada).toISOString()).toBe('2026-09-18T00:00:00.000Z');
+  });
 });
 
 describe('GPS solo dirección', () => {

@@ -12,9 +12,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { DevicesModule } from '../devices/devices.module.js';
 import { IntegraModule } from '../integra/integra.module';
 import { ExcelModule } from '../common/excel.module.js';
+import { HorarioModule } from './horario/horario.module.js';
 
 @Module({
-  imports: [PrismaModule, RealtimeModule, NotificationsModule, DevicesModule, IntegraModule, ExcelModule],
+  imports: [PrismaModule, RealtimeModule, NotificationsModule, DevicesModule, IntegraModule, ExcelModule, HorarioModule],
   // Antes que AttendanceController: su ruta fija no debe caer en una con parámetro.
   controllers: [EstadoUbicacionController, AttendanceController],
   providers: [

@@ -7,6 +7,7 @@
  * día si dura varios, tiempo estimado obligatorio, encargo según la persona, etapa del proyecto).
  */
 import { buildApiUrl } from "@/lib/api-base";
+import { manejarErrorJornada } from "@/lib/jornada-candado";
 import {
   ACTIVITY_KINDS,
   TAREA_OTRO_CHIP,
@@ -150,7 +151,9 @@ async function pedir<T>(token: string, path: string, init?: RequestInit): Promis
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(text || `HTTP ${res.status}`);
+    const err = new Error(text || `HTTP ${res.status}`);
+    manejarErrorJornada(err);
+    throw err;
   }
   return (await res.json()) as T;
 }
@@ -594,8 +597,8 @@ export function payloadFinal(
     if (motivo) out.estandarCambiadoMotivo = motivo.slice(0, 500);
     else delete out.estandarCambiadoMotivo;
   }
-  // Fechas como el formulario: inicio = entrega = máxima (a la hora compromiso si la hay); con
-  // último día, el periodo (la API pone la máxima y la entrega al fin de ese día).
+  // Fechas como el formulario: inicio = entrega = máxima (a la hora compromiso si la hay).
+  // Varios días → desglose (expandirPropuestasMultiDia); aquí no se manda periodo multi-día.
   // La hora por omisión es la entrada de quien ejecuta: si se eligió a otra persona, también cambia.
   const agendaVigente = agendaFinal(p, aj, ctx.entrada);
   const otraEntrada = Boolean(p.agenda?.dia && agendaVigente.hora !== p.agenda.hora);
@@ -608,10 +611,9 @@ export function payloadFinal(
       out.fechaInicio = iso;
       out.fechaEntregaEsperada = limite;
       out.fechaMaxima = limite;
-      if (ag.hasta && ag.hasta > ag.dia) {
-        out.periodoInicio = ag.dia;
-        out.periodoFin = ag.hasta;
-      }
+      // Un solo día: si venía periodo multi en el payload de la IA, se limpia.
+      delete out.periodoInicio;
+      delete out.periodoFin;
     }
   }
   const encargo = reglaEncargo(tipo, ctx.destinoEmail, encargoElegido(p, aj)).valor;

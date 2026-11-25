@@ -276,7 +276,7 @@ describe('calculaKpisPersona', () => {
       minutosProductivos: 210,
       minutosInactivos: 270,
       productividadPct: 44,
-      minutosExtra: 0,
+      minutosExtra: 60, // 09:00–10:00 fuera del rango normal 10–18
       retardo: false,
     });
     expect(totales).toMatchObject({ minutosLaborados: 480, minutosProductivos: 210, minutosInactivos: 270 });
@@ -444,18 +444,19 @@ describe('calculaKpisPersona', () => {
         salida('17', '18:00'),
         entrada('18', '10:00'),
         salida('18', '18:00'),
-        // Sábado a las 12: no es retardo, es tiempo extra.
-        entrada('19', '12:00'),
-        salida('19', '16:00'),
+        // Sábado de noche: fuera de 10–18 → todo extra (no es retardo).
+        entrada('19', '19:00'),
+        salida('19', '23:00'),
       ],
     });
     expect(totales).toMatchObject({ retardos: 2, minutosTarde: 80, diasConJornada: 6 });
     expect(dias.find((d) => d.fecha === '2026-09-19')).toMatchObject({ laborable: false, retardo: false, minutosExtra: 240 });
   });
 
-  it('tiempo extra: arriba de 8 h en día laborable; sin horario no se calcula', () => {
+  it('tiempo extra: fuera de 10–18 en día laborable; sin horario no se calcula', () => {
     const larga = [entrada('14', '08:00'), salida('14', '19:00')];
-    expect(calcula({ checadas: larga, comidas: comidaNormal }).dias[0].minutosExtra).toBe(120);
+    // 08–10 (120) + 18–19 (60) = 180 fuera de 10–18; comida 60 no cambia el tramo fuera.
+    expect(calcula({ checadas: larga, comidas: comidaNormal }).dias[0].minutosExtra).toBe(180);
     const dir = calcula({ checadas: larga, comidas: comidaNormal, horario: direccion });
     expect(dir.dias[0].minutosExtra).toBeNull();
     expect(dir.totales.minutosExtra).toBeNull();
@@ -911,8 +912,8 @@ describe('sumaEquipo', () => {
     }).totales;
     const equipo = sumaEquipo([uno, otro]);
     expect(equipo).toMatchObject({ minutosLaborados: 600, minutosProductivos: 480, productividadPct: 80 });
-    // Uno tiene horario (extra 0) y el otro no: el equipo suma solo a quien sí.
-    expect(equipo.minutosExtra).toBe(0);
+    // Uno tiene horario (09–17 → 60 min fuera de 10–18) y el otro no: el equipo suma solo a quien sí.
+    expect(equipo.minutosExtra).toBe(60);
     expect(sumaEquipo([otro]).minutosExtra).toBeNull();
   });
 

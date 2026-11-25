@@ -981,6 +981,12 @@ internal fun ActivityFormPanel(
                 modifier = Modifier.weight(1f),
             )
         }
+        Text(
+            "Las actividades son de un solo día. Si el trabajo toma varios días, crea una actividad por día.",
+            fontSize = 12.sp,
+            color = NxColors.Muted,
+            modifier = Modifier.padding(top = 6.dp),
+        )
         if (autoasignacion) {
             Gap()
             TiempoCalculadoCard(repo = repo, form = form)

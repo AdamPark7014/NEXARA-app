@@ -21,6 +21,7 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { ModulePolicyService } from '../common/tenant/module-policy.service.js';
 import { esSuperAdmin } from '../common/tenant/module-policy.js';
 import { ControlNominaService } from './control-nomina.service.js';
+import { NominaPagoService } from './nomina-pago.service.js';
 import { nombreArchivoControl } from './control-nomina-excel.js';
 import { esContadoraNomina, esRhNomina } from './nomina-alcance.js';
 import {
@@ -44,6 +45,7 @@ import {
 export class ControlNominaController {
   constructor(
     private readonly service: ControlNominaService,
+    private readonly pagos: NominaPagoService,
     private readonly policy: ModulePolicyService,
   ) {}
 
@@ -203,4 +205,58 @@ export class ControlNominaController {
     await this.gate(user, companyId);
     return this.service.reabrir(this.actor(user), companyId, body);
   }
+
+  /** PATCH …/pago — ajusta el pago sugerido (monto ± y motivo). Semana abierta. */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.CONTABILIDAD_MANAGE, PERMISSIONS.HR_MANAGE] })
+  @Patch('pago')
+  async ajustarPago(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: { semana: string; userId: number; monto: number; motivo: string; pagoSugerido?: number },
+  ) {
+    await this.gate(user, companyId);
+    return this.pagos.ajustarPago(this.viewer(user), this.actor(user), companyId, body);
+  }
+
+  /** POST …/registrar-pago — solo CEO; forma + comprobante opcional; parcialidades. */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
+  @Post('registrar-pago')
+  async registrarPago(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body()
+    body: {
+      semana: string;
+      userId: number;
+      monto: number;
+      fecha?: string;
+      forma: string;
+      comprobanteUrl?: string | null;
+    },
+  ) {
+    await this.gate(user, companyId);
+    return this.pagos.registrarPago(this.viewer(user), this.actor(user), companyId, body);
+  }
+
+  /** GET …/como-se-calculo?semana&userId — renglones + saldo + movimientos. */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({
+    anyPermissions: [PERMISSIONS.CONTABILIDAD_VIEW, PERMISSIONS.CONTABILIDAD_MANAGE, PERMISSIONS.HR_MANAGE],
+  })
+  @Get('como-se-calculo')
+  async comoSeCalculo(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('semana') semana?: string,
+    @Query('userId') userId?: string,
+  ) {
+    if (!semana) throw new BadRequestException('semana es obligatoria');
+    const uid = Number(userId);
+    if (!uid) throw new BadRequestException('userId es obligatorio');
+    await this.gate(user, companyId);
+    return this.pagos.saldoYComoSeCalculo(this.viewer(user), companyId, { semana, userId: uid });
+  }
+
 }

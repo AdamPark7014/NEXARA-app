@@ -461,6 +461,9 @@ struct CoreActivityFormView: View {
                     if scheduled {
                         DatePicker("Día", selection: $fecha, displayedComponents: .date)
                         DatePicker("Hora", selection: $fecha, displayedComponents: .hourAndMinute)
+                        Text("Las actividades son de un solo día. Si el trabajo toma varios días, crea una actividad por día.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                     // Autoasignación: la entrega y los tiempos los fija el sistema (tarjeta de abajo).
                     if scheduled && !autoasignacion {

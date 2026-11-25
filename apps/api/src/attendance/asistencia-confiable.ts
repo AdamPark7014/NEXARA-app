@@ -13,6 +13,8 @@
 import { workDayAtClock, WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 import { detectDeviceDetails } from '../common/device-detector.js';
+import { umbralNocheH as umbralNocheHora } from './horario/horario-de.js';
+import { cierreAutomaticoConHorario } from './horario/cierre-con-horario.js';
 
 /** Estado de una checada: OK, PENDIENTE (sin conexión) o REVISAR (algo no cuadra). */
 export type ValidacionChecada = 'OK' | 'PENDIENTE' | 'REVISAR';
@@ -337,23 +339,44 @@ export function diaDeJornadaParaEntrada(p: {
   /** El día siguiente ya tiene una entrada asignada. */
   mananaOcupado: boolean;
   tz?: string;
+  /** Horario citado: sustituye el umbral fijo de 18:00 cuando existe. */
+  horario?: { horaEntrada?: string | null; horaSalida?: string | null; tipo?: 'diurno' | 'nocturno' | 'mixto' | null } | null;
 }): { dia: Date; segundoTurno: boolean } | null {
   if (!p.hoyOcupado) return { dia: p.hoy, segundoTurno: false };
-  if (esEntradaDeNoche(p.ahora, p.tz) && !p.mananaOcupado) return { dia: p.manana, segundoTurno: true };
+  if (esEntradaDeNoche(p.ahora, p.tz, p.horario) && !p.mananaOcupado) return { dia: p.manana, segundoTurno: true };
   return null;
 }
 
-export function esEntradaDeNoche(entrada: Date, tz = WORKDAY_TIMEZONE): boolean {
-  return horaLocal(entrada, tz) >= TURNO_NOCHE_DESDE_H;
+export function esEntradaDeNoche(
+  entrada: Date,
+  tz = WORKDAY_TIMEZONE,
+  /** Horario citado del día; si existe y es nocturno, sustituye el umbral fijo de 18:00. */
+  horario?: { horaEntrada?: string | null; horaSalida?: string | null; tipo?: 'diurno' | 'nocturno' | 'mixto' | null } | null,
+): boolean {
+  const umbral = horario ? umbralNocheHora(horario) : TURNO_NOCHE_DESDE_H;
+  return horaLocal(entrada, tz) >= umbral;
 }
 
 /**
  * Salida que se inventa cuando alguien olvidó checarla: `min(entrada + 9 h, 23:30)`
  * del día de la entrada, en hora de México.
  */
-export function horaCierreAutomatico(entrada: Date, tz = WORKDAY_TIMEZONE): Date {
-  // De noche no hay tope de las 23:30: la salida olvidada es entrada + jornada máxima.
-  if (esEntradaDeNoche(entrada, tz)) return new Date(entrada.getTime() + JORNADA_MAXIMA_H * 60 * 60 * 1000);
+export function horaCierreAutomatico(
+  entrada: Date,
+  tz = WORKDAY_TIMEZONE,
+  horario?: {
+    horaEntrada?: string | null;
+    horaSalida?: string | null;
+    graciaMin?: number | null;
+    tipo?: 'diurno' | 'nocturno' | 'mixto' | null;
+  } | null,
+): Date {
+  // Con horario citado: salida citada + gracia (sustituye el tope fijo de 18:00 / 23:30).
+  const conHorario = cierreAutomaticoConHorario(entrada, tz, horario);
+  if (conHorario) return conHorario;
+
+  // Sin horario: comportamiento histórico (umbral 18:00 / tope 23:30).
+  if (esEntradaDeNoche(entrada, tz, horario)) return new Date(entrada.getTime() + JORNADA_MAXIMA_H * 60 * 60 * 1000);
   const tope = workDayAtClock(
     entrada,
     HORA_CIERRE_AUTOMATICO.hora,

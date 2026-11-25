@@ -88,7 +88,7 @@ const compra: PropuestaActividad = {
   responsable: { id: 7, nombre: "Jorge Méndez" },
   cliente: null,
   textoCliente: null,
-  agenda: { dia: "2026-10-21", hora: "10:35", hasta: "2026-10-23", horaDicha: false },
+  agenda: { dia: "2026-10-21", hora: "10:35", hasta: null, horaDicha: false },
   duracionMin: null,
   indicaciones: null,
   faltantes: ["duración"],
@@ -103,8 +103,6 @@ const compra: PropuestaActividad = {
     fechaInicio: "2026-10-21T16:35:00.000Z",
     fechaEntregaEsperada: "2026-10-21T16:35:00.000Z",
     fechaMaxima: "2026-10-21T16:35:00.000Z",
-    periodoInicio: "2026-10-21",
-    periodoFin: "2026-10-23",
   },
 };
 
@@ -162,7 +160,7 @@ describe("AsistenteIA", () => {
     expect(screen.getByText("Tarea · Compra de material")).toBeInTheDocument();
     // Y se abren con el lápiz para cambiarlas.
     await abrir(usuario, "Cuándo", 1);
-    expect(screen.getByLabelText(/^Último día/)).toHaveValue("2026-10-23");
+    expect(screen.getByLabelText(/^Último día/)).toHaveValue("");
     // A la compra le falta la duración: su renglón queda abierto y no se puede crear hasta elegirla.
     expect(screen.getByText("Indica cuánto tiempo toma.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirmar la que está lista" })).toBeEnabled();
@@ -172,11 +170,41 @@ describe("AsistenteIA", () => {
 
     await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(2));
     expect(api.crearActividad.mock.calls[0][1]).toMatchObject({ responsableId: 8, clientId: 1, tiempoEstimadoMin: 120 });
-    expect(api.crearActividad.mock.calls[1][1]).toMatchObject({ responsableId: 7, tiempoEstimadoMin: 30, periodoFin: "2026-10-23" });
+    expect(api.crearActividad.mock.calls[1][1]).toMatchObject({ responsableId: 7, tiempoEstimadoMin: 30 });
     // Como «Asignar»: el responsable queda en el equipo con su tiempo estimado.
     expect(api.sumarAlEquipo).toHaveBeenCalledWith("tok", 101, { userId: 8, rol: "LEAD", horasPlan: 2 });
     expect(api.sumarAlEquipo).toHaveBeenCalledWith("tok", 102, { userId: 7, rol: "LEAD", horasPlan: 0.5 });
     expect(await screen.findByText("Listo. Todo quedó asignado.")).toBeInTheDocument();
+  });
+
+  it("con último día crea una actividad por día laboral y conserva lo corregido; al reintentar no repite las ya creadas", async () => {
+    const usuario = userEvent.setup();
+    render(<AsistenteIA />);
+    await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que Carolina revise el DVR y Jorge compre conectores");
+    await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
+    await screen.findByText("El DVR de la caja no graba desde ayer.");
+    await abrir(usuario, "Cuándo", 1);
+    fireEvent.change(screen.getByLabelText(/^Último día/), { target: { value: "2026-10-23" } });
+    await usuario.selectOptions(screen.getByLabelText("Tiempo"), "30");
+
+    // Falla el tercer alta (segundo día de la serie); al confirmar otra vez sigue desde ahí.
+    let altas = 0;
+    api.crearActividad.mockImplementation(async () => {
+      altas += 1;
+      if (altas === 3) throw new Error("sin conexión");
+      return { id: 100 + altas, anNumber: `AN-${altas}` };
+    });
+    await usuario.click(screen.getByRole("button", { name: "Confirmar las 2 que están listas" }));
+    await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(3));
+    await usuario.click(await screen.findByRole("button", { name: /Confirmar la que está lista|Reintentar|^Confirmar/ }));
+    await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(5));
+
+    const dias = api.crearActividad.mock.calls.slice(1).map((c) => c[1] as Record<string, unknown>);
+    expect(dias.map((d) => d.serieDia)).toEqual([1, 2, 2, 3]);
+    for (const d of dias) {
+      expect(d).toMatchObject({ responsableId: 7, tiempoEstimadoMin: 30, serieTotal: 3 });
+      expect(d.periodoFin).toBeUndefined();
+    }
   });
 
   it("deja corregir título, indicaciones, día y prioridad antes de crear", async () => {

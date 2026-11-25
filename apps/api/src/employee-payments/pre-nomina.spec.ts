@@ -40,17 +40,18 @@ describe('las horas que llegan a nómina son netas', () => {
     // Diez horas de jornada, menos la comida que sí se registró.
     expect(dias[0].minutosComida).toBe(60);
     expect(totales.minutosLaborados).toBe(9 * 60);
-    // Y de esas nueve, una es tiempo extra sobre la jornada de ocho.
-    expect(totales.minutosExtra).toBe(60);
+    // Extra = fuera de 10:00–18:00 (Adam, 20-11): 09–10 (60) + 18–19 (60) = 120.
+    // Antes se medía «arriba de 8 h» y aquí salían 60.
+    expect(totales.minutosExtra).toBe(120);
   });
 
   it('el extra calculado no se paga solo: sin decisión, no es pagable', () => {
     const { totales } = calculaKpisPersona(baseKpi);
-    expect(totales.minutosExtra).toBe(60);
+    expect(totales.minutosExtra).toBe(120);
     expect(totales.minutosExtraAprobados).toBe(0);
-    expect(totales.minutosExtraPendientes).toBe(60);
+    expect(totales.minutosExtraPendientes).toBe(120);
     expect(totales.diasExtraPendientes).toBe(1);
-    // Con su jornada de 8 h, la hora de más sin aprobar no se paga.
+    // Con su jornada de 8 h, el extra sin aprobar no se paga.
     expect(minutosPagables(totales, 8 * 60)).toBe(8 * 60);
     expect(minutosPagables(totales)).toBe(9 * 60);
   });
@@ -80,13 +81,13 @@ describe('las horas que llegan a nómina son netas', () => {
   });
 
   it('el jefe puede autorizar menos de lo que salió', () => {
-    // «Se quedó una hora de más, le autorizo media.»
+    // «Se quedó tiempo de más, le autorizo media hora.»
     const { totales, dias } = calculaKpisPersona({
       ...baseKpi,
       detalle: true,
       aprobacionesExtra: [{ fecha: DIA, minutos: 30, estado: 'APROBADO' }],
     });
-    expect(totales.minutosExtra).toBe(60);
+    expect(totales.minutosExtra).toBe(120);
     expect(totales.minutosExtraAprobados).toBe(30);
     expect(minutosPagables(totales, 8 * 60)).toBe(8 * 60 + 30);
     expect(dias[0]).toMatchObject({ extraEstado: 'APROBADO', minutosExtraAprobados: 30 });

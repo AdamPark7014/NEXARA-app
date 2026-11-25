@@ -194,6 +194,22 @@ export class CreateActivityDto {
   @Matches(/^\d{4}-\d{2}-\d{2}/, { message: 'periodoInicio debe ser AAAA-MM-DD' })
   periodoInicio?: string | null;
 
+  /** Serie diaria (día N de M). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  serieClave?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  serieDia?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  serieTotal?: number | null;
+
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}/, { message: 'periodoFin debe ser AAAA-MM-DD' })
   periodoFin?: string | null;

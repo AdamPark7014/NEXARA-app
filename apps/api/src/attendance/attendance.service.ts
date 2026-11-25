@@ -15,14 +15,6 @@ import { NotificationsService, type INotificationPayload } from '../notification
 import { PERMISSIONS } from '../common/permissions.js';
 import { detectDeviceFromUserAgent } from '../common/device-detector.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
-import {
-  parseWorkDate,
-  workDateColumn,
-  workDateKey,
-  workDayBounds,
-  workDayEnd,
-  workDayStart,
-} from '../common/time/workday.js';
 import { NotificationType, Prisma } from '@prisma/client';
 import { saveBase64Photo } from '../common/file-upload.util';
 import { horaAviso } from '../notifications/notification-push-meta.js';
@@ -41,6 +33,8 @@ import { ejecutoresDeActividad, yaEntrego } from '../activities/recordatorios-jo
 import { limiteDeEntrega } from '../activities/semaforo-actividad.js';
 import { NO_CUMPLIDA_VIGENTE_DESDE } from '../activities/incumplimiento.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
+import { HorarioService } from './horario/horario.service.js';
+import { parseWorkDate, workDateColumn, workDateKey, workDayBounds, workDayEnd, workDayStart } from '../common/time/workday.js';
 import { DOMAIN_EVENTS, type EntradaDeJornada, type SalidaDeJornada } from '../domain-events/domain-event.types.js';
 import { MENSAJE_FIN_DE_SEMANA_SIN_GUARDIA, diaDeGuardia } from '../guardias/guardias-reglas.js';
 import { festivoSinLaborar } from '../festivos/festivos-datos.js';
@@ -104,7 +98,30 @@ export class AttendanceService {
     private readonly notificationHierarchy: NotificationHierarchyService,
     @Optional() private readonly notifications?: NotificationsService,
     @Optional() private readonly domainEvents?: DomainEventBusService,
+    @Optional() private readonly horarioSvc?: HorarioService,
   ) {}
+
+  /**
+   * Horario programado para ese día. Sin uno propio del día devuelve null y rige la regla histórica
+   * (entrada + jornada, tope 23:30): el 10:00–18:00 por omisión no debe cerrar un turno de noche.
+   */
+  private async horarioCitadoDe(
+    userId: number,
+    fechaIsoOrDate: string | Date,
+    companyId: number,
+  ) {
+    if (!this.horarioSvc) return null;
+    const fecha =
+      typeof fechaIsoOrDate === 'string'
+        ? fechaIsoOrDate.slice(0, 10)
+        : workDateKey(fechaIsoOrDate);
+    try {
+      const horario = await this.horarioSvc.horarioDeTolerante(userId, fecha, companyId);
+      return horario.fuente === 'horario_dia' ? horario : null;
+    } catch {
+      return null;
+    }
+  }
 
   /** Aviso con push (NotificationsService); sin él (pruebas) queda solo en la campana como antes. */
   private async avisar(payload: INotificationPayload) {
@@ -1563,7 +1580,12 @@ export class AttendanceService {
       });
       return null;
     }
-    const salidaAt = horaCierreAutomatico(day.lastEntryAt);
+    const horario = await this.horarioCitadoDe(
+      day.userId,
+      day.date instanceof Date ? day.date : day.lastEntryAt,
+      tenantId,
+    );
+    const salidaAt = horaCierreAutomatico(day.lastEntryAt, undefined, horario);
     const minutos = Math.max(0, Math.ceil((salidaAt.getTime() - day.lastEntryAt.getTime()) / 60000));
 
     let attendanceId: number | null = null;
@@ -1632,7 +1654,10 @@ export class AttendanceService {
     let cerradas = 0;
     for (const dia of dias) {
       // Turno de noche: su jornada cruza la medianoche; la cierra su salida o `cerrarJornadasDeNocheOlvidadas`.
-      if (dia.lastEntryAt && esEntradaDeNoche(dia.lastEntryAt)) continue;
+      const horarioOlvidada = dia.lastEntryAt
+        ? await this.horarioCitadoDe(dia.userId, dia.date instanceof Date ? dia.date : dia.lastEntryAt, dia.companyId)
+        : null;
+      if (dia.lastEntryAt && esEntradaDeNoche(dia.lastEntryAt, undefined, horarioOlvidada)) continue;
       try {
         await this.cerrarJornadaAutomatica(dia, dia.companyId);
         cerradas += 1;
@@ -2126,12 +2151,14 @@ export class AttendanceService {
           select: { id: true },
         }),
       ]);
+      const horarioEntrada = await this.horarioCitadoDe(userId, today, tenantId);
       const jornada = diaDeJornadaParaEntrada({
         ahora: now,
         hoy: today,
         manana,
         hoyOcupado: Boolean(entradaConHoraDeHoy || entradaDelDiaDeHoy),
         mananaOcupado: Boolean(entradaDelDiaSiguiente),
+        horario: horarioEntrada,
       });
       if (!jornada) {
         throw new BadRequestException('Ya existe una entrada registrada para hoy');

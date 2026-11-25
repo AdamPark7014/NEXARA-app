@@ -1,6 +1,7 @@
 /** Formulario moderno de OT — extraído del legacy `ActivitiesTable`. */
 import { aInputFecha } from "@/lib/proyecto-plan";
 import { estandarDeRegistro, payloadEstandar, type EstandarGuardado } from "@/lib/tiempo-estandar";
+import { MENSAJE_UN_SOLO_DIA, validarUnSoloDia } from "@/lib/actividad-un-solo-dia";
 
 export type ActivityProjectMode = 'with_project' | 'without_project';
 
@@ -291,7 +292,22 @@ export function periodoDelFormulario(
   form: Pick<ActivityFormState, "fecha" | "periodoFin">,
 ): { inicio: string; fin: string } | null {
   if (!form.fecha || !form.periodoFin || form.periodoFin < form.fecha) return null;
+  // Solo mismo día: varios días van por desglose (N actividades), no por periodo.
+  if (form.periodoFin !== form.fecha) return null;
   return { inicio: form.fecha, fin: form.periodoFin };
+}
+
+/** Mensaje si el formulario pide varios días o más de una jornada sin desglose. */
+export function pideVariosDiasSinDesglose(
+  form: Pick<ActivityFormState, "fecha" | "periodoFin" | "tiempoEstimadoMin">,
+): string | null {
+  if (form.fecha && form.periodoFin && form.periodoFin > form.fecha) return MENSAJE_UN_SOLO_DIA;
+  const v = validarUnSoloDia({
+    periodoInicio: form.fecha && form.periodoFin === form.fecha ? form.fecha : null,
+    periodoFin: form.fecha && form.periodoFin === form.fecha ? form.periodoFin : null,
+    tiempoEstimadoMin: form.tiempoEstimadoMin ? Number(form.tiempoEstimadoMin) : null,
+  });
+  return v.ok ? null : v.error;
 }
 
 export function activitySubmitLabel(form: ActivityFormState, isEdit: boolean, tone: 'ops' | 'core' = 'ops'): string {

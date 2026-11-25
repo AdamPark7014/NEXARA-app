@@ -33,6 +33,7 @@ import { DevicesModule } from './devices/devices.module.js';
 import { ViaticosModule } from './viaticos/viaticos.module';
 import { GestionViaticosModule } from './gestion-viaticos/gestion-viaticos.module.js';
 import { AttendanceModule } from './attendance/attendance.module';
+import { HorarioModule } from './attendance/horario/horario.module.js';
 import { GuardiasModule } from './guardias/guardias.module.js';
 import { FestivosModule } from './festivos/festivos.module.js';
 import { SupervisionModule } from './supervision/supervision.module.js';
@@ -147,6 +148,7 @@ import { CctvDisenosModule } from './cctv-disenos/cctv-disenos.module.js';
     ViaticosModule,
     GestionViaticosModule,
     AttendanceModule,
+    HorarioModule,
     GuardiasModule,
     FestivosModule,
     SupervisionModule,

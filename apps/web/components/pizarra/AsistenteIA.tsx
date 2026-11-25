@@ -85,6 +85,8 @@ import {
   type Referencia,
   type RespuestaAsistente,
 } from "@/lib/asistente-ia-api";
+import { expandirPropuestasMultiDia } from "@/lib/asistente-desglose-dias";
+
 import { forcesDespachoOnly } from "@/lib/activity-kinds";
 import type { ActivityKind } from "@/lib/activity-kinds";
 import c from "./comun.module.css";
@@ -269,6 +271,8 @@ function Contenido({
   const generacion = useRef(0);
   /** Proyecto del que se pidió la etapa, por tarjeta (si cambia, la respuesta vieja se ignora). */
   const etapaPedida = useRef<Record<number, number>>({});
+  /** Días ya creados por propuesta: al reintentar una serie a medias no se repiten. */
+  const seriesRef = useRef<Record<number, Record<number, { id: number; anNumber?: string }>>>({});
   /** Clientes ya dados de alta al confirmar: «Confirmar todas» corre sin esperar al estado. */
   const altasHechas = useRef(new Map<string, Referencia>());
 
@@ -284,7 +288,8 @@ function Contenido({
         const r = await interpretar(token, limpio);
         generacion.current += 1;
         etapaPedida.current = {};
-        setRespuesta(r);
+        seriesRef.current = {};
+        setRespuesta({ ...r, propuestas: expandirPropuestasMultiDia(r.propuestas ?? []) });
         setListoEnMs(Math.round(performance.now() - inicio));
         setAjustes({});
         setEscribiendo({});
@@ -513,6 +518,7 @@ function Contenido({
     if (motivos.length || estados[i]?.creando || estados[i]?.creada) return false;
     setEstados((prev) => ({ ...prev, [i]: { creando: true } }));
     let creada: { id: number; anNumber?: string };
+    let multiCreada = false;
     try {
       if (pendiente && !payload.clientId) {
         try {
@@ -534,14 +540,57 @@ function Contenido({
           return false;
         }
       }
-      creada = await crearActividad(token, payload);
+      const agendaCrear = agendaFinal(p, aj);
+      if (agendaCrear.dia && agendaCrear.hasta && agendaCrear.hasta > agendaCrear.dia) {
+        // `payload` ya trae lo que la persona corrigió (tipo, cliente, responsable): cada día parte de él.
+        const partes = expandirPropuestasMultiDia([
+          {
+            ...p,
+            titulo: String(payload.titulo ?? p.titulo),
+            indicaciones: (payload.indicaciones as string | null | undefined) ?? null,
+            duracionMin: Number(payload.tiempoEstimadoMin) || p.duracionMin,
+            agenda: agendaCrear,
+            camposEvidencia: campos,
+            payload,
+          },
+        ]);
+        let last: { id: number; anNumber?: string } = { id: 0 };
+        const hechas = (seriesRef.current[i] ??= {});
+        for (const [n, parte] of partes.entries()) {
+          if (hechas[n]) {
+            last = hechas[n];
+            continue;
+          }
+          last = await crearActividad(token, parte.payload);
+          hechas[n] = last;
+          const camposParte = parte.camposEvidencia ?? [];
+          if (camposParte.length) {
+            try {
+              await definirCamposEvidencia(
+                token,
+                last.id,
+                camposParte.map((c) => ({
+                  ...campoVacio(c.nombre, c.momentos as Momento[]),
+                  notas: (c.notas ?? "").slice(0, 500),
+                })),
+              );
+            } catch {
+              /* sigue con el resto de días */
+            }
+          }
+        }
+        creada = last;
+        multiCreada = true;
+      } else {
+        creada = await crearActividad(token, payload);
+      }
     } catch (e) {
       setEstados((prev) => ({ ...prev, [i]: { error: formatApiError(e, "No se pudo crear.") } }));
       return false;
     }
     // Lo que hay que fotografiar por elemento (Cámara 1… antes, en progreso, después).
     let avisoCampos: string | undefined;
-    if (campos.length) {
+    if (campos.length && !multiCreada) {
       try {
         await definirCamposEvidencia(
           token,
@@ -1359,7 +1408,10 @@ function Contenido({
                         <Input type="time" value={agenda.compromiso ?? ""} disabled={!agenda.dia} onChange={(e) => ajustar(i, { compromiso: e.target.value })} />
                       </Field>
                     ) : null}
-                    <Field label="Último día" optional>
+                    <Field label="Último día"
+                      optional
+                      hint="Si el trabajo toma varios días, se proponen N actividades diarias (una por día laboral) con cantidad y tiempo editables."
+                    >
                       <DateInput
                         value={agenda.hasta ?? ""}
                         min={agenda.dia ?? undefined}
