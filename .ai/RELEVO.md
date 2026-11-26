@@ -1,5 +1,13 @@
 # RELEVO
 
+- **26-11 ~15:10 México (claude-code) — Autoasignarse una actividad de día completo fallaba con «Las actividades son de un solo día». API y web; sin migraciones; SIN DESPLEGAR (espera OK de Adam).**
+  - Causa: `validarUnSoloDia` recortaba el texto ISO para sacar el día. La entrega que el servidor calcula para quien llega a la salida (18:00 México) es `…T00:00:00.000Z` del día siguiente, y se leía como otro día. Pasaba desde el despliegue del 25-11 20:37 UTC.
+  - Afectados en bitácora (25-11 y 26-11): Mónica (soluciones@), Jorge Plácido, Salvador Hernández, Alejandro González y Luis (en `/api/activities`); 41 intentos rechazados. Ningún dato que corregir: las altas no se guardaron.
+  - Arreglo: las fechas con hora se leen en hora de México (`workDateKey`); solo un `AAAA-MM-DD` se toma tal cual. Igual en `apps/web/lib/actividad-un-solo-dia.ts`. Reproducido en producción con el servicio real antes del arreglo.
+  - Visto de paso: en producción la IA de complejidad dice «ANTHROPIC_API_KEY inválida» (token de la puerta). No se tocó.
+  - Verificado: jest de activities 598/598 y me/ 413, vitest del archivo web, tsc de API y web limpios.
+  - Paridad: API hecho · Web hecho · Android e iOS no aplican (solo muestran el texto; la regla vive en la API).
+
 - **25-11 ~14:20 México (claude-code) — El pago semanal y la lista de pagos son uno solo: no se puede pagar doble por ningún lado. Sin migraciones.**
   - Al completar el saldo en «Pago», queda una línea en la lista por lo que de verdad se pagó (usa el Borrador del cierre si existe), se marca «Pagado» y se asienta su póliza. Si la póliza falla, el pago queda registrado y se avisa; se reintenta marcándolo en la lista.
   - Lo pagado en la lista cuenta en «Pago» leyendo el dato de hoy, no la foto del cierre. Con un pago a medias en «Pago», la lista no deja marcarlo. Anular en la lista libera el saldo. Un solo candado: `employee-payments/pago-candado.ts`.

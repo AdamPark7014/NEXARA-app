@@ -18,6 +18,21 @@ describe("validarUnSoloDia", () => {
       error: MENSAJE_UN_SOLO_DIA,
     });
   });
+  it("acepta la que entrega a las 18:00 de México (00:00 UTC del día siguiente)", () => {
+    expect(
+      validarUnSoloDia({
+        fechaInicio: "2026-11-26T16:00:00.000Z",
+        fechaMaxima: "2026-11-27T00:00:00.000Z",
+        fechaEntregaEsperada: "2026-11-27T00:00:00.000Z",
+      }),
+    ).toEqual({ ok: true });
+  });
+  it("sigue rechazando la que pasa al otro día en México", () => {
+    expect(validarUnSoloDia({ fechaInicio: "2026-11-26T16:00:00.000Z", fechaMaxima: "2026-11-27T16:00:00.000Z" })).toEqual({
+      ok: false,
+      error: MENSAJE_UN_SOLO_DIA,
+    });
+  });
 });
 
 describe("desglosarPorDias", () => {

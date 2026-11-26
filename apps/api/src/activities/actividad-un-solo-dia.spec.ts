@@ -25,6 +25,21 @@ describe('validarUnSoloDia', () => {
   it('rechaza tiempo planeado mayor a la jornada', () => {
     expect(validarUnSoloDia({ tiempoEstimadoMin: MINUTOS_JORNADA_NETOS + 1 })).toEqual({ ok: false, error: MENSAJE_UN_SOLO_DIA });
   });
+  it('acepta la que entrega a las 18:00 de México (00:00 UTC del día siguiente)', () => {
+    // Caso real 26-11: autoasignación de 10:00 a 18:00; la entrega llega como 2026-11-27T00:00Z.
+    expect(
+      validarUnSoloDia({
+        fechaInicio: '2026-11-26T16:00:00.000Z',
+        fechaMaxima: '2026-11-27T00:00:00.000Z',
+        fechaEntregaEsperada: '2026-11-27T00:00:00.000Z',
+        tiempoEstimadoMin: 420,
+      }),
+    ).toEqual({ ok: true });
+    expect(validarUnSoloDia({ fechaInicio: new Date('2026-11-26T16:00:00.000Z'), fechaMaxima: new Date('2026-11-27T01:30:00.000Z') })).toEqual({ ok: true });
+  });
+  it('sigue rechazando la que de verdad pasa al otro día en México', () => {
+    expect(validarUnSoloDia({ fechaInicio: '2026-11-26T16:00:00.000Z', fechaMaxima: '2026-11-27T16:00:00.000Z' })).toEqual({ ok: false, error: MENSAJE_UN_SOLO_DIA });
+  });
   it('sin fechas ni tiempo pasa', () => {
     expect(validarUnSoloDia({})).toEqual({ ok: true });
   });

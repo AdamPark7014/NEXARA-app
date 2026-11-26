@@ -19,6 +19,20 @@ function workDateKeyLocal(d: Date): string {
   return d.toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
 }
 
+/**
+ * Fechas con hora se leen en hora de México: «2026-11-27T00:00:00.000Z» son las 18:00 del 26.
+ * Recortar el texto daba el 27 y la actividad que llegaba a la salida «duraba dos días».
+ */
+function diaInstante(valor: unknown): string | null {
+  if (typeof valor === "string" && /^\d{4}-\d{2}-\d{2}$/.test(valor.trim())) return claveDia(valor);
+  if (valor instanceof Date && !Number.isNaN(valor.getTime())) return workDateKeyLocal(valor);
+  if (typeof valor === "string" && valor.trim() !== "") {
+    const d = new Date(valor.trim());
+    return Number.isNaN(d.getTime()) ? null : workDateKeyLocal(d);
+  }
+  return null;
+}
+
 function diaClave(valor: unknown): string | null {
   const c = claveDia(valor);
   if (c) return c;
@@ -52,9 +66,9 @@ export function validarUnSoloDia(input: {
     if (!a || !b) return { ok: false, error: "Las fechas del periodo no son válidas (usa AAAA-MM-DD)" };
     if (a !== b) return { ok: false, error: MENSAJE_UN_SOLO_DIA };
   }
-  const inicio = diaClave(input.fechaInicio);
-  const max = diaClave(input.fechaMaxima);
-  const entrega = diaClave(input.fechaEntregaEsperada);
+  const inicio = diaInstante(input.fechaInicio);
+  const max = diaInstante(input.fechaMaxima);
+  const entrega = diaInstante(input.fechaEntregaEsperada);
   const ancla = inicio ?? max ?? entrega;
   if (ancla) {
     for (const d of [inicio, max, entrega]) {

@@ -29,6 +29,23 @@ function diaDe(valor: unknown): string | null {
   return null;
 }
 
+/**
+ * Día laboral (México) de una fecha con hora. «2026-11-27T00:00:00.000Z» son las 18:00 del 26 en
+ * Puebla: recortar el texto daba el 27 y toda actividad que llegaba a la salida «duraba dos días».
+ * Solo un «AAAA-MM-DD» sin hora se toma tal cual.
+ */
+function diaDeInstante(valor: unknown): string | null {
+  if (valor == null || valor === '') return null;
+  if (typeof valor === 'string') {
+    const texto = valor.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) return claveDia(texto);
+    const d = new Date(texto);
+    return Number.isNaN(d.getTime()) ? null : workDateKey(d);
+  }
+  if (valor instanceof Date && !Number.isNaN(valor.getTime())) return workDateKey(valor);
+  return null;
+}
+
 export type ValidacionUnSoloDia = { ok: true } | { ok: false; error: string };
 
 export function validarUnSoloDia(input: {
@@ -51,9 +68,9 @@ export function validarUnSoloDia(input: {
     if (!a || !b) return { ok: false, error: 'Las fechas del periodo no son válidas (usa AAAA-MM-DD)' };
     if (a !== b) return { ok: false, error: MENSAJE_UN_SOLO_DIA };
   }
-  const inicio = diaDe(input.fechaInicio);
-  const max = diaDe(input.fechaMaxima);
-  const entrega = diaDe(input.fechaEntregaEsperada);
+  const inicio = diaDeInstante(input.fechaInicio);
+  const max = diaDeInstante(input.fechaMaxima);
+  const entrega = diaDeInstante(input.fechaEntregaEsperada);
   const ancla = inicio ?? max ?? entrega;
   if (ancla) {
     for (const d of [inicio, max, entrega]) {
