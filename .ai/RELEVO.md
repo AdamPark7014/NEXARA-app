@@ -1,6 +1,6 @@
 # RELEVO
 
-- **26-11 ~15:10 México (claude-code) — Autoasignarse una actividad de día completo fallaba con «Las actividades son de un solo día». API y web; sin migraciones; SIN DESPLEGAR (espera OK de Adam).**
+- **26-11 ~15:10 México (claude-code) — Autoasignarse una actividad de día completo fallaba con «Las actividades son de un solo día». API y web; sin migraciones; DESPLEGADO 26-11 21:18 UTC con OK de Adam (API_LISTO, WEB_LISTO; caso de Mónica pasa en prod).**
   - Causa: `validarUnSoloDia` recortaba el texto ISO para sacar el día. La entrega que el servidor calcula para quien llega a la salida (18:00 México) es `…T00:00:00.000Z` del día siguiente, y se leía como otro día. Pasaba desde el despliegue del 25-11 20:37 UTC.
   - Afectados en bitácora (25-11 y 26-11): Mónica (soluciones@), Jorge Plácido, Salvador Hernández, Alejandro González y Luis (en `/api/activities`); 41 intentos rechazados. Ningún dato que corregir: las altas no se guardaron.
   - Arreglo: las fechas con hora se leen en hora de México (`workDateKey`); solo un `AAAA-MM-DD` se toma tal cual. Igual en `apps/web/lib/actividad-un-solo-dia.ts`. Reproducido en producción con el servicio real antes del arreglo.
