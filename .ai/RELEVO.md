@@ -5,6 +5,12 @@
   - Siguientes números libres: Android 26, iOS build 19.
   - Pruebas: CI verde; release de Android arranca sin fallos en emulador. NO se probó login con la cuenta de revisión ni se renovaron capturas (las de la tienda son de antes de la firma v3).
 
+- **27-11 ~16:40 México (claude-code) — Tras un bloqueo vencido, el contador de errores al entrar empieza de cero. Solo API; sin migraciones; con OK de Adam para desplegar.**
+  - Caso: Antonio (jose.ramirez@, id 39) no entraba a la web el 26-11 en la noche. No fue cambio nuestro: su contraseña es la del 23-10 y la app iOS vive de la sesión de ese día. Traía 5 fallos del 26-10 y su primer error lo bloqueó otra vez 15 min.
+  - Arreglo: `common/security/fallos-login.ts` (`fallosVigentes`) en `auth.service` (contraseña y MFA) y en la bóveda (`account-access`). Al fallar se borra el bloqueo vencido junto con sus fallos (`lockedUntil: null`), para que el contador siga sumando.
+  - Verificado: jest de auth, account-access y users 162/162 (incluye `fallos-tras-bloqueo.spec.ts`), tsc limpio.
+  - Paridad: API hecho · Web, Android e iOS no aplican (usan el mismo `POST /auth/login`).
+
 - **26-11 ~15:10 México (claude-code) — Autoasignarse una actividad de día completo fallaba con «Las actividades son de un solo día». API y web; sin migraciones; DESPLEGADO 26-11 21:18 UTC con OK de Adam (API_LISTO, WEB_LISTO; caso de Mónica pasa en prod).**
   - Causa: `validarUnSoloDia` recortaba el texto ISO para sacar el día. La entrega que el servidor calcula para quien llega a la salida (18:00 México) es `…T00:00:00.000Z` del día siguiente, y se leía como otro día. Pasaba desde el despliegue del 25-11 20:37 UTC.
   - Afectados en bitácora (25-11 y 26-11): Mónica (soluciones@), Jorge Plácido, Salvador Hernández, Alejandro González y Luis (en `/api/activities`); 41 intentos rechazados. Ningún dato que corregir: las altas no se guardaron.

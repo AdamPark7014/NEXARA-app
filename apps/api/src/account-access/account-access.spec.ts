@@ -112,12 +112,18 @@ describe('AccountAccessService', () => {
     const { servicio, update, log } = crear({ failed: 3 });
     await expect(servicio.desbloquear({ id: 1 }, 'incorrecta', 7)).rejects.toBeInstanceOf(UnauthorizedException);
     expect((update.mock.calls[0] as any[])[0].data.failedLoginCount).toBe(4);
-    expect((update.mock.calls[0] as any[])[0].data.lockedUntil).toBeUndefined();
+    expect((update.mock.calls[0] as any[])[0].data.lockedUntil).toBeNull();
     expect((log.mock.calls[0] as any[])[0].action).toBe('ACCOUNT_ACCESS_DENIED');
 
     const quinto = crear({ failed: 4 });
     await expect(quinto.servicio.desbloquear({ id: 1 }, 'incorrecta', 7)).rejects.toBeInstanceOf(UnauthorizedException);
     expect((quinto.update.mock.calls[0] as any[])[0].data.lockedUntil).toBeInstanceOf(Date);
+  });
+
+  it('tras un bloqueo vencido, el primer error cuenta 1 y no vuelve a bloquear', async () => {
+    const { servicio, update } = crear({ failed: 5, lockedUntil: new Date(Date.now() - 60_000) });
+    await expect(servicio.desbloquear({ id: 1 }, 'incorrecta', 7)).rejects.toBeInstanceOf(UnauthorizedException);
+    expect((update.mock.calls[0] as any[])[0].data).toEqual({ failedLoginCount: 1, lockedUntil: null });
   });
 
   it('bloqueada: ni siquiera compara la contraseña', async () => {

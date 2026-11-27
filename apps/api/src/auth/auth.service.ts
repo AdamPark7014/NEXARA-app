@@ -2,6 +2,7 @@ import { puedeVerPrecios, veTodasLasCotizaciones } from '../common/visibilidad/v
 import { canManageAlmacen } from '../warehouse/almacen-access.js';
 import { canUsarMesaContable } from '../accounting/mesa-contable/mesa-por-correo.js';
 import { rememberExpiresIn, rememberMaxMs } from '../common/security/session-cookie.js';
+import { fallosVigentes } from '../common/security/fallos-login.js';
 import { ModuleRef } from '@nestjs/core';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
@@ -1015,7 +1016,8 @@ export class AuthService {
     }
     const isPasswordMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordMatch) {
-      const failures = (user.failedLoginCount ?? 0) + 1;
+      // Tras un bloqueo ya vencido se empieza de cero (antes el primer error volvía a bloquear 15 min).
+      const failures = fallosVigentes(user) + 1;
       const lockThreshold = 5;
       const lockMinutes = 15;
       const lockedNow = failures >= lockThreshold;
@@ -1024,7 +1026,8 @@ export class AuthService {
         where: { id: user.id },
         data: {
           failedLoginCount: failures,
-          ...(lockedUntil ? { lockedUntil } : {}),
+          // El bloqueo vencido se borra con sus fallos: si se quedara, el contador volvería a cero en cada error.
+          lockedUntil: lockedUntil ?? null,
         },
       });
       if (lockedNow) {
@@ -1108,12 +1111,12 @@ export class AuthService {
       if (!verifyTotp(user.mfaSecret, loginDto.mfaCode)) {
         // Cuenta como intento fallido: sin esto, con la contraseña en la mano se podía probar
         // códigos sin límite (solo el límite por IP).
-        const fallos = (user.failedLoginCount ?? 0) + 1;
+        const fallos = fallosVigentes(user) + 1;
         await this.prisma.user.update({
           where: { id: user.id },
           data: {
             failedLoginCount: fallos,
-            ...(fallos >= 5 ? { lockedUntil: new Date(Date.now() + 15 * 60_000) } : {}),
+            lockedUntil: fallos >= 5 ? new Date(Date.now() + 15 * 60_000) : null,
           },
         });
         throw new UnauthorizedException('Código MFA inválido');

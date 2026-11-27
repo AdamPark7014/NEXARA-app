@@ -6,6 +6,7 @@ import { UsersService } from '../users/users.service.js';
 import { CredentialVaultService } from '../credential-vault/credential-vault.service.js';
 import { isDeveloperSuperAdminEmail, isPlatformOwnerEmail } from '../common/platform-accounts.js';
 import { emitirFicha, fichaValida, generarContrasenaSegura } from './account-access-token.js';
+import { fallosVigentes } from '../common/security/fallos-login.js';
 
 const MAX_FALLOS = 5;
 const BLOQUEO_MIN = 15;
@@ -74,12 +75,13 @@ export class AccountAccessService {
     }
     const bien = typeof password === 'string' && password.length > 0 && (await bcrypt.compare(password, dueno.passwordHash));
     if (!bien) {
-      const fallos = (dueno.failedLoginCount ?? 0) + 1;
+      const fallos = fallosVigentes(dueno) + 1;
       await this.prisma.user.update({
         where: { id: dueno.id },
         data: {
           failedLoginCount: fallos,
-          ...(fallos >= MAX_FALLOS ? { lockedUntil: new Date(Date.now() + BLOQUEO_MIN * 60_000) } : {}),
+          // Un bloqueo ya vencido se borra junto con sus fallos: si se quedara, el contador volvería a cero cada vez.
+          lockedUntil: fallos >= MAX_FALLOS ? new Date(Date.now() + BLOQUEO_MIN * 60_000) : null,
         },
       });
       await this.audit
