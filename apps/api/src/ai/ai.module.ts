@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { UsersModule } from '../users/users.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 import { AiTriageService } from './ai-triage.service.js';
 import { RevisionActividadService } from './revision/revision-actividad.service.js';
 import { AiController } from './ai.controller.js';
@@ -13,7 +14,9 @@ import { EstandarService } from './estandar/estandar.service.js';
 import { GuardiaIaService } from './claude/guardia-ia.service.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UsersModule],
+  // NotificationsModule: la tarjeta de «la IA cayó / volvió» de GuardiaIaService. UsersModule ya lo importa, así que no
+  // crea ciclo (NotificationsModule solo depende de PrismaModule, AuthModule y DevicesModule).
+  imports: [PrismaModule, AuthModule, UsersModule, NotificationsModule],
   providers: [AiTriageService, ClaudeService, AsistenteActividadesService, TranscriptorService, ComplejidadService, EstandarService, RevisionActividadService, GuardiaIaService],
   controllers: [AiController],
   exports: [AiTriageService, ClaudeService, TranscriptorService, ComplejidadService, EstandarService],
