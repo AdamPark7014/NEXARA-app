@@ -1,7 +1,7 @@
 import { contarEs } from '../common/contar-es.js';
 import { Injectable, Logger, Inject, Optional, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { NotificationType } from '@prisma/client';
+import { NotificationType, type Prisma } from '@prisma/client';
 import { Cron } from '@nestjs/schedule';
 import { PERMISSIONS } from '../common/permissions.js';
 import { PushDispatchService, type PushPayload } from '../devices/push-dispatch.service.js';
@@ -73,6 +73,39 @@ export class NotificationsService {
    */
   private inboxScope(companyId?: number | null) {
     return companyWhere(companyId ?? null, 'soft');
+  }
+
+  /**
+   * Marca como leído y devuelve el aviso con quien lo disparó.
+   *
+   * Va por `updateMany` + `findFirst` con el alcance blando de la bandeja en el `where` (empresa activa o vacía) y no
+   * por `update({ where: { id } })`: el aislamiento por empresa de PrismaService vuelve ese update un `updateMany` con
+   * `companyId = empresa activa`, que en un aviso con la empresa vacía (24 % de la tabla: los crons los crean sin
+   * contexto de empresa) cuenta 0 y devuelve null. Con el `OR` de empresa en el `where` el aislamiento lo deja pasar tal
+   * cual, igual que ya hace `markAllAsRead`.
+   */
+  private async marcarLeidoYLeer(
+    where: Prisma.NotificationWhereInput,
+    data: Prisma.NotificationUpdateManyMutationInput & { companyId?: number },
+  ) {
+    const { count } = await this.prisma.notification.updateMany({ where, data });
+    if (!count) throw new NotFoundException('Notificación no encontrada');
+    const notification = await this.prisma.notification.findFirst({
+      where,
+      include: { triggerUser: true },
+    });
+    if (!notification) throw new NotFoundException('Notificación no encontrada');
+    return notification;
+  }
+
+  /**
+   * Borra por consulta (ver `marcarLeidoYLeer`). Devuelve `{ count }`, la misma forma que ya recibían la web y las apps
+   * (el aislamiento por empresa convertía el `delete` en un `deleteMany`). Si no borró nada, es que ya no existía.
+   */
+  private async borrarAviso(where: Prisma.NotificationWhereInput) {
+    const { count } = await this.prisma.notification.deleteMany({ where });
+    if (!count) throw new NotFoundException('Notificación no encontrada');
+    return { count };
   }
 
   async getUserNotifications(
@@ -200,11 +233,10 @@ export class NotificationsService {
   async markSalesNotificationAsRead(user: any, notificationId: number, companyId?: number | null) {
     await this.assertSalesNotificationAccess(user, notificationId, companyId);
 
-    const notification = await this.prisma.notification.update({
-      where: { id: notificationId },
-      data: { isRead: true, readAt: new Date() },
-      include: { triggerUser: true },
-    });
+    const notification = await this.marcarLeidoYLeer(
+      { id: notificationId, ...this.inboxScope(companyId) },
+      { isRead: true, readAt: new Date() },
+    );
 
     this.gateway?.notifyUser(notification.userId, {
       event: 'notification:read',
@@ -248,7 +280,7 @@ export class NotificationsService {
 
   async deleteSalesNotification(user: any, notificationId: number, companyId?: number | null) {
     await this.assertSalesNotificationAccess(user, notificationId, companyId);
-    return this.prisma.notification.delete({ where: { id: notificationId } });
+    return this.borrarAviso({ id: notificationId, ...this.inboxScope(companyId) });
   }
 
   async getUnreadCount(userId: number, companyId?: number | null) {
@@ -275,15 +307,15 @@ export class NotificationsService {
         ? Number(companyId)
         : undefined;
 
-    const notification = await this.prisma.notification.update({
-      where: { id: notificationId },
-      data: {
+    // Al marcarlo, un aviso viejo con la empresa vacía queda con la empresa activa (`healCompanyId`).
+    const notification = await this.marcarLeidoYLeer(
+      { id: notificationId, userId, ...this.inboxScope(companyId) },
+      {
         isRead: true,
         readAt: new Date(),
         ...(healCompanyId != null ? { companyId: healCompanyId } : {}),
       },
-      include: { triggerUser: true },
-    });
+    );
 
     this.gateway?.notifyUser(notification.userId, {
       event: 'notification:read',
@@ -316,7 +348,7 @@ export class NotificationsService {
     ) {
       throw new NotFoundException('Notificación no encontrada');
     }
-    return this.prisma.notification.delete({ where: { id: notificationId } });
+    return this.borrarAviso({ id: notificationId, userId, ...this.inboxScope(companyId) });
   }
 
   /**
