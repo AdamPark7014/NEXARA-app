@@ -1,4 +1,5 @@
-import { CtCatalogSyncService, firmaDeFila, firmaDeProducto } from './ct-catalog-sync.service';
+import { Logger } from '@nestjs/common';
+import { camposQueCambian, CtCatalogSyncService, firmaDeFila, firmaDeProducto } from './ct-catalog-sync.service';
 import type { NormalizedSupplierProduct, SupplierPullResult } from '../connectors/supplier-connector';
 import { applyCap, resolveRowCap, shouldCap } from '../../prisma/row-cap';
 
@@ -103,6 +104,118 @@ describe('firmas', () => {
   });
 });
 
+describe('camposQueCambian', () => {
+  const cambian = (guardada: ReturnType<typeof fila>, p: NormalizedSupplierProduct) => camposQueCambian(guardada as never, p);
+
+  it('una fila igual al producto no tiene cambios', () => {
+    const p = producto('A');
+
+    expect(cambian(fila(1, p), p)).toEqual([]);
+  });
+
+  it('si cambia solo el precio, dice precio', () => {
+    expect(cambian(fila(1, producto('A')), producto('A', { price: 11 }))).toEqual(['precio']);
+  });
+
+  it('el tipo de cambio de 19.81 a 19.82 cuenta', () => {
+    const guardada = fila(1, producto('A', { exchangeRate: 19.81 }));
+
+    expect(cambian(guardada, producto('A', { exchangeRate: 19.82 }))).toEqual(['tipoCambio']);
+  });
+
+  it('la existencia con las mismas piezas y otro orden de llaves no cuenta', () => {
+    const guardada = fila(1, producto('A'), { existencia: { GDL: 1, PUE: 2 } });
+
+    expect(cambian(guardada, producto('A', { existencia: { PUE: 2, GDL: 1 } }))).toEqual([]);
+  });
+
+  it('un almacén en cero en el producto, ausente en la fila, no cuenta', () => {
+    const guardada = fila(1, producto('A'), { existencia: { PUE: 2 } });
+
+    expect(cambian(guardada, producto('A', { existencia: { PUE: 2, GDL: 0 } }))).toEqual([]);
+  });
+
+  it('una pieza más en un almacén cuenta como existencia', () => {
+    expect(cambian(fila(1, producto('A')), producto('A', { existencia: { PUE: 3 } }))).toEqual(['existencia']);
+  });
+
+  it('las especificaciones distintas cuentan', () => {
+    const otras = [{ tipo: 'Color', valor: 'Blanco' }];
+
+    expect(cambian(fila(1, producto('A')), producto('A', { specifications: otras }))).toEqual(['especificaciones']);
+  });
+
+  it('dos campos a la vez salen los dos, sin repetirse', () => {
+    const r = cambian(fila(1, producto('A')), producto('A', { price: 12, exchangeRate: 19.5 }));
+
+    expect(r).toHaveLength(2);
+    expect(r).toEqual(expect.arrayContaining(['precio', 'tipoCambio']));
+    expect(new Set(r).size).toBe(2);
+  });
+
+  it('vacío en la base y nulo en CT son lo mismo, como en la firma', () => {
+    const guardada = fila(1, producto('A'), { ean: undefined, promociones: null, especificaciones: null });
+
+    expect(cambian(guardada, producto('A', { specifications: [], promotions: [] }))).toEqual([]);
+  });
+
+  // Todo lo que la firma ve como cambio lo ve el diagnóstico, y al revés: si discreparan, el log mentiría.
+  describe('es consistente con la firma', () => {
+    const base = producto('A', { promotions: [{ nombre: 'Promo', precio: 5 }], existencia: { PUE: 2, GDL: 1 }, ean: '123' });
+    const variantes: Array<[string, Partial<NormalizedSupplierProduct>]> = [
+      ['sin cambio', {}],
+      ['mismo valor, otro objeto', { specifications: [{ tipo: 'Color', valor: 'Negro' }], promotions: [{ precio: 5, nombre: 'Promo' }] }],
+      ['existencia con otro orden', { existencia: { GDL: 1, PUE: 2 } }],
+      ['existencia con un almacén en cero', { existencia: { PUE: 2, GDL: 1, MTY: 0 } }],
+      ['existencia con más piezas', { existencia: { PUE: 2, GDL: 2 } }],
+      ['existencia sin piezas', { existencia: {} }],
+      ['otro almacén', { existencia: { PUE: 2, MTY: 1 } }],
+      ['número de parte', { partNumber: 'otro' }],
+      ['nombre', { name: 'Otro nombre' }],
+      ['modelo', { model: 'M-otro' }],
+      ['modelo nulo', { model: null }],
+      ['marca', { brand: 'OTRA' }],
+      ['subcategoría', { subcategory: 'Otra' }],
+      ['categoría', { category: 'Otra' }],
+      ['descripción corta', { shortDescription: 'Otra' }],
+      ['ean', { ean: '456' }],
+      ['ean nulo', { ean: null }],
+      ['upc', { upc: '789' }],
+      ['sustituto', { substituteSku: 'SUS' }],
+      ['activo', { active: false }],
+      ['protegido', { protected: true }],
+      ['precio', { price: 10.01 }],
+      ['precio igual', { price: 10 }],
+      ['moneda', { currency: 'MXN' }],
+      ['tipo de cambio', { exchangeRate: 18.91 }],
+      ['tipo de cambio nulo', { exchangeRate: null }],
+      ['especificaciones', { specifications: [] }],
+      ['promociones', { promotions: [] }],
+      ['imagen', { imageUrl: 'https://x/y.png' }],
+      ['varios a la vez', { price: 11, exchangeRate: 19, active: false, name: 'Z' }],
+    ];
+
+    it.each(variantes)('%s', (_, extra) => {
+      const p = producto('A', { ...base, ...extra });
+      const guardada = fila(1, base);
+
+      expect(firmaDeFila(guardada as never) !== firmaDeProducto(p)).toBe(cambian(guardada, p).length > 0);
+    });
+
+    it('también al revés: la fila es la que trae el cambio', () => {
+      const cambios: Array<Record<string, unknown>> = [
+        { nombre: 'Otro' }, { precio: 99 }, { tipoCambio: 17.06 }, { activo: false }, { existencia: { PUE: 9 } },
+        { existencia: { PUE: 2, GDL: 1, MTY: 0 } }, { especificaciones: [] }, { promociones: null }, { imagen: 'https://x/y.png' }, { ean: null },
+      ];
+      for (const c of cambios) {
+        const guardada = fila(1, base, c);
+
+        expect(firmaDeFila(guardada as never) !== firmaDeProducto(base)).toBe(cambian(guardada, base).length > 0);
+      }
+    });
+  });
+});
+
 describe('CtCatalogSyncService.sync', () => {
   it('solo escribe lo que cambió o es nuevo', async () => {
     const igual = producto('IGUAL');
@@ -117,6 +230,86 @@ describe('CtCatalogSyncService.sync', () => {
 
     expect(prisma.productCT.upsert.mock.calls.map(([a]) => a.where.clave)).toEqual(['CAMBIA', 'NUEVO']);
     expect(r).toMatchObject({ status: 'OK', rowsRead: 3, rowsUpserted: 2, error: null });
+  });
+
+  describe('cambios por campo en el log', () => {
+    let log: jest.SpyInstance;
+    beforeEach(() => {
+      log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    });
+    afterEach(() => log.mockRestore());
+
+    const lineaDeSync = () => String(log.mock.calls.map(([m]) => m).find((m) => String(m).startsWith('CT sync OK')));
+
+    it('cuenta cuántas filas cambiaron en cada campo', async () => {
+      const a = producto('A');
+      const b = producto('B');
+      const c = producto('C');
+      const { servicio, prisma } = armar({
+        existentes: [fila(1, a), fila(2, b), fila(3, c)],
+        pull: { products: [{ ...a, exchangeRate: 19.1 }, { ...b, exchangeRate: 19.1 }, c] },
+      });
+
+      const r = await servicio.sync({ source: 'PRIMARY' });
+
+      expect(lineaDeSync()).toContain('upserted=2');
+      expect(lineaDeSync()).toMatch(/cambiosPorCampo=tipoCambio:2$/);
+      expect(prisma.productCT.upsert).toHaveBeenCalledTimes(2);
+      expect(r).toMatchObject({ status: 'OK', rowsRead: 3, rowsUpserted: 2, error: null });
+    });
+
+    it('los productos que no estaban cuentan como nuevos', async () => {
+      const a = producto('A');
+      const { servicio } = armar({
+        existentes: [fila(1, a)],
+        pull: { products: [{ ...a, price: 99 }, producto('N1'), producto('N2')] },
+      });
+
+      await servicio.sync({ source: 'PRIMARY' });
+
+      expect(lineaDeSync()).toMatch(/cambiosPorCampo=nuevo:2,precio:1$/);
+    });
+
+    it('si nada cambia dice ninguno', async () => {
+      const a = producto('A');
+      const { servicio } = armar({ existentes: [fila(1, a)], pull: { products: [a] } });
+
+      await servicio.sync({ source: 'PRIMARY' });
+
+      expect(lineaDeSync()).toMatch(/upserted=0 .*cambiosPorCampo=ninguno$/);
+    });
+
+    it('lista los 8 campos que más cambian, de mayor a menor', async () => {
+      const a = producto('A');
+      const b = producto('B');
+      const { servicio } = armar({
+        existentes: [fila(1, a), fila(2, b)],
+        pull: {
+          products: [
+            { ...a, price: 1, name: 'X', model: 'X', brand: 'X', category: 'X', subcategory: 'X', shortDescription: 'X', currency: 'MXN', exchangeRate: 1, active: false },
+            { ...b, price: 1 },
+          ],
+        },
+      });
+
+      await servicio.sync({ source: 'PRIMARY' });
+
+      const campos = lineaDeSync().split('cambiosPorCampo=')[1]!.split(',');
+      expect(campos).toHaveLength(8);
+      expect(campos[0]).toBe('precio:2');
+      expect(campos.slice(1).every((c) => c.endsWith(':1'))).toBe(true);
+    });
+
+    it('una fila que falla al guardar igual queda contada, y el diagnóstico no cambia qué se guarda', async () => {
+      const a = producto('A');
+      const { servicio, prisma } = armar({ existentes: [fila(1, a)], pull: { products: [{ ...a, price: 5 }] } });
+      prisma.productCT.upsert.mockRejectedValueOnce(new Error('value too long'));
+
+      const r = await servicio.sync({ source: 'PRIMARY' });
+
+      expect(r).toMatchObject({ status: 'OK', rowsUpserted: 0 });
+      expect(lineaDeSync()).toMatch(/conError=1 cambiosPorCampo=precio:1$/);
+    });
   });
 
   it('guarda solo los almacenes con piezas y no pisa el id que dejó el JSON', async () => {
@@ -298,5 +491,46 @@ describe('CtCatalogSyncService.sync', () => {
 
       expect(r).toMatchObject({ status: 'ERROR', error: 'Timeout (data socket)' });
     });
+  });
+});
+
+describe('camposQueCambian · cada campo lleva su propio nombre', () => {
+  // Si una etiqueta de la lista interna quedara cruzada (modelo con la etiqueta de marca), el log mentiría
+  // justo en lo que sirve para decidir el arreglo. Aquí cada campo cambia solo y debe salir con su nombre.
+  it.each<[string, Partial<NormalizedSupplierProduct>]>([
+    ['numParte', { partNumber: 'OTRO' }],
+    ['nombre', { name: 'Otro nombre' }],
+    ['modelo', { model: 'M-OTRO' }],
+    ['marca', { brand: 'OTRA' }],
+    ['subcategoria', { subcategory: 'Otra sub' }],
+    ['categoria', { category: 'Otra cat' }],
+    ['descripcion_corta', { shortDescription: 'Otra corta' }],
+    ['ean', { ean: '1234567890123' }],
+    ['upc', { upc: '123456789012' }],
+    ['sustituto', { substituteSku: 'SUST-1' }],
+    ['activo', { active: false }],
+    ['protegido', { protected: true }],
+    ['existencia', { existencia: { PUE: 7 } }],
+    ['precio', { price: 99 }],
+    ['moneda', { currency: 'MXN' }],
+    ['tipoCambio', { exchangeRate: 20.5 }],
+    ['especificaciones', { specifications: [{ tipo: 'Color', valor: 'Blanco' }] }],
+    ['promociones', { promotions: [{ nombre: 'Promo', precio: 5 }] }],
+    ['imagen', { imageUrl: 'https://ejemplo.invalid/foto.jpg' }],
+  ])('si solo cambia %s, dice %s y nada más', (campo, cambio) => {
+    const guardada = fila(1, producto('A'));
+
+    expect(camposQueCambian(guardada as never, producto('A', cambio))).toEqual([campo]);
+  });
+
+  it('los campos nombrados son todos los que firma la fila (ninguno se queda sin diagnóstico)', () => {
+    const cambioTotal = producto('A', {
+      partNumber: 'X', name: 'X', model: 'X', brand: 'X', subcategory: 'X', category: 'X', shortDescription: 'X',
+      ean: 'X', upc: 'X', substituteSku: 'X', active: false, protected: true, existencia: { PUE: 9 }, price: 77,
+      currency: 'MXN', exchangeRate: 21, specifications: [{ tipo: 'a', valor: 'b' }],
+      promotions: [{ nombre: 'P' }], imageUrl: 'https://ejemplo.invalid/x.jpg',
+    });
+
+    expect(camposQueCambian(fila(1, producto('A')) as never, cambioTotal)).toHaveLength(19);
   });
 });

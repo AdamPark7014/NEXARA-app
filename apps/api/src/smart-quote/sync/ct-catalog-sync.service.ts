@@ -79,18 +79,44 @@ function ordenado(valor: unknown): unknown {
   return valor;
 }
 
-/** Para no reescribir lo que no cambió: cada 15 min serían 5,600 filas, y el disco lleno ya tumbó la base (26-10). */
-export function firmaDeFila(f: Omit<FilaComparada, 'id' | 'clave'>): string {
-  return JSON.stringify(
-    ordenado([
-      f.numParte, f.nombre, f.modelo, f.marca, f.subcategoria, f.categoria, f.descripcion_corta, f.ean, f.upc, f.sustituto,
-      f.activo, f.protegido, f.existencia ?? {}, Number(f.precio) || 0, f.moneda, f.tipoCambio, f.especificaciones ?? [], f.promociones ?? [], f.imagen,
-    ]),
-  );
+type FilaSinIds = Omit<FilaComparada, 'id' | 'clave'>;
+
+/**
+ * Los campos que se comparan, ya normalizados y en un orden fijo. La firma y el diagnóstico por campo salen de aquí:
+ * así «cambió algo» y «qué cambió» nunca pueden discrepar.
+ */
+function camposNormalizados(f: FilaSinIds): Array<readonly [string, unknown]> {
+  return [
+    ['numParte', f.numParte],
+    ['nombre', f.nombre],
+    ['modelo', f.modelo],
+    ['marca', f.marca],
+    ['subcategoria', f.subcategoria],
+    ['categoria', f.categoria],
+    ['descripcion_corta', f.descripcion_corta],
+    ['ean', f.ean],
+    ['upc', f.upc],
+    ['sustituto', f.sustituto],
+    ['activo', f.activo],
+    ['protegido', f.protegido],
+    ['existencia', f.existencia ?? {}],
+    ['precio', Number(f.precio) || 0],
+    ['moneda', f.moneda],
+    ['tipoCambio', f.tipoCambio],
+    ['especificaciones', f.especificaciones ?? []],
+    ['promociones', f.promociones ?? []],
+    ['imagen', f.imagen],
+  ];
 }
 
-export function firmaDeProducto(p: NormalizedSupplierProduct): string {
-  return firmaDeFila({
+/** Para no reescribir lo que no cambió: cada 15 min serían 5,600 filas, y el disco lleno ya tumbó la base (26-10). */
+export function firmaDeFila(f: FilaSinIds): string {
+  return JSON.stringify(ordenado(camposNormalizados(f).map(([, valor]) => valor)));
+}
+
+/** Lo que la base guardaría para este producto, con la misma forma que lee `leerCatalogoGuardado`. */
+function filaDeProducto(p: NormalizedSupplierProduct): FilaSinIds {
+  return {
     numParte: p.partNumber,
     nombre: p.name,
     modelo: p.model,
@@ -110,7 +136,42 @@ export function firmaDeProducto(p: NormalizedSupplierProduct): string {
     especificaciones: p.specifications,
     promociones: p.promotions as Prisma.JsonValue,
     imagen: p.imageUrl,
-  });
+  };
+}
+
+export function firmaDeProducto(p: NormalizedSupplierProduct): string {
+  return firmaDeFila(filaDeProducto(p));
+}
+
+/** Un valor como lo vería la firma: `undefined` y `null` son lo mismo, y las llaves van en orden. */
+function comoFirma(valor: unknown): string {
+  return JSON.stringify(ordenado(valor)) ?? 'null';
+}
+
+/**
+ * Qué campos hacen que la fila guardada y el producto de CT no firmen igual. Solo sirve para el diagnóstico del log
+ * (no cambia qué se guarda): compara con la misma normalización que `firmaDeFila`, así que devuelve algo si y solo si
+ * las firmas difieren.
+ */
+export function camposQueCambian(f: FilaSinIds, p: NormalizedSupplierProduct): string[] {
+  const guardados = camposNormalizados(f);
+  const nuevos = camposNormalizados(filaDeProducto(p));
+  const cambian: string[] = [];
+  for (let i = 0; i < guardados.length; i++) {
+    if (comoFirma(guardados[i]![1]) !== comoFirma(nuevos[i]![1])) cambian.push(guardados[i]![0]);
+  }
+  return cambian;
+}
+
+/** Los que más se repiten primero; son los que dicen dónde está el vaivén. */
+function resumenDeCambios(cambios: Map<string, number>): string {
+  return (
+    [...cambios]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([campo, filas]) => `${campo}:${filas}`)
+      .join(',') || 'ninguno'
+  );
 }
 
 @Injectable()
@@ -197,11 +258,19 @@ export class CtCatalogSyncService {
       let upserted = 0;
       let conError = 0;
       let primerError: string | null = null;
+      // Diagnóstico del vaivén: cuántas filas cambian por campo. Solo se cuenta y se escribe en el log.
+      const cambios = new Map<string, number>();
+      const contarCambio = (campo: string) => cambios.set(campo, (cambios.get(campo) ?? 0) + 1);
       for (const product of pull.products) {
         // Comparar 15 mil filas sin soltar el hilo detendría las peticiones de la API.
         if (++vistos % CEDER_CADA === 0) await new Promise((listo) => setImmediate(listo));
         const guardada = porClave.get(product.sku);
-        if (guardada && firmaDeFila(guardada) === firmaDeProducto(product)) continue;
+        if (guardada) {
+          if (firmaDeFila(guardada) === firmaDeProducto(product)) continue;
+          camposQueCambian(guardada, product).forEach(contarCambio);
+        } else {
+          contarCambio('nuevo');
+        }
         try {
           await this.upsertProduct(product);
           upserted += 1;
@@ -235,7 +304,7 @@ export class CtCatalogSyncService {
       });
 
       this.logger.log(
-        `CT sync OK source=${pull.source} read=${pull.products.length} upserted=${upserted} apagados=${apagados} conError=${conError}`,
+        `CT sync OK source=${pull.source} read=${pull.products.length} upserted=${upserted} apagados=${apagados} conError=${conError} cambiosPorCampo=${resumenDeCambios(cambios)}`,
       );
       return finished;
     } catch (err) {
