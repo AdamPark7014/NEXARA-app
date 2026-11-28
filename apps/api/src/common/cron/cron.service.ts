@@ -7,7 +7,12 @@ import { MaintenanceContractsService } from '../../maintenance-contracts/mainten
 import { VehiclesService } from '../../vehicles/vehicles.service.js';
 import { WebhooksService } from '../../webhooks/webhooks.service.js';
 import { DomainEventBusService } from '../../domain-events/domain-event-bus.service.js';
-import { sinPlazoStatusVariants } from '../../activities/activity-status.js';
+import {
+  ACTIVITY_STATUS,
+  OPEN_ACTIVITY_WHERE,
+  sinPlazoStatusVariants,
+  statusVariants,
+} from '../../activities/activity-status.js';
 import { finDelPeriodo, periodoDeActividad } from '../../activities/actividad-periodo.js';
 import { horasResolucionPorActividad, limiteResolucionMs } from '../../sla-tracker/sla-tracker.service.js';
 import { ProyectoCostosAvisosService } from './proyecto-costos-avisos.service.js';
@@ -196,14 +201,23 @@ export class CronService {
   }
 
   // ── KPI Snapshot — cada hora ────────────────────────────────────
+  // `activeActivities` = actividades «En Proceso» (con todas sus grafías históricas, vía
+  // `statusVariants`); `openActivities` = todo lo que no está cerrado. Hasta la versión 1 este
+  // método contaba el estatus 'EN_PROGRESO', que ningún camino escribe, y guardó 0 siempre: en las
+  // filas sin `metadata.version` (o con version < 2) `activeActivities` no sirve para tendencias y se
+  // ignora (`pendingPOs` y `overdueInvoices` de esas filas sí son datos válidos).
   @Cron(CronExpression.EVERY_HOUR, { name: 'kpi-snapshot' })
   async handleKpiSnapshot() {
     const [
       activeActivities,
+      openActivities,
       pendingPOs,
       overdueInvoices,
     ] = await Promise.all([
-      this.prisma.activity.count({ where: { estatus: 'EN_PROGRESO' } }),
+      this.prisma.activity.count({
+        where: { estatus: { in: statusVariants(ACTIVITY_STATUS.EN_PROCESO) }, deletedAt: null },
+      }),
+      this.prisma.activity.count({ where: OPEN_ACTIVITY_WHERE }),
       this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'CONFIRMED'] } } }),
       this.prisma.invoice.count({ where: { status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: workDateColumn(new Date()) }, isCancelled: false } }),
     ]);
@@ -218,8 +232,10 @@ export class CronService {
         periodEnd: today,
         metadata: {
           activeActivities,
+          openActivities,
           pendingPOs,
           overdueInvoices,
+          version: 2,
           timestamp: new Date().toISOString(),
         },
       },
