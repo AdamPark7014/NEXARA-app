@@ -278,7 +278,9 @@ export class ActivitiesService {
       fechaEntregaEsperada: (createActivityDto as { fechaEntregaEsperada?: unknown }).fechaEntregaEsperada,
       tiempoEstimadoMin: (createActivityDto as { tiempoEstimadoMin?: number | null }).tiempoEstimadoMin ?? null,
     });
-    if (!unDia.ok) throw new UnprocessableEntityException(unDia.error);
+    if (!unDia.ok) {
+      throw new UnprocessableEntityException(unDia.codigo ? { message: unDia.error, code: unDia.codigo } : unDia.error);
+    }
     const conPeriodo = leido.periodo ? camposDePeriodo(leido.periodo, rest.fechaInicio ?? null) : {};
 
     const activity = await db.activity.create({
@@ -1395,7 +1397,9 @@ export class ActivitiesService {
             : (prev?.tiempoEstimadoMin ?? null),
       });
       if (!unDiaUp.ok && (tocaPeriodo || updateActivityDto.fechaInicio != null || updateActivityDto.fechaMaxima != null || updateActivityDto.fechaEntregaEsperada != null || updateActivityDto.tiempoEstimadoMin !== undefined)) {
-        throw new UnprocessableEntityException(unDiaUp.error);
+        throw new UnprocessableEntityException(
+          unDiaUp.codigo ? { message: unDiaUp.error, code: unDiaUp.codigo } : unDiaUp.error,
+        );
       }
       if (leido.periodo) {
         const campos = camposDePeriodo(leido.periodo, updateActivityDto.fechaInicio ?? prev?.fechaInicio ?? null);

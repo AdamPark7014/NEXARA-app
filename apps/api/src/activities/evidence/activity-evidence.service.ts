@@ -10,6 +10,15 @@ import {
 import { Prisma, type ActivityEvidence } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { saveBase64Photo } from '../../common/file-upload.util';
+import {
+  rechazoActividadAprobada,
+  rechazoActividadCancelada,
+  rechazoActividadNoCumplida,
+  rechazoEvidenciaAprobada,
+  rechazoEvidenciaEnRevision,
+  rechazoFotoEntradaYaGuardada,
+  rechazoPasoIncorrecto,
+} from './evidencia-mensajes';
 import { ActivitiesService } from '../activities.service.js';
 import { PERMISSIONS } from '../../common/permissions.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
@@ -461,15 +470,13 @@ export class ActivityEvidenceService {
     const activity = await this.loadActivityForTenant(activityId, companyId);
 
     if (activity.estatus === 'Aprobada') {
-      throw new ForbiddenException('La actividad ya fue aprobada y no permite nuevas evidencias');
+      throw new ForbiddenException(rechazoActividadAprobada());
     }
     if (/cancel/i.test(activity.estatus || '')) {
-      throw new ForbiddenException('La actividad fue cancelada y ya no recibe evidencias');
+      throw new ForbiddenException(rechazoActividadCancelada());
     }
     if (esNoCumplida(activity.estatus)) {
-      throw new ForbiddenException(
-        'La actividad quedó como no cumplida y ya no recibe evidencias; tu superior puede reprogramarla',
-      );
+      throw new ForbiddenException(rechazoActividadNoCumplida());
     }
 
     // Quien pasó la actividad a otro compañero ya no sube evidencia: su avance quedó guardado.
@@ -490,11 +497,11 @@ export class ActivityEvidenceService {
     });
 
     if (evidence?.reviewStatus === 'APPROVED') {
-      throw new ForbiddenException('La evidencia ya fue aprobada y no puede modificarse');
+      throw new ForbiddenException(rechazoEvidenciaAprobada());
     }
 
     if (evidence?.status === 'COMPLETED' && evidence?.reviewStatus !== 'REJECTED') {
-      throw new ForbiddenException('La evidencia está en revisión y no puede modificarse');
+      throw new ForbiddenException(rechazoEvidenciaEnRevision());
     }
 
     if (!evidence) {
@@ -630,7 +637,7 @@ export class ActivityEvidenceService {
     const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
 
     if (evidence.status !== 'ENTRY_PHOTO') {
-      throw new BadRequestException('Ya se ha guardado la foto de entrada');
+      throw new BadRequestException(rechazoFotoEntradaYaGuardada(evidence.status));
     }
 
     const updated = await this.prisma.activityEvidence.update({
@@ -850,7 +857,7 @@ export class ActivityEvidenceService {
     const required = clampEvidencePhotoRequired(activity.evidencePhotoRequired);
 
     if (evidence.status !== 'EVIDENCE_PHOTOS') {
-      throw new BadRequestException('No estás en el paso correcto para guardar evidencias');
+      throw new BadRequestException(rechazoPasoIncorrecto('EVIDENCE_PHOTOS', evidence.status));
     }
 
     // Con campos definidos, lo que se exige son los huecos que pidió quien asignó
@@ -914,7 +921,7 @@ export class ActivityEvidenceService {
     // serializado: dos fotos a la vez no pueden leer la misma lista y pisarse.
     const seeded = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
     if (seeded.status !== 'EVIDENCE_PHOTOS') {
-      throw new BadRequestException('No estás en el paso correcto para guardar evidencias');
+      throw new BadRequestException(rechazoPasoIncorrecto('EVIDENCE_PHOTOS', seeded.status));
     }
 
     const punto = sanitizePhotoGeo([geo ?? null], 1)?.[0] ?? null;
@@ -925,7 +932,7 @@ export class ActivityEvidenceService {
         where: { id: seeded.id },
       });
       if (!evidence || evidence.status !== 'EVIDENCE_PHOTOS') {
-        throw new BadRequestException('No estás en el paso correcto para guardar evidencias');
+        throw new BadRequestException(rechazoPasoIncorrecto('EVIDENCE_PHOTOS', evidence?.status));
       }
 
       const actuales = evidence.evidencePhotos || [];
@@ -966,7 +973,7 @@ export class ActivityEvidenceService {
     const activity = await this.loadActivityForTenant(activityId, companyId);
 
     if (evidence.status !== 'SERVICE_SHEET_PDF') {
-      throw new BadRequestException('No estás en el paso correcto para guardar la hoja de servicio');
+      throw new BadRequestException(rechazoPasoIncorrecto('SERVICE_SHEET_PDF', evidence.status));
     }
 
     if (!isPdfUrl(pdfUrl)) {
@@ -1002,7 +1009,7 @@ export class ActivityEvidenceService {
     const activity = await this.loadActivityForTenant(activityId, companyId);
 
     if (evidence.status !== 'SERVICE_SHEET_DATA') {
-      throw new BadRequestException('No estás en el paso correcto para completar la plantilla');
+      throw new BadRequestException(rechazoPasoIncorrecto('SERVICE_SHEET_DATA', evidence.status));
     }
 
     const updated = await this.prisma.activityEvidence.update({
@@ -1046,7 +1053,7 @@ export class ActivityEvidenceService {
     const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
 
     if (evidence.status !== 'EXIT_PHOTO') {
-      throw new BadRequestException('No estás en el paso correcto para guardar la foto de salida');
+      throw new BadRequestException(rechazoPasoIncorrecto('EXIT_PHOTO', evidence.status));
     }
 
     const punto = coordenadasDeFoto(latitude, longitude);

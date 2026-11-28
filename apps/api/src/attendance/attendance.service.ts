@@ -1,3 +1,4 @@
+import { rechazoEntradaYaRegistrada, rechazoSalidaYaRegistrada } from './mensajes-checada';
 import {
   BadRequestException,
   Injectable,
@@ -570,11 +571,7 @@ export class AttendanceService {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const tipo = (args as { data?: { type?: string } })?.data?.type;
-        throw new BadRequestException(
-          tipo === 'entrada'
-            ? 'Ya existe una entrada registrada para hoy'
-            : 'Ya existe una salida registrada para hoy',
-        );
+        throw new BadRequestException(tipo === 'entrada' ? rechazoEntradaYaRegistrada() : rechazoSalidaYaRegistrada());
       }
       throw error;
     }
@@ -2161,7 +2158,7 @@ export class AttendanceService {
         horario: horarioEntrada,
       });
       if (!jornada) {
-        throw new BadRequestException('Ya existe una entrada registrada para hoy');
+        throw new BadRequestException(rechazoEntradaYaRegistrada());
       }
       const diaJornada = jornada.dia;
 
@@ -2261,7 +2258,7 @@ export class AttendanceService {
     if (!openDay?.isOpen || !openDay.lastEntryAt) {
       const existingExit = await this.findAttendanceOnDate(userId, 'salida', now, tenantId);
       if (existingExit) {
-        throw new BadRequestException('Ya existe una salida registrada para hoy');
+        throw new BadRequestException(rechazoSalidaYaRegistrada());
       }
       throw new BadRequestException('No hay una entrada abierta para cerrar');
     }

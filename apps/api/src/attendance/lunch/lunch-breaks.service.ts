@@ -1,3 +1,8 @@
+import {
+  rechazoComidaRegresoYaRegistrado,
+  rechazoComidaSinSalida,
+  rechazoComidaYaCompletada,
+} from '../mensajes-checada';
 import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { LunchBreak } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -137,7 +142,7 @@ export class LunchBreaksService {
     });
 
     if (existingLunch && existingLunch.checkoutTime) {
-      throw new BadRequestException('Ya completaste tu hora de comida hoy');
+      throw new BadRequestException(rechazoComidaYaCompletada());
     }
 
     const checkinTime = this.horaRegistro(data.checkinTime, now);
@@ -243,11 +248,11 @@ export class LunchBreaksService {
     });
 
     if (!lunch) {
-      throw new BadRequestException('No existe un registro de comida para hoy');
+      throw new BadRequestException(rechazoComidaSinSalida());
     }
 
     if (lunch.checkoutTime) {
-      throw new BadRequestException('Ya registraste tu salida de comida');
+      throw new BadRequestException(rechazoComidaRegresoYaRegistrado());
     }
 
     const checkoutTime = this.horaRegistro(data.checkoutTime, now);

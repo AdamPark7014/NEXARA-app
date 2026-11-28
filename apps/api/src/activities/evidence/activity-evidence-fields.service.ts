@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { rechazoEvidenciaAprobada, rechazoFotoEnRevision } from './evidencia-mensajes';
 import { PrismaService } from '../../prisma/prisma.service';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import { PERMISSIONS } from '../../common/permissions.js';
@@ -347,10 +348,10 @@ export class ActivityEvidenceFieldsService {
       throw new ForbiddenException('La actividad ya está cerrada: su evidencia no se puede cambiar ni quitar.');
     }
     if (evidencia?.reviewStatus === 'APPROVED') {
-      throw new ForbiddenException('La evidencia ya fue aprobada y no puede modificarse');
+      throw new ForbiddenException(rechazoEvidenciaAprobada());
     }
     if (evidencia?.status === 'COMPLETED' && evidencia?.reviewStatus !== 'REJECTED') {
-      throw new ForbiddenException('La evidencia está en revisión y no puede modificarse');
+      throw new ForbiddenException(rechazoFotoEnRevision());
     }
   }
 

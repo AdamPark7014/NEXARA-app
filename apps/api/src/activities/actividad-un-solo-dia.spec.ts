@@ -14,16 +14,32 @@ describe('validarUnSoloDia', () => {
     expect(validarUnSoloDia({ periodoInicio: '2026-11-20', periodoFin: '2026-11-20' })).toEqual({ ok: true });
   });
   it('rechaza periodo de varios dias', () => {
-    expect(validarUnSoloDia({ periodoInicio: '2026-11-16', periodoFin: '2026-11-20' })).toEqual({ ok: false, error: MENSAJE_UN_SOLO_DIA });
+    expect(validarUnSoloDia({ periodoInicio: '2026-11-16', periodoFin: '2026-11-20' })).toEqual({
+      ok: false,
+      error: 'Esta actividad abarca varios días y cada actividad es de un solo día. Crea una actividad por cada día.',
+      codigo: 'ACTIVIDAD_VARIOS_DIAS',
+    });
   });
   it('pide los dos extremos del periodo', () => {
     expect(validarUnSoloDia({ periodoInicio: '2026-11-20' })).toEqual({ ok: false, error: 'El periodo necesita día de inicio y día de fin' });
   });
   it('rechaza fechaMaxima en otro dia que fechaInicio', () => {
-    expect(validarUnSoloDia({ fechaInicio: '2026-11-20T10:00:00-06:00', fechaMaxima: '2026-11-21T18:00:00-06:00' })).toEqual({ ok: false, error: MENSAJE_UN_SOLO_DIA });
+    expect(validarUnSoloDia({ fechaInicio: '2026-11-20T10:00:00-06:00', fechaMaxima: '2026-11-21T18:00:00-06:00' })).toEqual({
+      ok: false,
+      error: 'El inicio y la hora de entrega caen en días distintos. Pon los dos en el mismo día.',
+      codigo: 'ACTIVIDAD_DIAS_DISTINTOS',
+    });
   });
   it('rechaza tiempo planeado mayor a la jornada', () => {
-    expect(validarUnSoloDia({ tiempoEstimadoMin: MINUTOS_JORNADA_NETOS + 1 })).toEqual({ ok: false, error: MENSAJE_UN_SOLO_DIA });
+    expect(MINUTOS_JORNADA_NETOS).toBe(420);
+    expect(validarUnSoloDia({ tiempoEstimadoMin: MINUTOS_JORNADA_NETOS + 1 })).toEqual({
+      ok: false,
+      error:
+        'El tiempo estimado (7 h 1 min) es más de lo que cabe en un día de trabajo (7 h). Baja el tiempo o crea otra actividad para el resto.',
+      codigo: 'ACTIVIDAD_TIEMPO_EXCEDE_DIA',
+    });
+    expect(validarUnSoloDia({ tiempoEstimadoMin: 540 })).toMatchObject({ ok: false, codigo: 'ACTIVIDAD_TIEMPO_EXCEDE_DIA' });
+    expect((validarUnSoloDia({ tiempoEstimadoMin: 540 }) as { error: string }).error).toContain('(9 h)');
   });
   it('acepta la que entrega a las 18:00 de México (00:00 UTC del día siguiente)', () => {
     // Caso real 26-11: autoasignación de 10:00 a 18:00; la entrega llega como 2026-11-27T00:00Z.
@@ -38,7 +54,16 @@ describe('validarUnSoloDia', () => {
     expect(validarUnSoloDia({ fechaInicio: new Date('2026-11-26T16:00:00.000Z'), fechaMaxima: new Date('2026-11-27T01:30:00.000Z') })).toEqual({ ok: true });
   });
   it('sigue rechazando la que de verdad pasa al otro día en México', () => {
-    expect(validarUnSoloDia({ fechaInicio: '2026-11-26T16:00:00.000Z', fechaMaxima: '2026-11-27T16:00:00.000Z' })).toEqual({ ok: false, error: MENSAJE_UN_SOLO_DIA });
+    expect(validarUnSoloDia({ fechaInicio: '2026-11-26T16:00:00.000Z', fechaMaxima: '2026-11-27T16:00:00.000Z' })).toMatchObject({
+      ok: false,
+      codigo: 'ACTIVIDAD_DIAS_DISTINTOS',
+    });
+  });
+  it('los errores de formato del periodo no llevan código de la regla', () => {
+    expect(validarUnSoloDia({ periodoInicio: '2026-11-20' })).not.toHaveProperty('codigo');
+  });
+  it('la regla general sigue disponible como texto de ayuda', () => {
+    expect(MENSAJE_UN_SOLO_DIA).toContain('un solo día');
   });
   it('sin fechas ni tiempo pasa', () => {
     expect(validarUnSoloDia({})).toEqual({ ok: true });

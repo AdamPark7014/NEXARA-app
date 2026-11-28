@@ -2,8 +2,38 @@ import { claveDia, sumarDias } from './actividad-periodo.js';
 import { JORNADA_OFICINA } from './tiempo-entrega.js';
 import { workDateKey } from '../common/time/workday.js';
 
+/** Regla general, para textos de ayuda. Los rechazos usan el texto de su causa (abajo). */
 export const MENSAJE_UN_SOLO_DIA =
   'Las actividades son de un solo día. Si el trabajo toma varios días, crea una actividad por día.';
+
+/** Código estable de cada causa: las pantallas pueden reaccionar sin leer el texto. */
+export const CODIGOS_UN_SOLO_DIA = {
+  ACTIVIDAD_VARIOS_DIAS: 'ACTIVIDAD_VARIOS_DIAS',
+  ACTIVIDAD_DIAS_DISTINTOS: 'ACTIVIDAD_DIAS_DISTINTOS',
+  ACTIVIDAD_TIEMPO_EXCEDE_DIA: 'ACTIVIDAD_TIEMPO_EXCEDE_DIA',
+} as const;
+
+export type CodigoUnSoloDia = (typeof CODIGOS_UN_SOLO_DIA)[keyof typeof CODIGOS_UN_SOLO_DIA];
+
+export const MENSAJE_VARIOS_DIAS =
+  'Esta actividad abarca varios días y cada actividad es de un solo día. Crea una actividad por cada día.';
+
+export const MENSAJE_DIAS_DISTINTOS =
+  'El inicio y la hora de entrega caen en días distintos. Pon los dos en el mismo día.';
+
+/** «9 h», «7 h 30 min», «45 min»: el tiempo como lo diría una persona. */
+export function horasYMinutos(minutos: number): string {
+  const total = Math.max(0, Math.round(Number(minutos) || 0));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h && m) return `${h} h ${m} min`;
+  if (h) return `${h} h`;
+  return `${m} min`;
+}
+
+export function mensajeTiempoExcedeDia(tiempoEstimadoMin: number): string {
+  return `El tiempo estimado (${horasYMinutos(tiempoEstimadoMin)}) es más de lo que cabe en un día de trabajo (${horasYMinutos(MINUTOS_JORNADA_NETOS)}). Baja el tiempo o crea otra actividad para el resto.`;
+}
 
 function minutosDeHm(hm: string): number {
   const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(hm ?? '').trim());
@@ -46,7 +76,8 @@ function diaDeInstante(valor: unknown): string | null {
   return null;
 }
 
-export type ValidacionUnSoloDia = { ok: true } | { ok: false; error: string };
+/** `codigo` viene solo en los rechazos de la regla de un día; los de formato del periodo no lo llevan. */
+export type ValidacionUnSoloDia = { ok: true } | { ok: false; error: string; codigo?: CodigoUnSoloDia };
 
 export function validarUnSoloDia(input: {
   periodoInicio?: unknown;
@@ -66,7 +97,7 @@ export function validarUnSoloDia(input: {
     const a = diaDe(input.periodoInicio);
     const b = diaDe(input.periodoFin);
     if (!a || !b) return { ok: false, error: 'Las fechas del periodo no son válidas (usa AAAA-MM-DD)' };
-    if (a !== b) return { ok: false, error: MENSAJE_UN_SOLO_DIA };
+    if (a !== b) return { ok: false, error: MENSAJE_VARIOS_DIAS, codigo: CODIGOS_UN_SOLO_DIA.ACTIVIDAD_VARIOS_DIAS };
   }
   const inicio = diaDeInstante(input.fechaInicio);
   const max = diaDeInstante(input.fechaMaxima);
@@ -74,11 +105,17 @@ export function validarUnSoloDia(input: {
   const ancla = inicio ?? max ?? entrega;
   if (ancla) {
     for (const d of [inicio, max, entrega]) {
-      if (d && d !== ancla) return { ok: false, error: MENSAJE_UN_SOLO_DIA };
+      if (d && d !== ancla) {
+        return { ok: false, error: MENSAJE_DIAS_DISTINTOS, codigo: CODIGOS_UN_SOLO_DIA.ACTIVIDAD_DIAS_DISTINTOS };
+      }
     }
   }
   if (typeof input.tiempoEstimadoMin === 'number' && Number.isFinite(input.tiempoEstimadoMin) && input.tiempoEstimadoMin > MINUTOS_JORNADA_NETOS) {
-    return { ok: false, error: MENSAJE_UN_SOLO_DIA };
+    return {
+      ok: false,
+      error: mensajeTiempoExcedeDia(input.tiempoEstimadoMin),
+      codigo: CODIGOS_UN_SOLO_DIA.ACTIVIDAD_TIEMPO_EXCEDE_DIA,
+    };
   }
   return { ok: true };
 }
