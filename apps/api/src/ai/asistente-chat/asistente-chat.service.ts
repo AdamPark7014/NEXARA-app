@@ -313,7 +313,16 @@ export class AsistenteChatService {
     if (!this.claude.disponible()) {
       return { ...base, fuente: 'codigo', texto: 'La IA no está disponible ahora: usa «Asignar» en Mi equipo.', accion: null };
     }
-    const r = await this.asistenteActividades.interpretar(pregunta, user, tenantId);
+    let r: Awaited<ReturnType<AsistenteActividadesService['interpretar']>>;
+    try {
+      r = await this.asistenteActividades.interpretar(pregunta, user, tenantId);
+    } catch (e) {
+      // Un 503 de IA (llave caída, corte, presupuesto, tope) ya trae su frase en español: se contesta en el chat en
+      // lugar de dejar que el error llegue al cliente. Cualquier otro error es un fallo de verdad y se relanza.
+      if (!(e instanceof ServiceUnavailableException)) throw e;
+      this.logger.warn(`[chat-asistente] asignar sin respuesta de la IA: ${e.message}`);
+      return { ...base, fuente: 'codigo', texto: e.message, accion: null };
+    }
     const fecha = (iso: unknown) =>
       typeof iso === 'string' && iso
         ? new Date(iso).toLocaleString('es-MX', {

@@ -191,15 +191,21 @@ export function clasificarFallo(error: unknown): ClaseFallo {
 }
 
 /**
- * Lo que se le dice a la persona cuando el corte niega una llamada. El de presupuesto y el de llave y token son los de
- * siempre (los mismos que salen cuando la puerta contesta); el de proyecto desactivado es nuevo porque hoy un 403 sale
- * como «no respondió».
+ * Lo que ve la persona cuando la llave o el token de la IA no sirven. Una sola frase sin nombres de variables: el
+ * detalle técnico (qué llave, qué código) queda en el log, en `GET /ai/salud` y en el aviso al administrador.
+ */
+export const TEXTO_IA_NO_DISPONIBLE = 'La IA no está disponible por ahora: ya se avisó al administrador.';
+
+/**
+ * Lo que se le dice a la persona cuando el corte niega una llamada. El de presupuesto es el de siempre; el de llave y
+ * token es el mismo que sale cuando la puerta contesta 401 (`TEXTO_IA_NO_DISPONIBLE`); el de proyecto desactivado es
+ * nuevo porque hoy un 403 sale como «no respondió».
  */
 export function textoDeCorte(motivo: MotivoCorte): string {
   switch (motivo) {
     case 'llave_puerta_invalida':
     case 'token_nexara_invalido':
-      return 'La clave de la IA no es válida: revisa ANTHROPIC_API_KEY en el servidor.';
+      return TEXTO_IA_NO_DISPONIBLE;
     case 'presupuesto_agotado':
       return 'Se acabó el presupuesto de IA de este mes: avísale al administrador.';
     case 'proyecto_desactivado':

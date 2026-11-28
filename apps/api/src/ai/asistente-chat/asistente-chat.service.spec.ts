@@ -1,6 +1,7 @@
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { AsistenteChatService } from './asistente-chat.service.js';
 import { IaNoDisponibleException } from '../claude/compuerta-ia.js';
+import { PLATFORM_DEVELOPER_EMAIL } from '../../common/platform-accounts.js';
 
 const GENERAL = { id: 333, members: [{ userId: 5 }] };
 
@@ -70,6 +71,56 @@ describe('AsistenteChatService', () => {
     expect(r.accion).toBeNull();
     expect(r.texto).toMatch(/solo del CEO/);
     expect(actividades.interpretar).not.toHaveBeenCalled();
+  });
+
+  describe('«asígnale a…» cuando la IA no está (solo el CEO lo usa)', () => {
+    const ceo = { id: 1, nombre: 'Dirección', email: PLATFORM_DEVELOPER_EMAIL, roleKey: 'admin', permissions: [] };
+    const pregunta = { texto: '@asistente asígnale a Raúl revisar cámaras', channelId: 333 };
+    let warn: jest.SpyInstance;
+    beforeEach(() => {
+      warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    });
+    afterEach(() => warn.mockRestore());
+
+    it('un 503 de IA (llave caída, corte, presupuesto) se contesta en el chat con su frase y no lanza', async () => {
+      const { svc, actividades } = armar();
+      actividades.interpretar.mockRejectedValue(
+        new IaNoDisponibleException('La IA no está disponible por ahora: ya se avisó al administrador.', 'llave_puerta_invalida', true),
+      );
+      const r = await svc.responder(ceo, 1, pregunta);
+      expect(r).toMatchObject({
+        intencion: 'asignar',
+        fuente: 'codigo',
+        texto: 'La IA no está disponible por ahora: ya se avisó al administrador.',
+        accion: null,
+        sugerencias: [],
+      });
+      expect(actividades.interpretar).toHaveBeenCalledTimes(1);
+    });
+
+    it('cualquier ServiceUnavailableException trae su texto (por ejemplo el tope diario)', async () => {
+      const { svc, actividades } = armar();
+      actividades.interpretar.mockRejectedValue(new ServiceUnavailableException('La IA respondió en un formato inesperado: intenta de nuevo.'));
+      const r = await svc.responder(ceo, 1, pregunta);
+      expect(r).toMatchObject({ fuente: 'codigo', accion: null, texto: 'La IA respondió en un formato inesperado: intenta de nuevo.' });
+    });
+
+    it('un error común (no es de la IA) se relanza: no se esconde un fallo de verdad', async () => {
+      const { svc, actividades } = armar();
+      actividades.interpretar.mockRejectedValue(new Error('boom'));
+      await expect(svc.responder(ceo, 1, pregunta)).rejects.toThrow('boom');
+    });
+
+    it('con IA responde como siempre: propuestas para confirmar', async () => {
+      const { svc, actividades } = armar();
+      actividades.interpretar.mockResolvedValue({
+        propuestas: [{ resumen: 'Revisar cámaras', titulo: 'Revisar cámaras', responsable: { nombre: 'Raúl' }, payload: { titulo: 'Revisar cámaras' } }],
+        aclaracion: null,
+      });
+      const r = await svc.responder(ceo, 1, pregunta);
+      expect(r).toMatchObject({ fuente: 'ia', intencion: 'asignar', accion: { tipo: 'crear-actividades' } });
+      expect(r.accion?.propuestas).toHaveLength(1);
+    });
   });
 
   it('lo que no cae en reglas va a Claude con proceso propio y respeta el tope por persona', async () => {

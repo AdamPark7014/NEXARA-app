@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { ClaudeService } from '../../ai/claude/claude.service.js';
@@ -8,9 +8,41 @@ import { CUENTAS, cents, type RenglonPoliza } from '../mesa-contable/polizas-mes
 import { coincideImporte, dentroDeDias } from './ingest-cfdi.js';
 import { normalizarRfc } from './lista-69b.js';
 import { proponerPolizaRecibido, type LigaDetectada } from './poliza-propuesta.js';
+import { workDateKey } from '../../common/time/workday.js';
+
+/**
+ * Freno propio de la póliza para no gastar el cupo de IA de la empresa.
+ *
+ * `sugerirCuentaConIa` manda el `companyId` real (antes mandaba 0 y su gasto no tocaba a nadie), así que cada CFDI
+ * recibido sin regla del proveedor gasta UNA llamada del cupo diario de la empresa (`ClaudeService`, 300). El ingest
+ * del buzón SAT llama a esto factura por factura: una descarga de varios cientos de recibidos vaciaba el cupo y dejaba
+ * sin IA, el resto del día, a la complejidad, el chat, la revisión y a todos los demás. Con el freno, pasado el límite
+ * la factura se propone sin IA (confianza «baja», «Sin historial ni IA…») y la contadora la corrige a mano; al aceptarla
+ * se aprende la regla del proveedor y la siguiente ya no necesita IA.
+ *
+ * Dos límites por empresa, los dos se cuentan al INTENTAR la llamada (aunque falle: un 5xx también gasta cupo):
+ *   - por minuto: lo que una descarga masiva puede pedir de golpe;
+ *   - por día de México: lo que la póliza puede quitarle al cupo de 300 entre todas las corridas del día.
+ * Es un freno de la póliza, no un tope por función de la IA: ese llega con C10.
+ */
+export const MAX_SUGERENCIAS_IA_POR_MINUTO = 20;
+export const MAX_SUGERENCIAS_IA_POR_DIA = 60;
+const VENTANA_SUGERENCIAS_MS = 60_000;
+
+type FrenoEmpresa = {
+  ventanaDesde: number;
+  enVentana: number;
+  dia: string;
+  enDia: number;
+  avisoVentana: boolean;
+  avisoDia: boolean;
+};
 
 @Injectable()
 export class PolizaPropuestaService {
+  private readonly logger = new Logger('PolizaPropuesta');
+  private readonly frenos = new Map<number, FrenoEmpresa>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly claude: ClaudeService,
@@ -71,8 +103,9 @@ export class PolizaPropuestaService {
 
     const ligas = await this.buscarLigas(companyId, inv);
     let sugerenciaIa: { codigo: string; porque: string } | null = null;
-    if (!regla && this.claude.disponible()) {
-      sugerenciaIa = await this.sugerirCuentaConIa(inv.notes || inv.emisorName || '', inv.emisorRfc);
+    // Orden a propósito: sin IA no se gasta el freno, y el freno se cuenta justo antes de preguntar.
+    if (!regla && this.claude.disponible() && this.permiteSugerenciaIa(companyId)) {
+      sugerenciaIa = await this.sugerirCuentaConIa(companyId, inv.notes || inv.emisorName || '', inv.emisorRfc);
     }
 
     const propuesta = proponerPolizaRecibido({
@@ -181,7 +214,60 @@ export class PolizaPropuestaService {
     return ligas;
   }
 
+  /**
+   * ¿Se le puede preguntar a la IA por esta factura? Si sí, ya cuenta la consulta contra los dos límites de la empresa
+   * (por minuto y por día de México). Síncrono y sin esperas entre revisar y contar, así que dos facturas a la vez no
+   * se cuelan. Al pasar el límite escribe UN aviso por ventana (no uno por factura: una descarga trae cientos).
+   */
+  private permiteSugerenciaIa(companyId: number): boolean {
+    const ahora = Date.now();
+    const dia = workDateKey(new Date(ahora));
+    let freno = this.frenos.get(companyId);
+    if (!freno) {
+      freno = { ventanaDesde: Number.NEGATIVE_INFINITY, enVentana: 0, dia, enDia: 0, avisoVentana: false, avisoDia: false };
+      this.frenos.set(companyId, freno);
+    }
+    if (freno.dia !== dia) {
+      freno.dia = dia;
+      freno.enDia = 0;
+      freno.avisoDia = false;
+    }
+    if (ahora - freno.ventanaDesde >= VENTANA_SUGERENCIAS_MS) {
+      freno.ventanaDesde = ahora;
+      freno.enVentana = 0;
+      freno.avisoVentana = false;
+    }
+
+    if (freno.enDia >= MAX_SUGERENCIAS_IA_POR_DIA) {
+      if (!freno.avisoDia) {
+        freno.avisoDia = true;
+        this.logger.warn(
+          `Empresa ${companyId}: ya se usaron ${MAX_SUGERENCIAS_IA_POR_DIA} sugerencias de IA para pólizas hoy; las demás facturas quedan en confianza «baja» para revisar a mano.`,
+        );
+      }
+      return false;
+    }
+    if (freno.enVentana >= MAX_SUGERENCIAS_IA_POR_MINUTO) {
+      if (!freno.avisoVentana) {
+        freno.avisoVentana = true;
+        this.logger.warn(
+          `Empresa ${companyId}: tope de ${MAX_SUGERENCIAS_IA_POR_MINUTO} sugerencias de IA por minuto para pólizas; las facturas que sigan en este minuto quedan en confianza «baja» para revisar a mano.`,
+        );
+      }
+      return false;
+    }
+    freno.enVentana += 1;
+    freno.enDia += 1;
+    return true;
+  }
+
+  /**
+   * Cuenta de gasto que sugiere la IA. Si la IA no responde devuelve null: sin sugerencia, el motor deja la propuesta en
+   * confianza «baja» con «Sin historial ni IA…». Antes devolvía «gastos de administración» con un porqué, y el motor lo
+   * tomaba como una sugerencia de IA con confianza «media».
+   */
   private async sugerirCuentaConIa(
+    companyId: number,
     concepto: string,
     rfc: string | null,
   ): Promise<{ codigo: string; porque: string } | null> {
@@ -200,14 +286,16 @@ export class PolizaPropuestaService {
         modelo: 'claude-haiku-5-5',
         esfuerzo: 'low',
         proceso: 'contadora-poliza',
-        companyId: 0,
+        companyId,
         pensar: false,
       });
       const codigo = String(datos.codigo ?? '').trim();
       if (!codigo) return null;
       return { codigo, porque: String(datos.porque ?? '').slice(0, 200) };
-    } catch {
-      return { codigo: CUENTAS.gastosAdministracion, porque: 'Haiku no respondió; se usa gastos de administración.' };
+    } catch (error) {
+      // Sin ruido por factura (la sincronización puede traer cientos): el aviso por motivo ya lo escribe ClaudeService.
+      this.logger.debug(`sin sugerencia de cuenta con IA: ${(error as Error).message}`);
+      return null;
     }
   }
 

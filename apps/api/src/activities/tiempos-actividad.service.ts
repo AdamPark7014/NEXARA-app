@@ -155,6 +155,9 @@ export class TiemposActividadService {
     const guardada = this.lecturas.get(clave);
     if (guardada && guardada.hasta > Date.now()) return guardada.lectura;
     let lectura: LecturaTitulo = { complejidad: null, cantidad: cantidadDelTitulo(titulo), destino: null };
+    // Una lectura vacía porque la IA falló NO se guarda: el 25-11 se quedaban 30 min sin lectura los mismos títulos
+    // aunque la IA ya hubiera vuelto. Sí se guardan los éxitos y el título corto (ahí la IA no tenía nada que leer).
+    let guardar = true;
     try {
       const r = await this.complejidad?.sugerir(companyId, {
         coreKind: a.coreKind,
@@ -162,11 +165,14 @@ export class TiemposActividadService {
         titulo,
         indicaciones: a.indicaciones ?? null,
       });
+      if (r?.motivo === 'ia_no_disponible' || r?.motivo === 'sin_respuesta') guardar = false;
       const s = r?.sugerencia;
       if (s) lectura = { complejidad: s.complejidad, cantidad: s.cantidad ?? lectura.cantidad, destino: s.destino };
     } catch (error) {
+      guardar = false;
       this.logger.warn(`sin lectura del título: ${(error as Error).message}`);
     }
+    if (!guardar) return lectura;
     this.lecturas.set(clave, { hasta: Date.now() + CACHE_LECTURA_MS, lectura });
     if (this.lecturas.size > 500) this.lecturas.delete(this.lecturas.keys().next().value as string);
     return lectura;

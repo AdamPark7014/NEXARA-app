@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import { ClaudeService } from '../claude/claude.service.js';
+import { IaNoDisponibleException } from '../claude/compuerta-ia.js';
 import { limpiarComplejidad, peticionComplejidad, type SugerenciaComplejidad } from './complejidad-ia.js';
 import { reglaDe } from '../estandar/tabla-estandar.js';
 import {
@@ -27,10 +28,31 @@ const CACHE_MS = 10 * 60_000;
 export type ConsultaTipo = { coreKind?: string | null; tipo?: string | null };
 export type RespuestaTiempos = TiemposTipicos & { clave: string | null };
 
+/** Por qué no hay sugerencia: título corto (no es fallo), la IA no está o no dio un nivel válido. */
+export type MotivoSinSugerencia = 'titulo_corto' | 'ia_no_disponible' | 'sin_respuesta';
+
+/**
+ * Lo que responde `sugerir`. `sugerencia` es lo de siempre; los otros tres campos son nuevos y opcionales para que
+ * una web o una app vieja, que solo lee `sugerencia`, se vea igual que hoy.
+ */
+export type RespuestaSugerencia = {
+  sugerencia: SugerenciaComplejidad | null;
+  /** `false` solo cuando la IA no está (llave caída, corte, presupuesto): ahí el nivel se elige a mano. */
+  disponible: boolean;
+  motivo?: MotivoSinSugerencia;
+  /** Una frase en español para mostrar tal cual. Falta cuando no hay nada que decir (título corto) o hubo sugerencia. */
+  mensaje?: string;
+};
+
+export const MENSAJE_SIN_IA = 'Sugerencia no disponible por ahora: elige tú el nivel.';
+export const MENSAJE_SIN_RESPUESTA = 'No pude sugerir esta vez: elige tú el nivel.';
+
 @Injectable()
 export class ComplejidadService {
   private readonly logger = new Logger('Complejidad');
   private readonly cache = new Map<number, { hasta: number; datos: Map<string, TiemposTipicos> }>();
+  /** Ya se avisó en el log que la IA no está; se vuelve a avisar solo después de que responda otra vez. */
+  private iaCaidaAvisada = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -55,30 +77,57 @@ export class ComplejidadService {
   }
 
   /**
-   * Sugerencia de la IA. Si no hay IA o falla, no hay sugerencia (la web lo calla): elegir la
-   * complejidad nunca depende de que responda.
+   * Sugerencia de la IA. Elegir la complejidad nunca depende de que responda, pero tampoco se calla: cuando no hay
+   * sugerencia, la respuesta dice por qué y trae una frase para mostrarla (`disponible`, `motivo`, `mensaje`). Los
+   * campos nuevos son opcionales para quien ya lee solo `sugerencia`. `opciones.proceso` cambia el `x-proceso` que ve
+   * la puerta (el relleno de actividades viejas usa `complejidad-relleno`).
    */
   async sugerir(
     companyId: number | null,
     body: { coreKind?: string | null; tipo?: string | null; titulo?: string | null; indicaciones?: string | null },
-  ): Promise<{ sugerencia: SugerenciaComplejidad | null }> {
+    opciones: { proceso?: string } = {},
+  ): Promise<RespuestaSugerencia> {
     const tenantId = requireCompanyId(companyId);
     const titulo = String(body.titulo ?? '').trim();
-    if (titulo.length < 6 || !this.claude.disponible()) return { sugerencia: null };
+    // Un título corto no es un fallo de la IA: ni se le pregunta ni se avisa de nada.
+    if (titulo.length < 6) return { sugerencia: null, disponible: true, motivo: 'titulo_corto' };
+    if (!this.claude.disponible()) return this.sinIa();
     try {
       const regla = reglaDe({ coreKind: body.coreKind, ticketType: body.tipo, ticketTypeCustom: body.tipo });
       // La jornada en sitio no se lee del título: es lo que se supone cuando no dice cuántas piezas.
       const seCuenta = regla?.unidades.filter((x) => !x.sinBase).map((x) => x.plural).join(' o ') || null;
       const { datos } = await this.claude.json<SugerenciaComplejidad>({
         ...peticionComplejidad({ tipo: tipoLegible(body.coreKind, body.tipo), seCuenta, titulo, indicaciones: body.indicaciones }),
-        proceso: 'complejidad',
+        proceso: opciones.proceso || 'complejidad',
         companyId: tenantId,
       });
-      return { sugerencia: limpiarComplejidad(datos) };
+      this.avisarVuelta();
+      const sugerencia = limpiarComplejidad(datos);
+      // La IA respondió pero sin un nivel válido: tampoco es un hueco, se dice.
+      return sugerencia
+        ? { sugerencia, disponible: true }
+        : { sugerencia: null, disponible: true, motivo: 'sin_respuesta', mensaje: MENSAJE_SIN_RESPUESTA };
     } catch (error) {
+      if (error instanceof IaNoDisponibleException) return this.sinIa();
+      this.avisarVuelta();
       this.logger.warn(`sin sugerencia: ${(error as Error).message}`);
-      return { sugerencia: null };
+      return { sugerencia: null, disponible: true, motivo: 'sin_respuesta', mensaje: MENSAJE_SIN_RESPUESTA };
     }
+  }
+
+  /** La IA no está: se avisa en el log al caerse y al volver, no una vez por llamada (en 32 h fueron 97 avisos iguales). */
+  private sinIa(): RespuestaSugerencia {
+    if (!this.iaCaidaAvisada) {
+      this.iaCaidaAvisada = true;
+      this.logger.warn('sin sugerencia de complejidad: la IA no está disponible (se avisa una vez hasta que vuelva)');
+    }
+    return { sugerencia: null, disponible: false, motivo: 'ia_no_disponible', mensaje: MENSAJE_SIN_IA };
+  }
+
+  private avisarVuelta(): void {
+    if (!this.iaCaidaAvisada) return;
+    this.iaCaidaAvisada = false;
+    this.logger.log('la sugerencia de complejidad volvió a responder');
   }
 
   private async porTipo(companyId: number): Promise<Map<string, TiemposTipicos>> {

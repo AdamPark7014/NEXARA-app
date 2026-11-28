@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { ClaudeService } from '../claude/claude.service.js';
 import { limiteDeEntrega } from '../../activities/semaforo-actividad.js';
@@ -10,6 +10,9 @@ import {
   type Hecho,
   type SalidaRevision,
 } from './revision-actividad.js';
+
+/** Lo que lee quien pide «Revisar con IA» cuando la IA no está o no respondió: una frase, sin detalles técnicos. */
+export const AVISO_SIN_IA = 'La IA no está disponible por ahora: se muestran solo los hechos.';
 
 export type ResultadoRevision = {
   hechos: Hecho[];
@@ -24,6 +27,8 @@ export type ResultadoRevision = {
  */
 @Injectable()
 export class RevisionActividadService {
+  private readonly logger = new Logger('RevisionActividad');
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly claude: ClaudeService,
@@ -91,7 +96,7 @@ export class RevisionActividadService {
   async revisar(activityId: number, companyId: number): Promise<ResultadoRevision> {
     const datos = await this.datos(activityId, companyId);
     const hechos = hechosDe(datos);
-    if (!this.claude.disponible()) return { hechos, ia: null, avisoIa: 'La IA no está configurada en este servidor: se muestran solo los hechos.' };
+    if (!this.claude.disponible()) return { hechos, ia: null, avisoIa: AVISO_SIN_IA };
     try {
       const { datos: salida } = await this.claude.json<SalidaRevision>({
         proceso: 'revision-actividad',
@@ -100,7 +105,9 @@ export class RevisionActividadService {
       });
       return { hechos, ia: salidaSegura(salida), avisoIa: null };
     } catch (e) {
-      return { hechos, ia: null, avisoIa: `La IA no respondió (${(e as Error).message}): se muestran solo los hechos.` };
+      // La persona lee una frase fija; el detalle de la excepción solo va al log (antes se pegaba entre paréntesis).
+      this.logger.warn(`[revision-actividad] sin respuesta de la IA: ${(e as Error).message}`);
+      return { hechos, ia: null, avisoIa: AVISO_SIN_IA };
     }
   }
 }

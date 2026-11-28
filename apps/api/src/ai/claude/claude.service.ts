@@ -8,6 +8,7 @@ import {
   CompuertaIa,
   IaNoDisponibleException,
   MODO_IA_POR_OMISION,
+  TEXTO_IA_NO_DISPONIBLE,
   clasificarFallo,
   tipoDeError,
   type ClaseFallo,
@@ -256,8 +257,12 @@ export class ClaudeService {
 
   private obtenerCliente(): Anthropic {
     if (!(process.env.ANTHROPIC_API_KEY || '').trim()) {
-      throw new ServiceUnavailableException(
+      // Mensaje de despliegue (nombra la variable): las pantallas no deben llegar aquí, antes preguntan `disponible()`.
+      // Lleva el code IA_NO_DISPONIBLE como las demás 503 de IA, para que no cuente como caída del servidor.
+      throw new IaNoDisponibleException(
         'La IA no está configurada: falta ANTHROPIC_API_KEY en el entorno del servidor.',
+        null,
+        true,
       );
     }
     if (!this.cliente) {
@@ -265,8 +270,10 @@ export class ClaudeService {
       // Regla de la empresa: en producción toda la IA pasa por la puerta (`ia.zynoratek.com` /
       // `puerta-ia:8080`), que lleva el tope de gasto. Sin CLAUDE_BASE_URL no se sale directo.
       if (!base && process.env.NODE_ENV === 'production') {
-        throw new ServiceUnavailableException(
+        throw new IaNoDisponibleException(
           'La IA no está configurada: falta CLAUDE_BASE_URL (la puerta) en el entorno del servidor.',
+          null,
+          true,
         );
       }
       this.cliente = new Anthropic({
@@ -293,8 +300,10 @@ export class ClaudeService {
     const clave = `${companyId}:${dia}`;
     const usadas = this.llamadasPorDia.get(clave) ?? 0;
     if (usadas >= tope) {
-      throw new ServiceUnavailableException(
+      throw new IaNoDisponibleException(
         `Se alcanzó el tope diario de ${tope} consultas a la IA para esta empresa: vuelve a intentarlo mañana.`,
+        null,
+        true,
       );
     }
     // Limpia los días anteriores para que el mapa no crezca.
@@ -404,11 +413,8 @@ export class ClaudeService {
       case 'llave_puerta_invalida':
       case 'token_nexara_invalido':
         this.avisarLimitado(clase.motivo, `[${proceso}] ANTHROPIC_API_KEY inválida (${clase.motivo}: ${clase.detalle})`);
-        return new IaNoDisponibleException(
-          'La clave de la IA no es válida: revisa ANTHROPIC_API_KEY en el servidor.',
-          clase.motivo,
-          clase.sinCosto,
-        );
+        // Lo técnico (qué llave, qué código) va al log y a la compuerta; la persona lee una frase sin variables.
+        return new IaNoDisponibleException(TEXTO_IA_NO_DISPONIBLE, clase.motivo, clase.sinCosto);
       case 'presupuesto_agotado':
         this.avisarLimitado(clase.motivo, `[${proceso}] presupuesto mensual de IA agotado en la puerta`);
         return new IaNoDisponibleException(

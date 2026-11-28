@@ -165,8 +165,9 @@ describe('ClaudeService', () => {
         },
       },
       {
-        viejo: 'La clave de la IA no es válida. Revisa ANTHROPIC_API_KEY en el servidor.',
-        nuevo: 'La clave de la IA no es válida: revisa ANTHROPIC_API_KEY en el servidor.',
+        // El 401 ya no nombra la variable del servidor: lo técnico queda en el log, no en la pantalla.
+        viejo: 'La IA no está disponible por ahora. Ya se avisó al administrador.',
+        nuevo: 'La IA no está disponible por ahora: ya se avisó al administrador.',
         disparar: () => conCliente(jest.fn().mockRejectedValue(fallo(Anthropic.AuthenticationError, 401, 'authentication_error'))).texto(peticion),
       },
     ];
@@ -186,6 +187,8 @@ describe('ClaudeService', () => {
         expect(error).toBeInstanceOf(Error);
         expect((error as Error).message).toBe(nuevo);
         expect((error as Error).message).not.toBe(viejo);
+        // Ningún aviso que llega a una pantalla nombra las variables del servidor.
+        expect((error as Error).message).not.toMatch(/ANTHROPIC_API_KEY|CLAUDE_BASE_URL/);
       }
     } finally {
       if (topePrevio === undefined) delete process.env.CLAUDE_TOPE_DIARIO;
@@ -289,7 +292,8 @@ describe('ClaudeService: compuerta de la IA', () => {
     for (let i = 0; i < 3; i++) {
       const error = await svc.texto(PETICION).catch((e) => e);
       expect(error).toBeInstanceOf(IaNoDisponibleException);
-      expect(error.message).toBe('La clave de la IA no es válida: revisa ANTHROPIC_API_KEY en el servidor.');
+      // La persona lee una sola frase, sin la variable del servidor.
+      expect(error.message).toBe('La IA no está disponible por ahora: ya se avisó al administrador.');
       expect(error.getResponse()).toMatchObject({ statusCode: 503, code: 'IA_NO_DISPONIBLE' });
     }
     expect(create).toHaveBeenCalledTimes(3);
@@ -313,7 +317,7 @@ describe('ClaudeService: compuerta de la IA', () => {
     const { svc } = conCompuerta(create, 'observar');
     for (let i = 0; i < 4; i++) {
       const error = await svc.texto(PETICION).catch((e) => e);
-      expect(error.message).toBe('La clave de la IA no es válida: revisa ANTHROPIC_API_KEY en el servidor.');
+      expect(error.message).toBe('La IA no está disponible por ahora: ya se avisó al administrador.');
     }
     expect(create).toHaveBeenCalledTimes(4);
     expect(svc.compuerta.instantanea()).toMatchObject({ estado: 'caida', motivo: 'llave_puerta_invalida' });
@@ -497,6 +501,9 @@ describe('ClaudeService: compuerta de la IA', () => {
       expect(llamadasContadas(svc)).toBe(300);
       const tope = await svc.texto(PETICION).catch((e) => e);
       expect(tope.message).toBe('Se alcanzó el tope diario de 300 consultas a la IA para esta empresa: vuelve a intentarlo mañana.');
+      // Es una 503 de IA como las demás: lleva el code para que no cuente como caída del servidor.
+      expect(tope).toBeInstanceOf(IaNoDisponibleException);
+      expect(tope.getResponse()).toMatchObject({ statusCode: 503, code: 'IA_NO_DISPONIBLE' });
       expect(create).toHaveBeenCalledTimes(305);
       expect(llamadasContadas(svc)).toBe(300);
     });
@@ -638,6 +645,9 @@ describe('ClaudeService: compuerta de la IA', () => {
       delete process.env.CLAUDE_BASE_URL;
       const error = await new ClaudeService().texto(PETICION).catch((e) => e);
       expect(error.message).toMatch(/falta CLAUDE_BASE_URL/);
+      // Es de despliegue (nombra la variable) pero sigue siendo una 503 de IA con su code.
+      expect(error).toBeInstanceOf(IaNoDisponibleException);
+      expect(error.getResponse()).toMatchObject({ statusCode: 503, code: 'IA_NO_DISPONIBLE' });
     });
 
     it('lee el modo de la base sin esperar y no vuelve a preguntar dentro de los 30 s', async () => {

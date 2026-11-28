@@ -21,6 +21,9 @@ import { puedeAsignarConIa } from './quien-asigna.js';
 /** Actividades recientes de las que se toman los nombres ya usados («Toks») y quién hace qué. */
 const ACTIVIDADES_PARA_NOMBRES = 400;
 
+/** Lo que lee quien ya puede usar «Asignar con IA» cuando la IA no está: qué hacer en su lugar. */
+export const MENSAJE_ASIGNAR_SIN_IA = '«Asignar con IA» no está disponible por ahora: usa «＋ Asignar» en Mi equipo.';
+
 export type RespuestaAsistente = {
   propuestas: PropuestaActividad[];
   aclaracion: string | null;
@@ -60,10 +63,16 @@ export class AsistenteActividadesService {
     return puedeAsignarConIa(this.prisma, user);
   }
 
-  estado() {
+  /**
+   * ¿Hay IA ahora? Si no, trae el motivo y una frase para la pantalla: la web ya no esconde el panel en silencio. Los
+   * campos `motivo` y `mensaje` son nuevos y opcionales (una web vieja solo lee `disponible`).
+   */
+  estado(): { disponible: boolean; modelo: string; motivo?: 'ia_no_disponible'; mensaje?: string } {
+    const disponible = this.claude.disponible();
     return {
-      disponible: this.claude.disponible(),
+      disponible,
       modelo: process.env.ANTHROPIC_ASSISTANT_MODEL || CONFIG_ASISTENTE.modelo,
+      ...(disponible ? {} : { motivo: 'ia_no_disponible' as const, mensaje: MENSAJE_ASIGNAR_SIN_IA }),
     };
   }
 

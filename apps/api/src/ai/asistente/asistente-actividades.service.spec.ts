@@ -61,4 +61,23 @@ describe('AsistenteActividadesService', () => {
     expect(res.propuestas[0].duracionMin).toBeGreaterThan(0);
     expect(res.propuestas[0].duracionOrigen).toBe('estimada');
   });
+
+  describe('estado()', () => {
+    const conIa = (disponible: boolean) =>
+      new AsistenteActividadesService({} as never, {} as never, { disponible: jest.fn().mockReturnValue(disponible) } as never, {} as never);
+
+    it('sin IA trae el motivo y una frase para la pantalla: qué usar en su lugar', () => {
+      const e = conIa(false).estado();
+      expect(e).toMatchObject({ disponible: false, motivo: 'ia_no_disponible' });
+      expect(e.mensaje).toBe('«Asignar con IA» no está disponible por ahora: usa «＋ Asignar» en Mi equipo.');
+      expect(typeof e.modelo).toBe('string');
+    });
+
+    it('con IA no trae motivo ni mensaje: la respuesta es la de siempre', () => {
+      const e = conIa(true).estado();
+      expect(e).toEqual({ disponible: true, modelo: expect.any(String) });
+      expect(e).not.toHaveProperty('motivo');
+      expect(e).not.toHaveProperty('mensaje');
+    });
+  });
 });
