@@ -227,12 +227,20 @@ function hidratar(filas: FilaLatido[]): number {
   return hidratadas;
 }
 
-/** El vigilante avisó de esta tarea: no volver a avisar hasta que se recupere. */
-function marcarAvisada(nombre: string, ahoraMs: number = Date.now()): void {
-  const estado = estados.get(nombre);
-  if (!estado) return;
+/**
+ * El vigilante avisó de esta tarea: no volver a avisar hasta que se recupere.
+ *
+ * Una tarea que nunca corrió desde el arranque no tiene estado todavía, y es justo la que el vigilante avisa como
+ * «atrasada»: por eso aquí SÍ se crea el estado si falta (vacío, solo con `avisadoAt`), si el latido está encendido y
+ * quedan lugares. Devuelve `true` si el aviso quedó anotado; `false` si no hubo dónde (latido apagado o tope de nombres
+ * lleno), para que quien llama no dé por hecho que se recordará. Nunca lanza.
+ */
+function marcarAvisada(nombre: string, ahoraMs: number = Date.now()): boolean {
+  const estado = estados.get(nombre) ?? (latidoEncendido() ? estadoDe(nombre) : null);
+  if (!estado) return false;
   estado.avisadoAt = ahoraMs;
   estado.sucio = true;
+  return true;
 }
 
 /** La tarea se recuperó: el vigilante vuelve a armar su aviso (si falla otra vez, avisará de nuevo). */

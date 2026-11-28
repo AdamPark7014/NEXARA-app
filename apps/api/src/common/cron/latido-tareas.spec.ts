@@ -167,9 +167,43 @@ describe('latido de tareas', () => {
     expect(estadoDe('t')?.sucio).toBe(true);
     latido.marcarLimpias(['t', 'no-existe']);
     expect(estadoDe('t')?.sucio).toBe(false);
-    latido.marcarAvisada('t', T0 + 5);
+    expect(latido.marcarAvisada('t', T0 + 5)).toBe(true);
     expect(estadoDe('t')).toMatchObject({ avisadoAt: T0 + 5, sucio: true });
-    expect(() => latido.marcarAvisada('no-existe')).not.toThrow();
+  });
+
+  it('marcarAvisada crea el estado de una tarea que nunca corrió (vacío, solo con el aviso)', () => {
+    expect(estadoDe('nunca-corrio')).toBeUndefined();
+    expect(latido.marcarAvisada('nunca-corrio', T0 + 7)).toBe(true);
+    expect(estadoDe('nunca-corrio')).toMatchObject({
+      avisadoAt: T0 + 7,
+      sucio: true,
+      corridas: 0,
+      ultimoInicio: null,
+      ultimoResultado: null,
+      recientes: [],
+    });
+    // Y cuando por fin corre, sigue siendo el mismo estado: el aviso se conserva hasta que el vigilante lo limpie.
+    latido.inicio('nunca-corrio', T0 + 100);
+    latido.fin('nunca-corrio', 'ok', 5, undefined, T0 + 105);
+    expect(estadoDe('nunca-corrio')).toMatchObject({ avisadoAt: T0 + 7, corridas: 1, ultimoResultado: 'ok' });
+  });
+
+  it('marcarAvisada devuelve false (sin lanzar) si no hay lugar: tope de nombres lleno', () => {
+    for (let i = 0; i < MAX_TAREAS_LATIDO; i += 1) latido.inicio(`t${i}`, T0);
+    expect(() => latido.marcarAvisada('uno-mas', T0)).not.toThrow();
+    expect(latido.marcarAvisada('uno-mas', T0)).toBe(false);
+    expect(estadoDe('uno-mas')).toBeUndefined();
+    // Las que ya tenían estado se siguen pudiendo marcar.
+    expect(latido.marcarAvisada('t0', T0 + 1)).toBe(true);
+  });
+
+  it('con PULSO_LATIDO=0 marcarAvisada no crea estados, pero sí marca los que ya existían', () => {
+    latido.inicio('antes', T0);
+    process.env.PULSO_LATIDO = '0';
+    expect(latido.marcarAvisada('nueva', T0)).toBe(false);
+    expect(estadoDe('nueva')).toBeUndefined();
+    expect(latido.marcarAvisada('antes', T0 + 1)).toBe(true);
+    expect(estadoDe('antes')?.avisadoAt).toBe(T0 + 1);
   });
 
   it('limpiarAviso vuelve a armar el aviso de una tarea recuperada', () => {

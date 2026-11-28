@@ -28,8 +28,8 @@ import { CronExpression } from '@nestjs/schedule';
  * `externo`: la tarea no es un `@Cron` de este proceso (la corre el servidor, por ejemplo un respaldo) y el latido
  *   llega por otra vía. La guardiana no exige su `@Cron`.
  *
- * Pendiente de otros cambios del paquete: C2 agrega `pulso:vigilante`; C6 borra `audit-cleanup` y deja una sola purga
- * de la bitácora; C8 agrega `pulso:limpieza` y `externo:respaldo-nexara` (`externo: true`).
+ * Pendiente de otros cambios del paquete: C6 borra `audit-cleanup` y deja una sola purga de la bitácora; C8 agrega
+ * `pulso:limpieza` y `externo:respaldo-nexara` (`externo: true`).
  */
 export interface TareaCatalogo {
   cron: string;
@@ -309,5 +309,11 @@ export const TAREAS_CATALOGO: Record<string, TareaCatalogo> = {
   'purga-bitacora': {
     cron: '15 4 1 * *', zona: 'MX', grupo: 'sistema',
     que: 'El día 1 de cada mes borra de la bitácora lo de más de un año.',
+  },
+
+  // ── Pulso (vigilancia de las propias tareas) ─────────────────────────────────────────────────
+  'pulso:vigilante': {
+    cron: '*/5 * * * *', zona: 'UTC', grupo: 'pulso',
+    que: 'Cada 5 minutos revisa que las demás tareas sigan corriendo y deja un solo aviso en el log por cada una que se atrase o se atore.',
   },
 };
