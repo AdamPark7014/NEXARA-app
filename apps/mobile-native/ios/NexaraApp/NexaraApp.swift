@@ -106,6 +106,8 @@ struct RootView: View {
         // `SessionExpiredHost` de Android: la expiración se confirma en cualquier
         // petición y hay que explicarla esté donde esté la persona.
         .sessionExpiredAlert()
+        // «Deshacer» de 5 s tras asignar o pedir (`DeshacerCentro`): también sobre toda la app.
+        .avisoDeshacer()
         // Sesión cerrada (botón, 401 o token vencido): de vuelta al login.
         .onChange(of: session.currentUser?.id) { _, newId in
             if newId == nil {

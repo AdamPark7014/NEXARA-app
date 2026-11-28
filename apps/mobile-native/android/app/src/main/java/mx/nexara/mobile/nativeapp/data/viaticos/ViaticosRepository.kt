@@ -93,7 +93,7 @@ class ViaticosRepository(context: Context) {
         categoria: String?,
         actividadId: Long?,
         ticket: GeoPhoto,
-    ): Boolean = api.crear(
+    ): AltaViatico = api.crear(
         montoSolicitado = texto(importe(centavos)),
         motivo = texto(motivo.trim()),
         categoria = categoria?.trim()?.takeIf { it.isNotEmpty() }?.let { texto(it) },
@@ -101,7 +101,7 @@ class ViaticosRepository(context: Context) {
         projectId = null,
         vehicleId = null,
         ticketEvidencia = parteFoto(ticket, "ticket.jpg"),
-    ).seEncolo()
+    ).alta()
 
     /**
      * Guarda el reparto completo. La suma tiene que dar el total exacto: el
@@ -189,6 +189,14 @@ class ViaticosRepository(context: Context) {
         )
     }
 
+    /** Alta con su id (para «Deshacer»); sin red el id no existe todavía. */
+    private fun ResponseBody.alta(): AltaViatico = use { body ->
+        val texto = body.string()
+        if (texto.contains("\"queued\":true")) return@use AltaViatico(encolado = true, id = null)
+        val id = runCatching { org.json.JSONObject(texto.trim()).optLong("id", 0L) }.getOrNull()?.takeIf { it > 0L }
+        AltaViatico(encolado = false, id = id)
+    }
+
     /** El interceptor offline contesta `{"queued":true}` a las mutaciones sin red. */
     private fun ResponseBody.seEncolo(): Boolean = use { body ->
         body.string().contains("\"queued\":true")
@@ -202,3 +210,6 @@ class ViaticosRepository(context: Context) {
         }
     }
 }
+
+/** Lo que regresa pedir un viático: si quedó en la cola sin red, o su id para poder deshacerlo. */
+data class AltaViatico(val encolado: Boolean, val id: Long?)

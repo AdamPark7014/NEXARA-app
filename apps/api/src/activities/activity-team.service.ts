@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { PrismaService } from '../prisma/prisma.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { avisarSiNoSeDeshizo } from '../deshacer/aviso-diferido.js';
 import { isClosedStatus } from './activity-status.js';
 import { horasPlanValidas } from './actividad-tiempos.js';
 import { errorDeHorasPlan } from './sessions/sesiones-trabajo.js';
@@ -269,15 +270,22 @@ export class ActivityTeamService {
 
     if (opciones.sinAviso) return member;
 
-    void this.notificationHierarchy?.notifyActivityDispatched({
-      activityId,
-      label: activity.titulo || '',
-      actorId: byId,
-      memberId: member.userId,
-      memberName: member.user?.nombre ?? 'alguien del equipo',
-      responsableId: activity.responsableId,
-      reparte,
-    });
+    // Se suele sumar equipo justo después de asignar: si la asignación se deshace en esos segundos,
+    // a quien se sumó tampoco le llega nada (`deshacer/aviso-diferido.ts`).
+    void avisarSiNoSeDeshizo(
+      `equipo de actividad ${activityId}`,
+      async () => Boolean(await this.prisma.activity.findFirst({ where: { id: activityId, deletedAt: null }, select: { id: true } })),
+      () =>
+        this.notificationHierarchy?.notifyActivityDispatched({
+          activityId,
+          label: activity.titulo || '',
+          actorId: byId,
+          memberId: member.userId,
+          memberName: member.user?.nombre ?? 'alguien del equipo',
+          responsableId: activity.responsableId,
+          reparte,
+        }),
+    );
 
     return member;
   }

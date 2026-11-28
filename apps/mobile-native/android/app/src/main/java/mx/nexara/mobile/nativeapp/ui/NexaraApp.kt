@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui
 
+import mx.nexara.mobile.nativeapp.ui.deshacer.AvisoDeshacerHost
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -88,6 +89,7 @@ fun NexaraApp() {
     }
 
     SessionExpiredHost(onSessionExpired = { logout() }) {
+        AvisoDeshacerHost {
         NavHost(navController = navController, startDestination = startDestination) {
             composable(Routes.Login) {
                 LoginScreen(
@@ -112,6 +114,7 @@ fun NexaraApp() {
             composable(Routes.Portal) {
                 TicketsNavHost(onLogout = { logout() })
             }
+        }
         }
     }
 }

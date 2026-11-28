@@ -243,7 +243,7 @@ struct NuevoViaticoView: View {
         error = nil
         Task {
             do {
-                let encolado = try await ViaticosRepository.shared.crear(
+                let alta = try await ViaticosRepository.shared.crear(
                     centavos: centavos,
                     motivo: motivo,
                     categoria: categoria,
@@ -251,11 +251,17 @@ struct NuevoViaticoView: View {
                     ticket: ticket
                 )
                 enviando = false
-                onCreado(
-                    encolado
-                        ? "Sin conexión: tu viático quedó en la cola con su foto y sale solo al volver la señal."
-                        : "Viático solicitado"
-                )
+                if let id = alta.id {
+                    // El aviso de abajo dice «Solicitud enviada» con su «Deshacer» de 5 s.
+                    DeshacerCentro.shared.ofrecer("Solicitud de viático enviada", tipo: DeshacerCentro.tipoViatico, ids: [id])
+                    onCreado("")
+                } else {
+                    onCreado(
+                        alta.encolado
+                            ? "Sin conexión: tu viático quedó en la cola con su foto y sale solo al volver la señal."
+                            : "Viático solicitado"
+                    )
+                }
                 dismiss()
             } catch {
                 enviando = false

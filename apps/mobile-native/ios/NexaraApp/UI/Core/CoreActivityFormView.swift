@@ -1151,6 +1151,13 @@ struct CoreActivityFormView: View {
                 entidadId: id,
                 detalle: "app"
             ))
+            // «Deshacer» de 5 s: a quien la recibe le avisamos hasta que pasa el plazo.
+            DeshacerCentro.shared.ofrecer(
+                selfAssign ? "Actividad creada" : "Actividad asignada",
+                tipo: DeshacerCentro.tipoActividad,
+                ids: [id],
+                detalle: selfAssign ? nil : "Le avisamos en unos segundos"
+            )
             await onCreated(id)
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo guardar la actividad")

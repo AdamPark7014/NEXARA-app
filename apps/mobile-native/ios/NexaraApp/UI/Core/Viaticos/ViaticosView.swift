@@ -131,16 +131,21 @@ struct ViaticosView: View {
         .task {
             if !cargado { await cargar() }
         }
+        // Se deshizo un viático desde el aviso de abajo: la lista se vuelve a leer.
+        .onReceive(NotificationCenter.default.publisher(for: DeshacerCentro.deshecho)) { nota in
+            if nota.object as? String == DeshacerCentro.tipoViatico { Task { await cargar() } }
+        }
         .navigationDestination(isPresented: $asignando) {
             AsignarViaticoView(onCreado: {
-                mensaje = "Viático asignado"
+                // Con id, el aviso de abajo ya dice «Viático asignado» con su «Deshacer».
+                mensaje = DeshacerCentro.shared.oferta == nil ? "Viático asignado" : nil
                 Task { await cargar() }
             })
             .nxBrandNavBar(title: "Asignar viático")
         }
         .navigationDestination(isPresented: $pidiendo) {
             NuevoViaticoView(onCreado: { texto in
-                mensaje = texto
+                mensaje = texto.isEmpty ? nil : texto
                 Task { await cargar() }
             })
             .nxBrandNavBar(title: "Pedir viático")

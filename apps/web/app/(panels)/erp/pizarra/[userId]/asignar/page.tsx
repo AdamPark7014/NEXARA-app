@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { useCronometroProceso } from "@/lib/cronometro-proceso";
@@ -376,7 +376,11 @@ export default function AsignarActividadPage() {
     return pasos;
   };
 
+  /** Se deshizo la asignación: lo que siga corriendo ya no lleva a su ficha. */
+  const deshechaRef = useRef(false);
+
   const correrPasos = async (activityId: number, pasos: PasoEquipo[]) => {
+    deshechaRef.current = false;
     const fichaAsignada = `/erp/pizarra/${userId}?asignada=${activityId}`;
     if (!token) {
       router.push(fichaAsignada);
@@ -388,6 +392,7 @@ export default function AsignarActividadPage() {
       addTeamMember(token, activityId, p.userId, p.indicaciones, p.rol, p.horasPlan),
     );
     setSumando(false);
+    if (deshechaRef.current) return;
     if (pendientes.length) {
       setPendiente({ activityId, pasos: pendientes });
       const quien =
@@ -866,6 +871,11 @@ export default function AsignarActividadPage() {
                     }}
                     onCancel={() => router.push(`/erp/pizarra/${userId}`)}
                     onSuccess={handleSuccess}
+                    onDeshecho={() => {
+                      deshechaRef.current = true;
+                      setPendiente(null);
+                      router.push(`/erp/pizarra/${userId}`);
+                    }}
                   />
                 )}
               </FormSection>

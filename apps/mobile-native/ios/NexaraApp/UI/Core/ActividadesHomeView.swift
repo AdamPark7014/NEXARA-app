@@ -104,6 +104,10 @@ struct ActividadesHomeView: View {
         }
         .background(NxColors.surface)
         .task(id: rango) { await cargarPizarra() }
+        // Se deshizo una asignación desde el aviso de abajo: la pizarra se vuelve a leer.
+        .onReceive(NotificationCenter.default.publisher(for: DeshacerCentro.deshecho)) { nota in
+            if nota.object as? String == DeshacerCentro.tipoActividad { Task { await cargarPizarra() } }
+        }
         // La pizarra se actualiza sola cada 30 s mientras se está viendo, en el rango elegido.
         .task(id: viendoEquipo ? rango.rawValue : "") {
             guard viendoEquipo else { return }
@@ -798,6 +802,9 @@ struct TeamMemberDetailView: View {
             .padding(16)
         }
         .refreshable { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: DeshacerCentro.deshecho)) { nota in
+            if nota.object as? String == DeshacerCentro.tipoActividad { Task { await load() } }
+        }
     }
 
     private func cabecera(_ p: TeamBoardUser) -> some View {

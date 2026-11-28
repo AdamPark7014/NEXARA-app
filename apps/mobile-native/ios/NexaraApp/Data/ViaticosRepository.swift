@@ -259,7 +259,9 @@ final class ViaticosRepository {
     /// `GET viatics` — sin `limit`, el API devuelve el arreglo completo (tope de
     /// 200 del lado del servidor). Trae ya los repartos y la liquidación.
     /// Asignar a alguien, ligado a una de sus actividades. No lleva ticket: se comprueba después.
-    func asignar(usuarioId: Int, actividadId: Int, centavos: Int, categoria: String, motivo: String) async throws {
+    /// Devuelve el id del viático (para «Deshacer»); nil si no vino.
+    @discardableResult
+    func asignar(usuarioId: Int, actividadId: Int, centavos: Int, categoria: String, motivo: String) async throws -> Int? {
         struct Cuerpo: Encodable {
             let usuarioId: Int
             let actividadId: Int
@@ -267,7 +269,7 @@ final class ViaticosRepository {
             let categoria: String
             let motivo: String
         }
-        _ = try await ApiClient.shared.postJSON(
+        let data = try await ApiClient.shared.postJSON(
             "viatics/assign",
             body: Cuerpo(
                 usuarioId: usuarioId,
@@ -277,6 +279,8 @@ final class ViaticosRepository {
                 motivo: motivo.trimmingCharacters(in: .whitespacesAndNewlines)
             )
         )
+        let id = ConsoleHelpers.mapInt(ConsoleHelpers.decodeMap(data), "id")
+        return id > 0 ? id : nil
     }
 
     func lista() async throws -> [Viatico] {
@@ -304,15 +308,15 @@ final class ViaticosRepository {
     /// adjuntar el ticket o comprobante»). El reparto no viaja aquí —un
     /// multipart no lleva listas anidadas—: se guarda después desde el detalle.
     ///
-    /// Devuelve `true` si se quedó en la cola sin conexión, para decirlo con
-    /// esas palabras en vez de fingir que se envió.
+    /// `encolado`: se quedó en la cola sin conexión, para decirlo con esas palabras
+    /// en vez de fingir que se envió. `id`: el viático creado, para «Deshacer».
     func crear(
         centavos: Int,
         motivo: String,
         categoria: String,
         actividadId: Int?,
         ticket: CapturedGeoPhoto
-    ) async throws -> Bool {
+    ) async throws -> (encolado: Bool, id: Int?) {
         var campos: [String: String] = [
             "montoSolicitado": Dinero.textoApi(centavos),
             "motivo": motivo.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -327,7 +331,9 @@ final class ViaticosRepository {
             fields: campos,
             files: [(field: "ticketEvidencia", data: ticket.jpeg, fileName: "ticket.jpg", mimeType: "image/jpeg")]
         )
-        return CoreRepository.isQueuedOffline(data)
+        if CoreRepository.isQueuedOffline(data) { return (true, nil) }
+        let id = ConsoleHelpers.mapInt(ConsoleHelpers.decodeMap(data), "id")
+        return (false, id > 0 ? id : nil)
     }
 
     /// `PUT viatics/:id/reparto` — la suma tiene que ser el total, al centavo.

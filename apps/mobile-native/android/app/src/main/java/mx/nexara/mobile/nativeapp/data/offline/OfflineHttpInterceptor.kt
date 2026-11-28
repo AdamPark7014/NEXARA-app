@@ -136,8 +136,9 @@ class OfflineHttpInterceptor(
          */
         private val SOLO_EN_LINEA = listOf(
             "/desactivar", "/reactivar", "/cancelar", "/reasignar", "/justificaciones",
-            // Vale 10 minutos: encolado, caería cuando ya no aplica.
-            "/salida/deshacer",
+            // «Deshacer» vale segundos (y el de la salida, 10 minutos): encolado, caería cuando ya no
+            // aplica. `/deshacer` cubre los dos.
+            "/deshacer",
             // Es opcional: sin señal se dice y ya; no vale la pena una cola.
             "/tiempo-dicho",
             // Mover el paso atrás con fotos encoladas las dejaría en el paso equivocado.

@@ -36,6 +36,7 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { HorarioModule } from './attendance/horario/horario.module.js';
 import { GuardiasModule } from './guardias/guardias.module.js';
 import { FestivosModule } from './festivos/festivos.module.js';
+import { DeshacerModule } from './deshacer/deshacer.module.js';
 import { SupervisionModule } from './supervision/supervision.module.js';
 import { CostosModule } from './costos/costos.module.js';
 import { ProcesoTiemposModule } from './proceso-tiempos/proceso-tiempos.module.js';
@@ -151,6 +152,7 @@ import { CctvDisenosModule } from './cctv-disenos/cctv-disenos.module.js';
     HorarioModule,
     GuardiasModule,
     FestivosModule,
+    DeshacerModule,
     SupervisionModule,
     CostosModule,
     ProcesoTiemposModule,

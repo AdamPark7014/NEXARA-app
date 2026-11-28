@@ -26,6 +26,7 @@ import {
   repartirEnPartesIguales,
 } from './viatico-reparto.js';
 import { workDateKey, workDateRange } from '../common/time/workday.js';
+import { avisarSiNoSeDeshizo } from '../deshacer/aviso-diferido.js';
 
 /** Cap list endpoints when the client omits limit (mobile dashboard was unbounded). */
 const DEFAULT_LIST_TAKE = 200;
@@ -300,19 +301,27 @@ export class ViaticosService {
     });
 
     if (viatico.usuarioId && viatico.User) {
-      await this.notificationHierarchy.notifyViaticRequested(
-        viatico.usuarioId,
-        viatico.id,
-        viatico.User.nombre || 'Usuario',
-        amount,
+      // Aviso a quien aprueba y autoaprobación: pasado el plazo de «Deshacer» y solo si sigue en pie.
+      await avisarSiNoSeDeshizo(
+        `viático ${viatico.id}`,
+        async () =>
+          Boolean(await this.prisma['viatico'].findFirst({ where: { id: viatico.id, deletedAt: null }, select: { id: true } })),
+        async () => {
+          await this.notificationHierarchy.notifyViaticRequested(
+            viatico.usuarioId,
+            viatico.id,
+            viatico.User.nombre || 'Usuario',
+            amount,
+          );
+          this.domainEvents.requestAutoApproval({
+            entityType: 'VIATIC',
+            entityId: viatico.id,
+            userId: viatico.usuarioId,
+            companyId: viatico.companyId ?? resolvedCompanyId,
+            payload: { amount, outOfPolicy: Boolean(dto?.outOfPolicy) },
+          });
+        },
       );
-      this.domainEvents.requestAutoApproval({
-        entityType: 'VIATIC',
-        entityId: viatico.id,
-        userId: viatico.usuarioId,
-        companyId: viatico.companyId ?? resolvedCompanyId,
-        payload: { amount, outOfPolicy: Boolean(dto?.outOfPolicy) },
-      });
     }
     return viatico;
   }
@@ -389,26 +398,34 @@ export class ViaticosService {
 
     const amount = this.amountOf(viatico);
     const assignerName = actor?.nombre || 'Administración';
-    await this.notificationHierarchy.notifyViaticAssignedToUser(
-      usuarioId,
-      viatico.id,
-      assignerName,
-      amount,
-      motivo,
+    // Igual que en la solicitud: los avisos esperan el plazo de «Deshacer».
+    await avisarSiNoSeDeshizo(
+      `viático ${viatico.id}`,
+      async () =>
+        Boolean(await this.prisma['viatico'].findFirst({ where: { id: viatico.id, deletedAt: null }, select: { id: true } })),
+      async () => {
+        await this.notificationHierarchy.notifyViaticAssignedToUser(
+          usuarioId,
+          viatico.id,
+          assignerName,
+          amount,
+          motivo,
+        );
+        await this.notificationHierarchy.notifyViaticRequested(
+          usuarioId,
+          viatico.id,
+          `${beneficiary.nombre} (asignado por ${assignerName})`,
+          amount,
+        );
+        this.domainEvents.requestAutoApproval({
+          entityType: 'VIATIC',
+          entityId: viatico.id,
+          userId: usuarioId,
+          companyId: viatico.companyId ?? resolvedCompanyId,
+          payload: { amount, outOfPolicy: false, origen: 'ASIGNACION' },
+        });
+      },
     );
-    await this.notificationHierarchy.notifyViaticRequested(
-      usuarioId,
-      viatico.id,
-      `${beneficiary.nombre} (asignado por ${assignerName})`,
-      amount,
-    );
-    this.domainEvents.requestAutoApproval({
-      entityType: 'VIATIC',
-      entityId: viatico.id,
-      userId: usuarioId,
-      companyId: viatico.companyId ?? resolvedCompanyId,
-      payload: { amount, outOfPolicy: false, origen: 'ASIGNACION' },
-    });
 
     return viatico;
   }

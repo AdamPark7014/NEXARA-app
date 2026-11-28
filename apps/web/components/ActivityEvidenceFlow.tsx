@@ -1,5 +1,6 @@
 'use client';
 import { toast } from '@/components/Toast';
+import { avisoDeshacer } from '@/components/AvisoDeshacer';
 import { formatApiError } from '@/lib/erp-api';
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from '@/lib/api-base';
 import { evidenceStepLabel, isEvidenceLocked, rejectedStepsList } from '@/lib/evidence-lock';
@@ -265,6 +266,9 @@ const ActivityEvidenceFlow = () => {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [selectedActivityId, setSelectedActivityId] = useState<number | ''>('');
   const [flowData, setFlowData] = useState<EvidenceFlowData | null>(null);
+  /** Lo último en pantalla, para que «Deshacer» de una foto encuentre dónde quedó aunque se tomen más. */
+  const flowDataRef = useRef<EvidenceFlowData | null>(null);
+  flowDataRef.current = flowData;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -1135,6 +1139,20 @@ const ActivityEvidenceFlow = () => {
         return [...alineadas, punto ? { ...punto, capturedAt: photo.capturedAt } : null];
       });
       setSuccessMsg(`Foto agregada (${updatedPhotos.length} de ${photoRequired})`);
+      // «Deshacer» de 5 s: la foto ya está guardada, así que deshacer es quitarla del servidor.
+      const fotoGuardada = delServidor ? updatedPhotos[updatedPhotos.length - 1] : null;
+      if (fotoGuardada) {
+        avisoDeshacer({
+          mensaje: `Foto agregada (${updatedPhotos.length} de ${photoRequired})`,
+          deshacer: async () => {
+            const actual = flowDataRef.current;
+            const indice = actual && actual.activityId === activityId ? actual.evidencePhotos.indexOf(fotoGuardada) : -1;
+            if (indice < 0) throw new Error('La foto ya no está en la lista.');
+            if (!(await handleRemoveEvidencePhoto(indice))) throw new Error('No se pudo quitar la foto.');
+          },
+          alDeshacer: () => setSuccessMsg(null),
+        });
+      }
       return true;
     } catch (err) {
       setError(mensajeFotoNoGuardada(err, 'No se pudo guardar la foto. Intenta de nuevo.'));
@@ -1213,9 +1231,9 @@ const ActivityEvidenceFlow = () => {
   };
 
   // Remover foto de evidencia — ya está guardada en el servidor, hay que avisarle también.
-  const handleRemoveEvidencePhoto = async (index: number) => {
-    if (!flowData || !user?.token) return;
-    if (fotoEnCursoRef.current) return;
+  const handleRemoveEvidencePhoto = async (index: number): Promise<boolean> => {
+    if (!flowData || !user?.token) return false;
+    if (fotoEnCursoRef.current) return false;
     fotoEnCursoRef.current = true;
     const activityId = flowData.activityId;
     setLoading(true);
@@ -1228,7 +1246,7 @@ const ActivityEvidenceFlow = () => {
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         setError(formatApiError(new Error(JSON.stringify(errorData ?? {})), 'No se pudo quitar la foto.'));
-        return;
+        return false;
       }
       const updated = await res.json().catch(() => null);
       if (Array.isArray(updated?.evidencePhotos)) {
@@ -1245,8 +1263,10 @@ const ActivityEvidenceFlow = () => {
         );
         setEvidenceGeo((prev) => prev.filter((_, i) => i !== index));
       }
+      return true;
     } catch (err) {
       setError(mensajeFotoNoGuardada(err, 'No se pudo quitar la foto.', 'quitar'));
+      return false;
     } finally {
       fotoEnCursoRef.current = false;
       setLoading(false);

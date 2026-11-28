@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.console.viaticos
 
+import mx.nexara.mobile.nativeapp.data.deshacer.Deshacer
 import android.app.Application
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -90,8 +91,11 @@ class AsignarViaticoViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(enviando = true, error = null) }
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.IO) { viaticos.asignar(personaId, actividadId, centavos, categoria, motivo) }
+                val creado = withContext(Dispatchers.IO) { viaticos.asignar(personaId, actividadId, centavos, categoria, motivo) }
                 _state.update { it.copy(enviando = false) }
+                creado.id?.let {
+                    Deshacer.ofrecer("Viático asignado", Deshacer.TIPO_VIATICO, listOf(it), detalle = "Le avisamos en unos segundos")
+                }
                 onListo()
             } catch (e: Throwable) {
                 _state.update { it.copy(enviando = false, error = e.toUserMessage("No se pudo asignar el viático")) }

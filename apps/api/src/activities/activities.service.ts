@@ -54,6 +54,7 @@ import { TiemposActividadService } from './tiempos-actividad.service.js';
 import { normalizarMomento, normalizarMomentos, progresoDeCampos, type Momento } from './evidence/evidence-fields.helpers.js';
 import { ChatService } from '../chat/chat.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { avisarSiNoSeDeshizo } from '../deshacer/aviso-diferido.js';
 import { esActividadNoProgramada } from './aviso-luis.js';
 import { avisoActividadNoProgramada as textoAvisoLuis } from '../chat/avisos-chat.js';
 import fs from 'fs/promises';
@@ -334,20 +335,29 @@ export class ActivitiesService {
   }
 
   async publicarActividadCreada(activity: { id: number; responsableId: number; creadoPorId: number; titulo: string; estatus: string; anNumber: string; responsable?: { id: number; nombre: string } | null; creador?: { nombre: string } | null }, resolvedCompanyId: number, sinAviso = false) {
-    // Notify the assigned user about new activity
-    if (!sinAviso && activity.responsableId && activity.responsable) {
-      await this.notificationHierarchy.notifyActivityAssigned(
-        activity.responsableId,
-        activity.id,
-        // El aviso nombra la actividad por su título, no por el folio.
-        activity.titulo || 'Nueva actividad',
-        activity.creador?.nombre || 'Sistema',
-        activity.creadoPorId,
-      );
-    }
-
+    // Los avisos a otras personas salen pasado el plazo de «Deshacer» y solo si no se deshizo
+    // (`deshacer/aviso-diferido.ts`): quien recibe no se entera de una asignación que no fue.
     if (!sinAviso) {
-      void this.avisarLuisSiNoProgramada(activity, resolvedCompanyId);
+      await avisarSiNoSeDeshizo(
+        `actividad ${activity.id}`,
+        async () =>
+          Boolean(
+            await this.prisma.activity.findFirst({ where: { id: activity.id, deletedAt: null }, select: { id: true } }),
+          ),
+        async () => {
+          if (activity.responsableId && activity.responsable) {
+            await this.notificationHierarchy.notifyActivityAssigned(
+              activity.responsableId,
+              activity.id,
+              // El aviso nombra la actividad por su título, no por el folio.
+              activity.titulo || 'Nueva actividad',
+              activity.creador?.nombre || 'Sistema',
+              activity.creadoPorId,
+            );
+          }
+          void this.avisarLuisSiNoProgramada(activity, resolvedCompanyId);
+        },
+      );
     }
 
     this.domainEvents.publishEntityLifecycle('created', {

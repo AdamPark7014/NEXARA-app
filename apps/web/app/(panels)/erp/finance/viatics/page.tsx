@@ -67,6 +67,8 @@ import {
   type ViaticoParte,
 } from "@/lib/viatics-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { avisoDeshacer } from "@/components/AvisoDeshacer";
+import { deshacerAlta } from "@/lib/deshacer-api";
 import { toast } from "@/components/Toast";
 import { formatApiError, errorSeguidoDe } from "@/lib/erp-api";
 import {
@@ -878,7 +880,17 @@ export default function ViaticosPage() {
       }
       setMode(null);
       setEvidenceFile(null);
-      toast.success("Solicitud enviada");
+      if (created?.id) {
+        // «Deshacer» de 5 s: a quien aprueba le avisamos hasta que pasa el plazo.
+        const id = Number(created.id);
+        avisoDeshacer({
+          mensaje: "Solicitud de viático enviada",
+          deshacer: () => deshacerAlta(token, "viatico", id),
+          alDeshacer: () => setItems((prev) => prev.filter((v) => v.id !== id)),
+        });
+      } else {
+        toast.success("Solicitud enviada");
+      }
     } catch (e) {
       setSaveErr(formatApiError(e, "No se pudo enviar la solicitud"));
     } finally { setSaving(false); }
@@ -924,9 +936,20 @@ export default function ViaticosPage() {
       const totalCent = res ? centavos(res.montoTotal) : resumenAsignacion.totalCent;
       void load();
       setMode(null);
-      toast.success(
-        `${plural(creados, "viático asignado", "viáticos asignados")} · ${dinero(totalCent)} en total`,
-      );
+      const ids = (res?.viaticos ?? [])
+        .map((v) => Number((v as { id?: unknown })?.id))
+        .filter((id) => Number.isInteger(id) && id > 0);
+      const resumen = `${plural(creados, "viático asignado", "viáticos asignados")} · ${dinero(totalCent)} en total`;
+      if (ids.length > 0) {
+        avisoDeshacer({
+          mensaje: resumen,
+          detalle: "Les avisamos en unos segundos",
+          deshacer: () => deshacerAlta(token, "viatico", ids),
+          alDeshacer: () => void load(),
+        });
+      } else {
+        toast.success(resumen);
+      }
     } catch (e) {
       setSaveErr(formatApiError(e, "No se pudieron asignar los viáticos"));
     } finally {

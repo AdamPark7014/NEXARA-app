@@ -479,6 +479,8 @@ export const SHARED_SESSION_URL_RULES: UrlRule[] = [
   { path: '/api/user-preferences/**', scope: 'write' },
   // Cronómetro: cada quien manda su propio tiempo (Programa Velocidad Core).
   { path: '/api/proceso-tiempos', methods: ['POST'], scope: 'write' },
+  // «Deshacer» de los primeros segundos (o de un superior): quién puede lo decide `DeshacerService`.
+  { path: '/api/deshacer', methods: ['POST'], scope: 'write' },
   { path: '/api/users/me', methods: ['GET', 'PATCH'], scope: 'write' },
   { path: '/api/users/profile/**', scope: 'write' },
   // Alta delegada: la ve todo el personal interno, pero el API solo deja pasar a quien tiene

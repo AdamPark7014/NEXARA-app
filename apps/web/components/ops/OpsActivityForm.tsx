@@ -110,6 +110,8 @@ import TiempoFijoCampo from "./TiempoFijoCampo";
 import type { SugerenciaComplejidad } from "@/lib/complejidad";
 import s from "./OpsActivityForm.module.css";
 import { formatoMinutos } from "@/lib/actividad-tiempos";
+import { avisoDeshacer } from "@/components/AvisoDeshacer";
+import { deshacerAlta } from "@/lib/deshacer-api";
 
 const SERVICIO_LABEL: Record<string, string> = {
   PREVENTIVO: "Servicio preventivo",
@@ -163,6 +165,8 @@ type Props = {
    */
   onEstandar?: (minutos: number | null) => void;
   onSuccess?: (id: number) => void;
+  /** Se tocó «Deshacer» en los primeros segundos y la API la retiró (`AvisoDeshacer`). */
+  onDeshecho?: (ids: number[]) => void;
   /** Cronómetro de la página que envuelve al formulario (el flujo de asignar empieza antes). */
   cronometro?: Cronometro;
   onCancel?: () => void;
@@ -189,6 +193,7 @@ export default function OpsActivityForm({
   onTiempoTipico,
   onEstandar,
   onSuccess,
+  onDeshecho,
   cronometro,
   onCancel,
 }: Props) {
@@ -769,8 +774,10 @@ export default function OpsActivityForm({
           lastId = Number(created?.id) || lastId;
           if (created?.id) serie.creadas.set(dia.dia, Number(created.id));
         }
+        const idsSerie = [...serie.creadas.values()];
         serieRef.current = null;
         setSuccess(`Se crearon ${desgloseDias.length} actividades (día 1…${desgloseDias.length})`);
+        ofrecerDeshacer(idsSerie, `Se crearon ${idsSerie.length} actividades`);
         onSuccess?.(lastId);
       } else {
         const yaCreada = creadaRef.current;
@@ -879,7 +886,28 @@ export default function OpsActivityForm({
     }
     creadaRef.current = null;
     if (newId > 0) (cronometro ?? cronometroPropio).terminar(newId, coreKind ?? null);
+    if (newId > 0) ofrecerDeshacer([newId], form.responsableId && !selfAssign ? "Actividad asignada" : "Actividad creada");
     if (newId > 0) onSuccess?.(newId);
+  };
+
+  /**
+   * «Deshacer» de 5 s (Adam, 27-11-2026). El aviso a quien la recibe sale cuando pasa el plazo; si se
+   * deshace, no le llega nada. La API vuelve a revisar el plazo y quién puede.
+   */
+  const ofrecerDeshacer = (ids: number[], mensaje: string) => {
+    if (!token || ids.length === 0) return;
+    const nombre = !selfAssign
+      ? users.find((u) => String(u.id) === String(form.responsableId))?.nombre?.split(/\s+/).slice(0, 2).join(" ")
+      : undefined;
+    avisoDeshacer({
+      mensaje: nombre ? `${mensaje} a ${nombre}` : mensaje,
+      detalle: nombre ? "Le avisamos en unos segundos" : undefined,
+      deshacer: () => deshacerAlta(token, "actividad", ids),
+      alDeshacer: () => {
+        setSuccess(null);
+        onDeshecho?.(ids);
+      },
+    });
   };
 
   /** La actividad ya existe: solo se reintenta guardar los puntos (nunca se crea otra). */

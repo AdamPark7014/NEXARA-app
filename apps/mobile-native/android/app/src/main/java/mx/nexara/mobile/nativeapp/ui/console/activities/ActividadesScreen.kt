@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.console.activities
 
+import mx.nexara.mobile.nativeapp.data.deshacer.Deshacer
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -165,6 +166,11 @@ fun ActividadesScreen(
     var rango by rememberSaveable { mutableStateOf(BoardRange.HOY) }
     var asignadasPorMi by remember { mutableStateOf<List<BoardAsignadaPorMiDto>>(emptyList()) }
     var porRevisar by remember { mutableStateOf<List<RevisionPendienteDto>>(emptyList()) }
+
+    // Se deshizo una asignación desde el aviso de abajo: la pizarra se vuelve a leer.
+    LaunchedEffect(Unit) {
+        Deshacer.deshechos.collect { if (it.tipo == Deshacer.TIPO_ACTIVIDAD) boardReload++ }
+    }
 
     LaunchedEffect(boardReload, rango) {
         boardLoading = true
@@ -831,6 +837,10 @@ private fun MisActividadesContent(
     var iniciandoId by remember { mutableStateOf<Long?>(null) }
     var iniciarError by remember { mutableStateOf<String?>(null) }
     var iniciarErrorId by remember { mutableStateOf<Long?>(null) }
+
+    LaunchedEffect(Unit) {
+        Deshacer.deshechos.collect { if (it.tipo == Deshacer.TIPO_ACTIVIDAD) reload++ }
+    }
 
     LaunchedEffect(reload) {
         try {

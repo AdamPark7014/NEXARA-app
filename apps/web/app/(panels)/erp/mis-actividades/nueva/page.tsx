@@ -116,6 +116,7 @@ export default function AutoAsignarmePage() {
               requireSchedule={Boolean(kindMeta.requiresSchedule)}
               onCancel={back}
               onSuccess={(id) => router.push(`/erp/pizarra?vista=mias&nueva=${id}`)}
+              onDeshecho={() => router.push("/erp/pizarra?vista=mias")}
             />
           </FormSection>
         ) : (

@@ -27,6 +27,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
+import { AvisoDeshacerViewport } from "@/components/AvisoDeshacer";
 
 const EVENT_NAME = "nx:toast";
 const MAX_TOASTS = 5;
@@ -138,11 +139,15 @@ export function ToastViewport() {
     return () => window.removeEventListener(EVENT_NAME, onToast);
   }, []);
 
-  if (items.length === 0) return null;
+  // «Deshacer» de 5 s vive aparte (abajo al centro) y se monta con este visor en cada layout. Va
+  // siempre en el mismo lugar del árbol para que un toast nuevo no lo reinicie.
+  if (items.length === 0) return <><AvisoDeshacerViewport /></>;
 
   const cerrar = (id: number) => setItems((prev) => prev.filter((x) => x.id !== id));
 
   return (
+    <>
+    <AvisoDeshacerViewport />
     <div
       aria-live="polite"
       aria-atomic="true"
@@ -312,5 +317,6 @@ export function ToastViewport() {
         }
       `}</style>
     </div>
+    </>
   );
 }

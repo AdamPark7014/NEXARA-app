@@ -176,7 +176,7 @@ struct AsignarViaticoView: View {
         error = nil
         Task { @MainActor in
             do {
-                try await ViaticosRepository.shared.asignar(
+                let id = try await ViaticosRepository.shared.asignar(
                     usuarioId: persona.id,
                     actividadId: actividadId,
                     centavos: centavos,
@@ -184,6 +184,12 @@ struct AsignarViaticoView: View {
                     motivo: motivo
                 )
                 enviando = false
+                if let id {
+                    DeshacerCentro.shared.ofrecer(
+                        "Viático asignado", tipo: DeshacerCentro.tipoViatico, ids: [id],
+                        detalle: "Le avisamos en unos segundos"
+                    )
+                }
                 onCreado()
                 dismiss()
             } catch {

@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.console.viaticos
 
+import mx.nexara.mobile.nativeapp.data.deshacer.Deshacer
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -66,6 +67,10 @@ class ViaticosViewModel(app: Application) : AndroidViewModel(app) {
     init {
         cargar()
         cargarActividades()
+        // Se deshizo un viático desde el aviso de abajo: la lista se vuelve a leer.
+        viewModelScope.launch {
+            Deshacer.deshechos.collect { if (it.tipo == Deshacer.TIPO_VIATICO) cargar(refresh = true) }
+        }
     }
 
     fun cargar(refresh: Boolean = false) {
@@ -128,7 +133,7 @@ class ViaticosViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(enviando = true, accionError = null) }
         viewModelScope.launch {
             try {
-                val encolado = withContext(Dispatchers.IO) {
+                val alta = withContext(Dispatchers.IO) {
                     repo.crear(
                         centavos = centavos,
                         motivo = motivo,
@@ -140,13 +145,16 @@ class ViaticosViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         enviando = false,
-                        mensaje = if (encolado) {
-                            "Sin conexión: tu viático quedó en la cola con su foto y sale solo al volver la señal."
-                        } else {
-                            "Viático solicitado"
+                        mensaje = when {
+                            alta.encolado ->
+                                "Sin conexión: tu viático quedó en la cola con su foto y sale solo al volver la señal."
+                            // Con id, el aviso de abajo dice «Solicitud enviada» con su «Deshacer».
+                            alta.id != null -> null
+                            else -> "Viático solicitado"
                         },
                     )
                 }
+                alta.id?.let { Deshacer.ofrecer("Solicitud de viático enviada", Deshacer.TIPO_VIATICO, listOf(it)) }
                 onListo()
                 cargar(refresh = true)
             } catch (e: Throwable) {

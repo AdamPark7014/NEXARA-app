@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.console.activities
 
+import mx.nexara.mobile.nativeapp.data.deshacer.Deshacer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -509,6 +510,7 @@ private fun AssignFlow(
                 }
             }
             if (selfAssign) {
+                id?.let { Deshacer.ofrecer("Actividad creada", Deshacer.TIPO_ACTIVIDAD, listOf(it)) }
                 onCreated(id)
             } else {
                 teamError = null
@@ -550,6 +552,13 @@ private fun AssignFlow(
                         e.toUserMessage("Actividad creada, pero falló al sumar el equipo")
                     }
                     if (failure == null) {
+                        // «Deshacer» 5 s: a quien la recibe le avisamos hasta que pasa el plazo.
+                        Deshacer.ofrecer(
+                            "Actividad asignada",
+                            Deshacer.TIPO_ACTIVIDAD,
+                            listOf(id),
+                            detalle = "Le avisamos en unos segundos",
+                        )
                         onCreated(id)
                     } else {
                         teamError = failure
