@@ -6,6 +6,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { resumenInterno } from './normalizar.js';
 
 
 @Catch()
@@ -59,38 +60,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Internal server error';
-    let errorCode = 'INTERNAL_ERROR';
-    // Código propio del error (`JORNADA_NO_ABIERTA`…): web y apps lo buscan para saber qué hacer.
-    let code: string | undefined;
-    let details: any = {};
-
-    if (exception instanceof HttpException) {
-      status = exception.getStatus();
-      const res = exception.getResponse();
-      if (typeof res === 'string') {
-        message = res;
-      } else if (typeof res === 'object' && res !== null) {
-        message = (res as any).message || message;
-        code = codigoPropio((res as any).code);
-        errorCode = (res as any).error || code || errorCode;
-        details = res;
-      }
-    } else if (exception instanceof Error) {
-      const mapped = mapPrismaError(exception) ?? mapMulterError(exception);
-      if (mapped) {
-        status = mapped.status;
-        message = mapped.message;
-        errorCode = mapped.errorCode;
-      } else {
-        // Nunca se devuelve al cliente el mensaje interno de un error no
-        // controlado: los de Prisma incluyen la forma de la consulta y los
-        // nombres de las columnas. Se registra completo y se responde genérico.
-        message = 'Error interno del servidor';
-      }
-      details = { originalMessage: exception.message, stack: exception.stack };
-    }
+    const clasificado = clasificarError(exception);
+    const { status, errorCode, code, details } = clasificado;
+    // Lo que ve el cliente: igual que siempre (un arreglo de validación sigue siendo un arreglo).
+    // Se asigna como `string` porque así se tipaba antes; el consejo de abajo lo usa tal cual.
+    const message = clasificado.mensajeRespuesta as string;
 
     const payload = {
       timestamp: new Date().toISOString(),
@@ -132,6 +106,87 @@ export class AllExceptionsFilter implements ExceptionFilter {
       path: request.url,
     });
   }
+}
+
+/** Un error ya clasificado: lo que se responde al cliente y lo que se guarda para entenderlo después. */
+export type ErrorClasificado = {
+  status: number;
+  /**
+   * El mensaje en una sola línea, para la bitácora y los logs. Si el error trae varios mensajes
+   * (validación), van unidos con « | ». Para responder al cliente se usa `mensajeRespuesta`.
+   */
+  message: string;
+  /** Lo que recibe el cliente en `message`: idéntico a como siempre (un arreglo sigue siendo arreglo). */
+  mensajeRespuesta: string | string[];
+  errorCode: string;
+  /** Código propio del error (`JORNADA_NO_ABIERTA`…): web y apps lo buscan para saber qué hacer. */
+  code?: string;
+  details: any;
+  /** Qué falló y dónde, sin valores entre comillas ni números. Solo para errores que no son HttpException. */
+  interno?: string;
+};
+
+function mensajeEnUnaLinea(mensaje: unknown): string {
+  if (typeof mensaje === 'string') return mensaje;
+  if (Array.isArray(mensaje)) return mensaje.map((m) => (typeof m === 'string' ? m : String(m))).join(' | ');
+  try {
+    return JSON.stringify(mensaje) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Qué estado, `errorCode`, código propio y mensaje le corresponden a una excepción. Es lo que
+ * el filtro responde al cliente, y lo comparten la bitácora de rechazos y la caja negra para
+ * guardar lo mismo que vio quien llamó (más un resumen interno sin valores entre comillas ni números).
+ */
+export function clasificarError(exception: unknown): ErrorClasificado {
+  let status: number = HttpStatus.INTERNAL_SERVER_ERROR;
+  let message: string | string[] = 'Internal server error';
+  let errorCode = 'INTERNAL_ERROR';
+  let code: string | undefined;
+  let details: any = {};
+  let interno: string | undefined;
+
+  if (exception instanceof HttpException) {
+    status = exception.getStatus();
+    const res = exception.getResponse();
+    if (typeof res === 'string') {
+      message = res;
+    } else if (typeof res === 'object' && res !== null) {
+      message = (res as any).message || message;
+      code = codigoPropio((res as any).code);
+      errorCode = (res as any).error || code || errorCode;
+      details = res;
+    }
+  } else {
+    if (exception instanceof Error) {
+      const mapped = mapPrismaError(exception) ?? mapMulterError(exception);
+      if (mapped) {
+        status = mapped.status;
+        message = mapped.message;
+        errorCode = mapped.errorCode;
+      } else {
+        // Nunca se devuelve al cliente el mensaje interno de un error no
+        // controlado: los de Prisma incluyen la forma de la consulta y los
+        // nombres de las columnas. Se registra completo y se responde genérico.
+        message = 'Error interno del servidor';
+      }
+      details = { originalMessage: exception.message, stack: exception.stack };
+    }
+    interno = resumenInterno(exception);
+  }
+
+  return {
+    status,
+    message: mensajeEnUnaLinea(message),
+    mensajeRespuesta: message,
+    errorCode,
+    ...(code ? { code } : {}),
+    details,
+    ...(interno ? { interno } : {}),
+  };
 }
 
 /**

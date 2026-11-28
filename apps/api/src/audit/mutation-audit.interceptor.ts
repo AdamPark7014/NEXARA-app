@@ -5,6 +5,7 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import { AuditService } from './audit.service.js';
+import { clasificarError } from '../common/errors/all-exception.filter.js';
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -27,6 +28,40 @@ const SKIP_PREFIXES = [
 /** ¿Esta ruta queda fuera de la auditoría de mutaciones? */
 export function skipsMutationAudit(path: string): boolean {
   return SKIP_PREFIXES.some((p) => path.startsWith(p) || path.includes(p));
+}
+
+/**
+ * El JSON `changes` de una fila de la bitácora de mutaciones. Un rechazo (`status: 'error'`) suma lo
+ * que ya sabía el filtro de excepciones: `httpStatus` (422, 409, 500…), `codigo` (el `code` propio,
+ * `JORNADA_NO_ABIERTA`…), `errorCode` y `interno` (qué falló y dónde, sin valores entre comillas
+ * ni números). Para consultar: `(changes->>'httpStatus')::int`. Un éxito queda como siempre.
+ * Nunca recibe el mensaje interno de Prisma: `error` es el mensaje que ve quien llamó.
+ */
+export function armarCambiosDeBitacora(input: {
+  path: string;
+  method: string;
+  durationMs: number;
+  status: 'ok' | 'error';
+  httpStatus?: number;
+  codigo?: string;
+  errorCode?: string;
+  error?: string;
+  interno?: string;
+  requestSanitizado?: Record<string, unknown> | null;
+}): Record<string, unknown> {
+  const fallo = input.status === 'error';
+  return {
+    path: input.path,
+    method: input.method,
+    durationMs: input.durationMs,
+    status: input.status,
+    ...(input.error ? { error: String(input.error).slice(0, 300) } : {}),
+    ...(fallo && input.httpStatus != null ? { httpStatus: input.httpStatus } : {}),
+    ...(fallo && input.codigo ? { codigo: input.codigo } : {}),
+    ...(fallo && input.errorCode ? { errorCode: input.errorCode } : {}),
+    ...(fallo && input.interno ? { interno: input.interno } : {}),
+    ...(input.requestSanitizado ? { request: input.requestSanitizado } : {}),
+  };
 }
 
 /**
@@ -73,11 +108,26 @@ export class MutationAuditInterceptor implements NestInterceptor {
           });
         },
         error: (err: any) => {
+          // Lo mismo que le responde el filtro de excepciones: estado, código propio y mensaje que
+          // ve quien llamó. Un error no controlado (Prisma, TypeError…) ya no guarda su texto interno.
+          // La bitácora nunca cambia el error que recibe quien llamó: una excepción dentro de este callback
+          // reemplazaría la del controlador, así que si clasificarla fallara (un `message` que lanza al leerse,
+          // un arreglo de mensajes raro) se guarda el rechazo sin clasificar.
+          let c: ReturnType<typeof clasificarError> | null = null;
+          try {
+            c = clasificarError(err);
+          } catch {
+            c = null;
+          }
           void this.safeLog({
             method, path, userId, ipAddress, userAgent,
             status: 'error',
             durationMs: Date.now() - started,
-            error: err?.message || String(err),
+            httpStatus: c?.status,
+            codigo: c?.code,
+            errorCode: c?.errorCode,
+            error: c ? c.message : 'Error sin clasificar',
+            interno: c?.interno,
             requestBody,
           });
         },
@@ -96,6 +146,10 @@ export class MutationAuditInterceptor implements NestInterceptor {
     body?: unknown;
     requestBody?: unknown;
     error?: string;
+    httpStatus?: number;
+    codigo?: string;
+    errorCode?: string;
+    interno?: string;
   }) {
     try {
       const entity = this.resolveEntity(input.path, input.body, input.requestBody);
@@ -104,16 +158,18 @@ export class MutationAuditInterceptor implements NestInterceptor {
           entityType: entity.entityType,
           entityId: entity.entityId,
           action: `${input.method}_${input.status === 'ok' ? 'OK' : 'FAIL'}`,
-          changes: {
+          changes: armarCambiosDeBitacora({
             path: input.path,
             method: input.method,
             durationMs: input.durationMs,
             status: input.status,
-            ...(input.error ? { error: String(input.error).slice(0, 300) } : {}),
-            ...(this.sanitizeBody(input.requestBody)
-              ? { request: this.sanitizeBody(input.requestBody) }
-              : {}),
-          },
+            httpStatus: input.httpStatus,
+            codigo: input.codigo,
+            errorCode: input.errorCode,
+            error: input.error,
+            interno: input.interno,
+            requestSanitizado: this.sanitizeBody(input.requestBody),
+          }),
           ipAddress: input.ipAddress,
           userAgent: input.userAgent,
         },
