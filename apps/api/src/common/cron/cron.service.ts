@@ -17,6 +17,7 @@ import { finDelPeriodo, periodoDeActividad } from '../../activities/actividad-pe
 import { horasResolucionPorActividad, limiteResolucionMs } from '../../sla-tracker/sla-tracker.service.js';
 import { ProyectoCostosAvisosService } from './proyecto-costos-avisos.service.js';
 import { WORKDAY_TIMEZONE, workClock, workDateColumn } from '../time/workday.js';
+import { runScheduledJob } from './run-scheduled-job.js';
 
 @Injectable()
 export class CronService {
@@ -36,20 +37,22 @@ export class CronService {
   // ── Contratos de mantenimiento — generar OT cada hora ───────────
   @Cron('15 * * * *', { name: 'maintenance-contracts-auto-ot' })
   async handleMaintenanceContractsAutoOt() {
-    this.logger.log('Procesando contratos de mantenimiento (auto-OT)...');
-    try {
+    await runScheduledJob('maintenance-contracts-auto-ot', this.logger, async () => {
+      this.logger.log('Procesando contratos de mantenimiento (auto-OT)...');
       const result = await this.maintenanceContracts.runAutoGenerationCycle();
       if (result.generated > 0) {
         this.logger.log(`Auto-OT generadas: ${result.generated} de ${result.processed} visitas`);
       }
-    } catch (error) {
-      this.logger.error('Auto-OT contratos falló', error as Error);
-    }
+    });
   }
 
   // ── Facturas vencidas — cada día 8AM ─────────────────────────────
   // Las tareas «de la mañana» corren en hora de México: sin `timeZone` salían a las 02:00 (UTC del contenedor).
   @Cron('0 8 * * *', { name: 'overdue-invoices', timeZone: WORKDAY_TIMEZONE })
+  async cronFacturasVencidas() {
+    await runScheduledJob('overdue-invoices', this.logger, () => this.handleOverdueInvoices());
+  }
+
   async handleOverdueInvoices() {
     this.logger.log('Verificando facturas vencidas...');
     // El vencimiento es un día de calendario: la factura vence al terminar ese día, no a su
@@ -115,6 +118,10 @@ export class CronService {
 
   // ── Órdenes de compra próximas a vencer — cada día 9AM ──────────
   @Cron('0 9 * * *', { name: 'po-reminders', timeZone: WORKDAY_TIMEZONE })
+  async cronRecordatoriosOc() {
+    await runScheduledJob('po-reminders', this.logger, () => this.handlePOReminders());
+  }
+
   async handlePOReminders() {
     this.logger.log('Verificando órdenes de compra próximas...');
     // Días de calendario: de hoy (incluida la que llega hoy) a tres días más.
@@ -143,6 +150,10 @@ export class CronService {
 
   // ── Mantenimiento preventivo — cada día 7AM ─────────────────────
   @Cron('0 7 * * *', { name: 'maintenance-reminders', timeZone: WORKDAY_TIMEZONE })
+  async cronRecordatoriosMantenimiento() {
+    await runScheduledJob('maintenance-reminders', this.logger, () => this.handleMaintenanceReminders());
+  }
+
   async handleMaintenanceReminders() {
     this.logger.log('Verificando mantenimientos pendientes...');
     const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000);
@@ -169,6 +180,10 @@ export class CronService {
 
   // ── Limpieza de logs de auditoría > 90 días — domingo 3AM ──────
   @Cron('0 3 * * 0', { name: 'audit-cleanup', timeZone: WORKDAY_TIMEZONE })
+  async cronLimpiezaAuditoria() {
+    await runScheduledJob('audit-cleanup', this.logger, () => this.handleAuditCleanup());
+  }
+
   async handleAuditCleanup() {
     this.logger.log('Limpiando logs de auditoría antiguos...');
     const cutoff = new Date(Date.now() - 90 * 86400000);
@@ -180,6 +195,10 @@ export class CronService {
 
   // ── Alertas de margen de proyectos — cada día 10AM ─────────────
   @Cron('0 10 * * *', { name: 'project-margin-alerts', timeZone: WORKDAY_TIMEZONE })
+  async cronAlertasMargenProyectos() {
+    await runScheduledJob('project-margin-alerts', this.logger, () => this.handleProjectMarginAlerts());
+  }
+
   async handleProjectMarginAlerts() {
     if (!this.costosAvisos) throw new Error('Servicio de avisos de costos no configurado');
     const enviados = await this.costosAvisos.ejecutar();
@@ -189,24 +208,26 @@ export class CronService {
   // ── Vehículos por vencer — 8AM y 4PM ───────────────────────────
   @Cron('0 8,16 * * *', { name: 'vehicle-usage-expiring', timeZone: WORKDAY_TIMEZONE })
   async handleVehicleUsageExpiring() {
-    this.logger.log('Verificando asignaciones de vehículo por vencer...');
-    try {
+    await runScheduledJob('vehicle-usage-expiring', this.logger, async () => {
+      this.logger.log('Verificando asignaciones de vehículo por vencer...');
       const result = await this.vehiclesService.notifyExpiringAssignments(24);
       if (result.notified > 0) {
         this.logger.log(`Avisos de vencimiento de vehículo: ${result.notified}`);
       }
-    } catch (error) {
-      this.logger.error('Cron vehículos por vencer falló', error as Error);
-    }
+    });
   }
 
   // ── KPI Snapshot — cada hora ────────────────────────────────────
+  @Cron(CronExpression.EVERY_HOUR, { name: 'kpi-snapshot' })
+  async cronKpiSnapshot() {
+    await runScheduledJob('kpi-snapshot', this.logger, () => this.handleKpiSnapshot());
+  }
+
   // `activeActivities` = actividades «En Proceso» (con todas sus grafías históricas, vía
   // `statusVariants`); `openActivities` = todo lo que no está cerrado. Hasta la versión 1 este
   // método contaba el estatus 'EN_PROGRESO', que ningún camino escribe, y guardó 0 siempre: en las
   // filas sin `metadata.version` (o con version < 2) `activeActivities` no sirve para tendencias y se
   // ignora (`pendingPOs` y `overdueInvoices` de esas filas sí son datos válidos).
-  @Cron(CronExpression.EVERY_HOUR, { name: 'kpi-snapshot' })
   async handleKpiSnapshot() {
     const [
       activeActivities,
@@ -245,19 +266,23 @@ export class CronService {
   // ── Webhooks retry — cada 5 min ────────────────────────────────
   @Cron(CronExpression.EVERY_5_MINUTES, { name: 'webhook-retries' })
   async handleWebhookRetries() {
-    if (!this.webhooks) return;
-    try {
-      const result = await this.webhooks.processRetries(40);
+    const webhooks = this.webhooks;
+    await runScheduledJob('webhook-retries', this.logger, async () => {
+      // Sin el servicio (solo pasa en pruebas: en producción siempre se inyecta) la tarea no actúa pero sí late.
+      if (!webhooks) return;
+      const result = await webhooks.processRetries(40);
       if (result.processed > 0) {
         this.logger.log(`Webhook retries procesados: ${result.processed}`);
       }
-    } catch (error) {
-      this.logger.error('Webhook retries falló', error as Error);
-    }
+    });
   }
 
   // ── IAM: usuarios inactivos 30d — diario 9AM ───────────────────
   @Cron('0 9 * * *', { name: 'inactive-users-warn', timeZone: WORKDAY_TIMEZONE })
+  async cronUsuariosInactivos() {
+    await runScheduledJob('inactive-users-warn', this.logger, () => this.handleInactiveUsers());
+  }
+
   async handleInactiveUsers() {
     const cutoff = new Date(Date.now() - 30 * 86_400_000);
     const stale = await this.prisma.user.findMany({
@@ -313,6 +338,10 @@ export class CronService {
 
   // ── Inventario: dead stock + low stock — diario 7AM ────────────
   @Cron('0 7 * * *', { name: 'inventory-health-alerts', timeZone: WORKDAY_TIMEZONE })
+  async cronSaludInventario() {
+    await runScheduledJob('inventory-health-alerts', this.logger, () => this.handleInventoryHealth());
+  }
+
   async handleInventoryHealth() {
     const levels = await this.prisma.stockLevel.findMany({
       include: {
@@ -404,6 +433,10 @@ export class CronService {
 
   // ── SLA breach escalate — cada hora ────────────────────────────
   @Cron(CronExpression.EVERY_HOUR, { name: 'sla-breach-escalate' })
+  async cronEscalarSlaVencido() {
+    await runScheduledJob('sla-breach-escalate', this.logger, () => this.handleSlaBreachEscalate());
+  }
+
   async handleSlaBreachEscalate() {
     const now = Date.now();
     const open = await this.prisma.activity.findMany({

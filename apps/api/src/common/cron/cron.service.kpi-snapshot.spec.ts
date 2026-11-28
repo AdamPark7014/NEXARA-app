@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { Logger } from '@nestjs/common';
 import { CronService } from './cron.service';
+import { latido, reiniciarLatido } from './latido-tareas';
 import {
   ACTIVITY_STATUS,
   isClosedStatus,
@@ -173,5 +175,33 @@ describe('regresión: nadie filtra Activity por el estatus inexistente EN_PROGRE
       .filter((ruta) => PATRON.test(readFileSync(ruta, 'utf8')))
       .map((ruta) => ruta.slice(raiz.length + 1).replace(/\\/g, '/'));
     expect(infractores).toEqual([]);
+  });
+});
+
+describe('kpi-snapshot: el @Cron deja latido', () => {
+  const estadoKpi = () => latido.instantanea().find((e) => e.nombre === 'kpi-snapshot');
+
+  beforeEach(() => reiniciarLatido());
+
+  it('tras llamar al método del @Cron el latido registra ok y la foto se guarda', async () => {
+    const { service, creados } = build();
+    expect(estadoKpi()).toBeUndefined();
+
+    await service.cronKpiSnapshot();
+
+    expect(creados).toHaveLength(1);
+    expect(estadoKpi()).toMatchObject({ ultimoResultado: 'ok', corridas: 1, fallosSeguidos: 0 });
+    expect(estadoKpi()?.ultimoOk).not.toBeNull();
+  });
+
+  it('si la base falla, el latido registra el error y el @Cron no propaga', async () => {
+    const { service, prisma } = build();
+    const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    prisma.activity.count.mockRejectedValue(new Error('base caída'));
+
+    await expect(service.cronKpiSnapshot()).resolves.toBeUndefined();
+
+    expect(estadoKpi()).toMatchObject({ ultimoResultado: 'error', fallosSeguidos: 1, ultimoError: 'base caída' });
+    log.mockRestore();
   });
 });

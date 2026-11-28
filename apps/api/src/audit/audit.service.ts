@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { celdaCsv } from '../common/security/celda-csv.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 
 @Injectable()
 export class AuditService {
@@ -132,12 +133,10 @@ export class AuditService {
    */
   @Cron('15 4 1 * *', { name: 'purga-bitacora', timeZone: WORKDAY_TIMEZONE })
   async purgaMensual() {
-    try {
+    await runScheduledJob('purga-bitacora', this.logger, async () => {
       const r = await this.purgeOlderThan(365);
       this.logger.log(`Bitácora: ${r.deleted} registros anteriores a ${r.cutoff} borrados`);
-    } catch (e) {
-      this.logger.warn(`No se pudo purgar la bitácora: ${e instanceof Error ? e.message : String(e)}`);
-    }
+    });
   }
 
   /** Retención: borra logs más viejos que N días (default 365). */

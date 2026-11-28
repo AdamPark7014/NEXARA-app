@@ -24,7 +24,7 @@ export class ActivityTimeAlertsService {
     private readonly notificationHierarchy: NotificationHierarchyService,
   ) {}
 
-  @Cron('*/15 * * * *')
+  @Cron('*/15 * * * *', { name: 'actividades-tiempo-excedido' })
   async avisarExcesosDeTiempo() {
     await runScheduledJob('actividades:tiempo-excedido', this.logger, () => this.escanear());
   }

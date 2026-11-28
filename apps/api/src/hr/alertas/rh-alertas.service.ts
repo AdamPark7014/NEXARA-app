@@ -5,6 +5,7 @@ import { SolicitudAprobacionService } from '../../common/aprobaciones/solicitud-
 import { WORKDAY_TIMEZONE, workDateKey } from '../../common/time/workday.js';
 import { ROLES } from '../../common/rbac/roles.v2.js';
 import { esCuentaAvisoRh } from '../../common/aprobaciones/cuenta-aviso.js';
+import { runScheduledJob } from '../../common/cron/run-scheduled-job.js';
 
 /**
  * Avisos diarios a Tere (RH): documentos por vencer, cumpleaños/aniversarios,
@@ -20,6 +21,11 @@ export class RhAlertasService {
   ) {}
 
   @Cron('0 9 * * *', { name: 'rh-alertas-diarias', timeZone: WORKDAY_TIMEZONE })
+  async cronCorrerDiario() {
+    await runScheduledJob('rh-alertas-diarias', this.logger, () => this.correrDiario());
+  }
+
+  /** El `try/catch` por empresa es a propósito: que una empresa falle no deja sin avisos a las demás. */
   async correrDiario() {
     let ultimoId = 0;
     while (true) {

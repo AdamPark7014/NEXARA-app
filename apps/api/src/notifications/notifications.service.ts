@@ -9,6 +9,7 @@ import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js
 import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
 import { buildCollapseKey, channelForCategory, iconForNotification } from './notification-push-meta.js';
 import { appUrls } from '../common/app-urls.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { PREF_SOLO_RESUMEN, modoResumenActivo, omitirEnModoResumen } from './notification-noise.js';
 import { WORKDAY_TIMEZONE, workDateColumn, workDayStart } from '../common/time/workday.js';
 import {
@@ -620,11 +621,15 @@ export class NotificationsService {
 
   // ==================== AUTOMATED TASKS ====================
 
+  @Cron('5 10 * * 1-6', { name: 'cotizaciones-por-vencer', timeZone: WORKDAY_TIMEZONE })
+  async cronCotizacionesPorVencer() {
+    await runScheduledJob('cotizaciones-por-vencer', this.logger, () => this.checkQuoteExpiration());
+  }
+
   /**
    * Check for expiring quotes every hour
    * Notifies salespeople when quotes are expiring soon (within 3 days)
    */
-  @Cron('5 10 * * 1-6', { timeZone: WORKDAY_TIMEZONE })
   async checkQuoteExpiration() {
     try {
       const now = new Date();
@@ -706,13 +711,19 @@ export class NotificationsService {
       this.logger.debug(`Checked ${expiringQuotes.length} expiring quotes`);
     } catch (error) {
       this.logger.error('Error checking quote expiration:', error);
+      // Se relanza para que el latido de la tarea marque el fallo y no un «ok» falso.
+      throw error;
     }
+  }
+
+  @Cron('0 */30 * * * *', { name: 'cotizaciones-borrador-vencidas' }) // Every 30 minutes
+  async cronCotizacionesBorradorVencidas() {
+    await runScheduledJob('cotizaciones-borrador-vencidas', this.logger, () => this.checkExpiredQuotes());
   }
 
   /**
    * Check for expired quotes every 30 minutes
    */
-  @Cron('0 */30 * * * *') // Every 30 minutes
   async checkExpiredQuotes() {
     try {
       const now = new Date();
@@ -789,6 +800,7 @@ export class NotificationsService {
       this.logger.debug(`Checked ${expiredQuotes.length} expired quotes`);
     } catch (error) {
       this.logger.error('Error checking expired quotes:', error);
+      throw error;
     }
   }
 

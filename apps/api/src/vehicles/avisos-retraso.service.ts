@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { ESTATUS_CERRADOS } from '../activities/rellenar-tiempos.js';
 import {
   dentroDeHorario,
@@ -32,13 +33,13 @@ export class AvisosRetrasoService {
 
   @Cron('*/10 8-20 * * *', { name: 'vehiculos-avisos-retraso', timeZone: WORKDAY_TIMEZONE })
   async correr() {
-    if (!(await capturaGuiadaPrendida(this.prisma))) return;
-    try {
+    await runScheduledJob('vehiculos-avisos-retraso', this.logger, async () => {
+      // El interruptor va DENTRO del trabajo: apagado, la tarea sigue latiendo («ok») y no actúa. Si estuviera
+      // antes, nunca dejaría latido y el vigilante la daría por atrasada (falsa alarma).
+      if (!(await capturaGuiadaPrendida(this.prisma))) return;
       const r = await this.avisar();
       if (r.avisos) this.logger.log(`Avisos de unidad sin devolver: ${r.avisos} de ${r.revisados} usos fuera`);
-    } catch (e) {
-      this.logger.error(`Avisos de retraso fallaron: ${String((e as Error)?.message ?? e)}`);
-    }
+    });
   }
 
   async avisar(ahora: Date = new Date()): Promise<{ revisados: number; avisos: number }> {

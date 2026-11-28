@@ -38,7 +38,7 @@ export class TicketAlertsService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  @Cron('*/1 * * * *')
+  @Cron('*/1 * * * *', { name: 'ticket-alerts-sla-proximo' })
   async notifyUpcomingDeadlines() {
     // Corre cada minuto: sin envoltura, un fallo se repetía sesenta veces por
     // hora como `unhandledRejection` anónimo, sin decir qué tarea era.

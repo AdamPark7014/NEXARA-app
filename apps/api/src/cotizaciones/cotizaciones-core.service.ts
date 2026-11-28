@@ -6,6 +6,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { CEO_EQUIVALENT_EMAILS } from '../common/platform-accounts.js';
 import { appUrls } from '../common/app-urls.js';
 import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import {
   cadenaParticipantes,
   folioBase,
@@ -253,13 +254,17 @@ export class CotizacionesCoreService {
     }
   }
 
+  @Cron('0 6 * * *', { name: 'cotizaciones-vencidas', timeZone: WORKDAY_TIMEZONE })
+  async cronMarcarVencidas() {
+    await runScheduledJob('cotizaciones-vencidas', this.logger, () => this.marcarVencidas());
+  }
+
   /**
    * Tarea diaria: marca vencidas las enviadas cuya vigencia ya pasó.
    *
    * Sin esto, `validUntil` era decorativo: una cotización de hace tres meses seguía en «Enviada» y
    * podía firmarse desde el enlace.
    */
-  @Cron('0 6 * * *', { name: 'cotizaciones-vencidas', timeZone: WORKDAY_TIMEZONE })
   async marcarVencidas(hoy: Date = new Date()): Promise<number> {
     const candidatas = await this.prisma.cotizacion.findMany({
       where: { status: 'SENT', validUntil: { not: null, lt: hoy }, deletedAt: null },

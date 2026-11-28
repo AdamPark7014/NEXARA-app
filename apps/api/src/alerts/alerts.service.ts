@@ -21,6 +21,7 @@ import { NotificationsService, type INotificationPayload } from '../notification
 import { ORG_ROLE_KEYS, type OrgRoleKey } from '../common/org-roles.js';
 import { appUrls } from '../common/app-urls.js';
 import { workDateColumn } from '../common/time/workday.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 
 const MARGIN_ALERT_THRESHOLD_PERCENT = 10;
 const STOCK_ALERT_DEDUP_HOURS = 24;
@@ -100,7 +101,11 @@ export class AlertsService {
 
   // ─── 1) margen real bajo umbral ────────────────────────────────────────
 
-  @Cron(CronExpression.EVERY_HOUR)
+  @Cron(CronExpression.EVERY_HOUR, { name: 'alertas-margen' })
+  async cronAlertasMargen() {
+    await runScheduledJob('alertas-margen', this.logger, () => this.checkMarginAlerts());
+  }
+
   async checkMarginAlerts() {
     try {
       const projects = await this.prisma.salesProject.findMany({
@@ -171,12 +176,18 @@ export class AlertsService {
       }
     } catch (err) {
       this.logger.error('checkMarginAlerts failed', err as any);
+      // Se relanza para que el latido de la tarea (runScheduledJob) marque el fallo y no un «ok» falso.
+      throw err;
     }
   }
 
   // ─── 2) SLA contratos de mantenimiento ─────────────────────────────────
 
-  @Cron(CronExpression.EVERY_30_MINUTES)
+  @Cron(CronExpression.EVERY_30_MINUTES, { name: 'alertas-sla-mantenimiento' })
+  async cronAlertasSlaMantenimiento() {
+    await runScheduledJob('alertas-sla-mantenimiento', this.logger, () => this.checkMaintenanceSlaAlerts());
+  }
+
   async checkMaintenanceSlaAlerts() {
     try {
       const now = new Date();
@@ -253,12 +264,17 @@ export class AlertsService {
       }
     } catch (err) {
       this.logger.error('checkMaintenanceSlaAlerts failed', err as any);
+      throw err;
     }
   }
 
   // ─── 3) Stock crítico en almacén ───────────────────────────────────────
 
-  @Cron(CronExpression.EVERY_2_HOURS)
+  @Cron(CronExpression.EVERY_2_HOURS, { name: 'alertas-stock' })
+  async cronAlertasStock() {
+    await runScheduledJob('alertas-stock', this.logger, () => this.checkStockAlerts());
+  }
+
   async checkStockAlerts() {
     try {
       // El mínimo capturado a mano (`minStock`) sigue mandando; desde el frente de
@@ -319,6 +335,7 @@ export class AlertsService {
       }
     } catch (err) {
       this.logger.error('checkStockAlerts failed', err as any);
+      throw err;
     }
   }
 

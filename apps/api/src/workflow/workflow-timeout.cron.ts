@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { appUrls } from '../common/app-urls.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 
 /**
  * Escalación de aprobaciones pendientes que superan `timeoutHours` del paso actual.
@@ -16,7 +17,11 @@ export class WorkflowTimeoutCronService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  @Cron(CronExpression.EVERY_HOUR)
+  @Cron(CronExpression.EVERY_HOUR, { name: 'workflow-timeouts' })
+  async cronTimeouts() {
+    await runScheduledJob('workflow-timeouts', this.logger, () => this.handleTimeouts());
+  }
+
   async handleTimeouts() {
     const openInstances = await this.prisma.workflowInstance.findMany({
       where: { isComplete: false, isCancelled: false },

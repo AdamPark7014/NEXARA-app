@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ChatService } from '../chat/chat.service.js';
 import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { DIRECCION_GENERAL_EMAIL, PLATFORM_DEVELOPER_EMAIL, PLATFORM_OWNER_EMAIL } from '../common/platform-accounts.js';
 import { hayAlgoQueResumir, resumenDiarioEncendido, textoResumenDiario, type DatosResumenDiario } from './resumen-diario.js';
 
@@ -23,13 +24,14 @@ export class ResumenDiarioService {
 
   @Cron('30 8 * * *', { name: 'resumen-diario-direccion', timeZone: WORKDAY_TIMEZONE })
   async cron() {
-    if (process.env.NEXARA_RELEVO === '1' || !resumenDiarioEncendido()) return;
-    try {
+    // Solo el relevo queda afuera (no corre tareas y el juez lo trata aparte); el interruptor va dentro para que la
+    // tarea apagada siga latiendo «ok» y el vigilante no la dé por atrasada.
+    if (process.env.NEXARA_RELEVO === '1') return;
+    await runScheduledJob('resumen-diario-direccion', this.logger, async () => {
+      if (!resumenDiarioEncendido()) return;
       const r = await this.enviar();
       if (r.enviados) this.logger.log(`Resumen diario: ${r.enviados} mensaje(s)`);
-    } catch (error) {
-      this.logger.error('Resumen diario falló', error as Error);
-    }
+    });
   }
 
   /** Datos de una empresa en las 24 horas anteriores a `ahora`. */

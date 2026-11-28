@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { ReabastecimientoService } from './reabastecimiento.service.js';
 
 /**
@@ -17,17 +18,13 @@ export class ReabastecimientoCronService {
 
   constructor(private readonly reabastecimiento: ReabastecimientoService) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_3AM, { timeZone: WORKDAY_TIMEZONE })
+  @Cron(CronExpression.EVERY_DAY_AT_3AM, { name: 'reabastecimiento-diario', timeZone: WORKDAY_TIMEZONE })
   async recalcularDiario() {
-    try {
+    await runScheduledJob('reabastecimiento-diario', this.logger, async () => {
       const res = await this.reabastecimiento.recalcularTodasLasEmpresas();
       this.logger.log(
         `Reabastecimiento: ${res.empresas} empresas, ${res.faltantes} renglones por comprar`,
       );
-    } catch (err) {
-      this.logger.error(
-        `Recálculo de reabastecimiento falló: ${err instanceof Error ? err.message : err}`,
-      );
-    }
+    });
   }
 }

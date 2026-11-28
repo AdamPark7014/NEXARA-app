@@ -5,6 +5,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { DOMAIN_EVENTS, type EntradaDeJornada, type SalidaDeJornada } from '../domain-events/domain-event.types.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { WORKDAY_TIMEZONE, workDateKey, workDayEnd, workDayStart } from '../common/time/workday.js';
@@ -211,12 +212,10 @@ export class ActivityNonComplianceService implements OnModuleInit {
   @Cron('10 0 * * *', { name: 'actividades-barrido-no-cumplida', timeZone: WORKDAY_TIMEZONE })
   async barridoNocturnoCron() {
     if (process.env.NEXARA_RELEVO === '1') return;
-    try {
+    await runScheduledJob('actividades-barrido-no-cumplida', this.logger, async () => {
       const r = await this.barridoNocturno();
       if (r.cerradas) this.logger.log(`Barrido nocturno: ${r.cerradas} actividad(es) no cumplida(s)`);
-    } catch (error) {
-      this.logger.error('Barrido nocturno de no cumplidas falló', error as Error);
-    }
+    });
   }
 
   /**

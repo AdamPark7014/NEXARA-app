@@ -17,6 +17,7 @@ import {
 } from '../hikvision-isapi';
 import { resolveUploadsDir } from '../common/uploads-path';
 import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { isAcsDenied, isAcsGranted, minorsDe } from './integra-acs-codes';
 import { IntegraSiteService } from './integra-site.service';
@@ -254,6 +255,11 @@ export class IntegraPushService {
     return site;
   }
 
+  @Cron('27 4 * * *', { name: 'integra-purga-diaria', timeZone: WORKDAY_TIMEZONE })
+  async cronPurgaDiaria() {
+    await runScheduledJob('integra-purga-diaria', this.logger, () => this.purgeOldEvents());
+  }
+
   /**
    * Poda nocturna.
    *
@@ -266,13 +272,16 @@ export class IntegraPushService {
    * Las fotos huérfanas se van con su fila: una foto de una cara sin el evento
    * que la explica no es un dato, es un archivo de gente suelto.
    */
-  @Cron('27 4 * * *', { timeZone: WORKDAY_TIMEZONE })
   async purgeOldEvents() {
     return this.purgeEvents({ wipeAllNoise: true, includeBusiness: true });
   }
 
+  @Cron('17 * * * *', { name: 'integra-purga-ruido' })
+  async cronPurgaRuido() {
+    await runScheduledJob('integra-purga-ruido', this.logger, () => this.purgeNoiseHourly());
+  }
+
   /** Cada hora: borra ruido histórico en lotes (no esperar a las 4:27). */
-  @Cron('17 * * * *')
   async purgeNoiseHourly() {
     return this.purgeEvents({ wipeAllNoise: true, includeBusiness: false });
   }

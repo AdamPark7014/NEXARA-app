@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PushDispatchService } from '../devices/push-dispatch.service.js';
 import { workDateColumn, workDateKey, workDayBounds } from '../common/time/workday.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import {
   horaCortaMexico,
   necesitaLatido,
@@ -34,12 +35,10 @@ export class GpsLatidoCronService {
 
   @Cron('*/5 * * * *', { name: 'gps-latido-jornada' })
   async revisar(): Promise<void> {
-    try {
+    await runScheduledJob('gps-latido-jornada', this.logger, async () => {
       const enviados = await this.revisarAhora(new Date());
       if (enviados) this.logger.log(`Latidos de GPS enviados: ${enviados}`);
-    } catch (error) {
-      this.logger.warn(`Latido de GPS falló: ${(error as Error).message}`);
-    }
+    });
   }
 
   /** Separado del cron para probarlo con una hora fija. Devuelve cuántas personas recibieron latido. */

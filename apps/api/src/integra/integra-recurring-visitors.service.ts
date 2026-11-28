@@ -8,6 +8,7 @@ import { Cron } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import {
   buildWeekPlanCfg,
@@ -570,14 +571,12 @@ export class IntegraRecurringVisitorsService {
     return { expired: n };
   }
 
-  @Cron('12 * * * *')
+  @Cron('12 * * * *', { name: 'integra-visitas-expiran' })
   async cronExpire() {
-    try {
+    await runScheduledJob('integra-visitas-expiran', this.logger, async () => {
       const r = await this.expireDue();
       if (r.expired > 0) this.logger.log(`Visitas recurrentes expiradas: ${r.expired}`);
-    } catch (e) {
-      this.logger.warn(`cronExpire: ${e instanceof Error ? e.message : String(e)}`);
-    }
+    });
   }
 
   private async pushToAcs(opts: {

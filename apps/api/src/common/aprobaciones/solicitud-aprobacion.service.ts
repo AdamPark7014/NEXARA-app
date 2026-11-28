@@ -14,6 +14,7 @@ import { NotificationsService } from '../../notifications/notifications.service.
 import { esCuentaAvisoRh as esCuentaAviso } from './cuenta-aviso.js';
 import { ROLES } from '../rbac/roles.v2.js';
 import { WORKDAY_TIMEZONE } from '../time/workday.js';
+import { runScheduledJob } from '../cron/run-scheduled-job.js';
 
 export type CrearSolicitudRhInput = {
   companyId: number;
@@ -373,8 +374,12 @@ export class SolicitudAprobacionService {
     });
   }
 
-  /** Escalamiento de vacaciones/permisos: jefe (0) → Luis (1) → dirección (2) tras 24 h. */
   @Cron('15 * * * *', { name: 'rh-escalar-solicitudes-24h', timeZone: WORKDAY_TIMEZONE })
+  async cronEscalarPendientes24h() {
+    await runScheduledJob('rh-escalar-solicitudes-24h', this.logger, () => this.escalarPendientes24h());
+  }
+
+  /** Escalamiento de vacaciones/permisos: jefe (0) → Luis (1) → dirección (2) tras 24 h. */
   async escalarPendientes24h() {
     const limite = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const pendientes = await this.prisma.solicitudAprobacionRh.findMany({

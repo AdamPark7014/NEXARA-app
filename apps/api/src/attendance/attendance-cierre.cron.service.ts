@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { AttendanceService } from './attendance.service.js';
 import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { HORA_CIERRE_AUTOMATICO } from './asistencia-confiable.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 
 /**
  * Se olvidó checar la salida.
@@ -26,23 +27,19 @@ export class AttendanceCierreCronService {
     timeZone: WORKDAY_TIMEZONE,
   })
   async cerrarJornadasOlvidadas() {
-    try {
+    await runScheduledJob('attendance-cierre-automatico', this.logger, async () => {
       const { cerradas } = await this.attendance.cerrarJornadasOlvidadas();
       if (cerradas) this.logger.log(`Jornadas cerradas automáticamente: ${cerradas}`);
-    } catch (error) {
-      this.logger.error('Cierre automático de jornadas falló', error as Error);
-    }
+    });
   }
 
   /** Turnos de noche sin salida: cada hora, las que ya pasaron su tope desde la entrada. */
   @Cron('5 * * * *', { name: 'attendance-cierre-noche', timeZone: WORKDAY_TIMEZONE })
   async cerrarJornadasDeNocheOlvidadas() {
     if (process.env.NEXARA_RELEVO === '1') return;
-    try {
+    await runScheduledJob('attendance-cierre-noche', this.logger, async () => {
       const { cerradas } = await this.attendance.cerrarJornadasDeNocheOlvidadas();
       if (cerradas) this.logger.log(`Jornadas de noche cerradas automáticamente: ${cerradas}`);
-    } catch (error) {
-      this.logger.error('Cierre automático de jornadas de noche falló', error as Error);
-    }
+    });
   }
 }
