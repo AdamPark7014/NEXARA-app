@@ -14,10 +14,18 @@ export class JobsController {
     return this.queue.getStats();
   }
 
+  /** Por cola: esperando, activos, demorados, fallidos, workers conectados, y la memoria de Redis. Solo lectura. */
+  @Get('stats/detalle')
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  statsDetalle() {
+    return this.queue.getStatsDetallado();
+  }
+
+  /** Trabajos perdidos: los que este proceso anotó y los que BullMQ guarda en Redis (sobreviven a un reinicio). */
   @Get('dlq')
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
-  dlq() {
-    return { items: this.queue.getDlq() };
+  async dlq() {
+    return { items: await this.queue.getDlq() };
   }
 
   @Post('enqueue')
