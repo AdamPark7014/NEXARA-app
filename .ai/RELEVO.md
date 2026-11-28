@@ -1,5 +1,12 @@
 # RELEVO
 
+- **27-11 ~23:05 México (claude-code) — Propuesta «Nexara que se corrige sola». Solo análisis: sin código, sin migraciones, sin desplegar.**
+  - 10 funciones de automatización en 4 olas (vigilante de datos con bandeja «Por corregir», parte diario, alarma de dinero raro, leer tickets y facturas, aprender de correcciones, primera revisión de evidencias, «Pregúntale a Nexara», cotización al cobro, predicción sin IA, alarma de integraciones caídas). Estimado ~3 USD/mes de API; tope actual en la puerta 5.
+  - Web pública: «Ensamble» sí está en producción y no hay nada de `app/(sitio)` sin salir. Adam la ve igual porque es foto + CSS; pide motion graphics y 3D. Se puede con Blender, los motores del estudio de Zynora, Real-ESRGAN y ffmpeg, sin costo.
+  - Documento: https://claude.ai/artifact/2gDqVGYRTvdu2PsNyyDQqE · copia en `C:\dev\datos\proyectos-claude\nexara\propuesta-autocorreccion-2026-11-27\PROPUESTA.md`.
+  - Espera de Adam: llave nueva de Anthropic (la IA de producción sigue en 401 desde el 21-11), OK para la ola 1, OK para la muestra del inicio en 3D y las 10 ideas de ChatGPT (no están en la PC).
+  - Paridad: Web, API, Android e iOS no aplican (no hubo cambio de producto).
+
 ## Turno claude-code - 27-11-2026: datos fuera del repo
 
 - Pedido de Adam: salieron listas de personas (auditoria de organigrama, usuarios retirados, jefes) y un revisor de cuentas de prueba; copias locales en `C:\dev\secrets\nexara\datos-fuera-del-repo-2026-11-25`. `nexara.sh` ya no trae `cleanup-users`, `delete-ghost-users` ni `audit-users`.
