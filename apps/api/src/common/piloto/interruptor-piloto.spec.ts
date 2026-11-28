@@ -67,9 +67,11 @@ describe('interruptor del Piloto', () => {
       expect(await leerModoPiloto(simulado('activo').prisma, 'piloto.b', undefined, T0)).toBe('activo');
     });
 
-    it('un valor basura = el valor por omisión (apagado si no se pide otro)', async () => {
+    it('un valor mal escrito apaga siempre, aunque quien llama pida otra cosa por omisión', async () => {
       expect(await leerModoPiloto(simulado('quizá').prisma, 'piloto.a', undefined, T0)).toBe('apagado');
-      expect(await leerModoPiloto(simulado('quizá').prisma, 'piloto.b', 'observar', T0)).toBe('observar');
+      expect(await leerModoPiloto(simulado('quizá').prisma, 'piloto.b', 'observar', T0)).toBe('apagado');
+      // El caso que importa: un «actvo» con error de dedo no puede encender a quien tenga «activo» por omisión.
+      expect(await leerModoPiloto(simulado('actvo').prisma, 'piloto.c', 'activo', T0)).toBe('apagado');
     });
 
     it('«apagado» escrito a propósito apaga aunque quien llama pida observar por omisión', async () => {

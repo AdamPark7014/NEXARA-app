@@ -102,7 +102,9 @@ async function consultar(prisma: LectorSettings, clave: string, ahora: number): 
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       select: { value: true },
     });
-    const modo = fila ? interpretarModoPiloto(fila.value) : null;
+    // Hay fila pero no se entiende (un error de dedo): se apaga. Así un llamador cuya omisión sea «activo» nunca se
+    // enciende por un valor mal escrito; solo la AUSENCIA de fila deja decidir a quien llama.
+    const modo = fila ? (interpretarModoPiloto(fila.value) ?? 'apagado') : null;
     cache.set(clave, { modo, leidoAt: ahora });
     return modo;
   } catch {
@@ -114,8 +116,9 @@ async function consultar(prisma: LectorSettings, clave: string, ahora: number): 
 }
 
 /**
- * Posición actual del interruptor `clave`. Sin fila (o con un valor que no se entiende) devuelve `porOmision`, que
- * por omisión es `apagado`. No necesita empresa ni petición: sirve igual desde un servicio, un cron o un timer.
+ * Posición actual del interruptor `clave`. Sin fila devuelve `porOmision`, que por omisión es `apagado`. Con una
+ * fila cuyo valor no se entiende devuelve siempre `apagado`, pida lo que pida quien llama. No necesita empresa ni
+ * petición: sirve igual desde un servicio, un cron o un timer.
  * `ahora` solo existe para las pruebas.
  */
 export async function leerModoPiloto(
