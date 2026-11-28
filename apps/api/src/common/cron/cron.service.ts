@@ -178,20 +178,7 @@ export class CronService {
     this.logger.log(`Maintenance reminders: ${upcoming.length}`);
   }
 
-  // ── Limpieza de logs de auditoría > 90 días — domingo 3AM ──────
-  @Cron('0 3 * * 0', { name: 'audit-cleanup', timeZone: WORKDAY_TIMEZONE })
-  async cronLimpiezaAuditoria() {
-    await runScheduledJob('audit-cleanup', this.logger, () => this.handleAuditCleanup());
-  }
-
-  async handleAuditCleanup() {
-    this.logger.log('Limpiando logs de auditoría antiguos...');
-    const cutoff = new Date(Date.now() - 90 * 86400000);
-    const result = await this.prisma.auditLog.deleteMany({
-      where: { createdAt: { lt: cutoff } },
-    });
-    this.logger.log(`Audit logs eliminados: ${result.count}`);
-  }
+  // La limpieza de la bitácora ya no vive aquí: la única purga es `AuditService.purgaProgramada` (`audit/`).
 
   // ── Alertas de margen de proyectos — cada día 10AM ─────────────
   @Cron('0 10 * * *', { name: 'project-margin-alerts', timeZone: WORKDAY_TIMEZONE })

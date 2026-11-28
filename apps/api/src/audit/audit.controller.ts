@@ -69,7 +69,9 @@ export class AuditController {
   @Post('purge')
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   purge(@Body('days') days?: number) {
-    return this.svc.purgeOlderThan(days ?? 365);
+    // Sin `days` rige la retención configurada (`audit.retencion_dias`; si esa fila es ilegible y no hay un número
+    // válido anterior, responde 400 y no borra nada); con `days` explícito, el piso es de 30.
+    return this.svc.purgeOlderThan(days);
   }
 
   @Post('privacy/erase/:userId')

@@ -28,8 +28,8 @@ import { CronExpression } from '@nestjs/schedule';
  * `externo`: la tarea no es un `@Cron` de este proceso (la corre el servidor, por ejemplo un respaldo) y el latido
  *   llega por otra vía. La guardiana no exige su `@Cron`.
  *
- * Pendiente de otros cambios del paquete: C6 borra `audit-cleanup` y deja una sola purga de la bitácora; C8 agrega
- * `pulso:limpieza` y `externo:respaldo-nexara` (`externo: true`).
+ * Pendiente de otros cambios del paquete: C8 agrega `pulso:limpieza` y `externo:respaldo-nexara` (`externo: true`).
+ * (C6 ya dejó una sola purga de la bitácora: `audit-cleanup` se borró y `purga-bitacora` corre los domingos.)
  */
 export interface TareaCatalogo {
   cron: string;
@@ -302,13 +302,9 @@ export const TAREAS_CATALOGO: Record<string, TareaCatalogo> = {
     cron: CronExpression.EVERY_5_MINUTES, zona: 'UTC', grupo: 'sistema', critica: true,
     que: 'Reintenta los avisos a sistemas externos que no se pudieron entregar.',
   },
-  'audit-cleanup': {
-    cron: '0 3 * * 0', zona: 'MX', grupo: 'sistema',
-    que: 'Los domingos borra de la bitácora lo de más de 90 días.',
-  },
   'purga-bitacora': {
-    cron: '15 4 1 * *', zona: 'MX', grupo: 'sistema',
-    que: 'El día 1 de cada mes borra de la bitácora lo de más de un año.',
+    cron: '15 4 * * 0', zona: 'MX', grupo: 'sistema',
+    que: 'Los domingos borra de la bitácora, por tandas, lo que pasó la retención configurada (si nadie la cambia, 90 días).',
   },
 
   // ── Pulso (vigilancia de las propias tareas) ─────────────────────────────────────────────────

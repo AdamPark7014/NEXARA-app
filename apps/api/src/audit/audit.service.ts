@@ -4,6 +4,17 @@ import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { celdaCsv } from '../common/security/celda-csv.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
+import {
+  CLAVE_RETENCION_BITACORA,
+  COMO_CORREGIR_RETENCION,
+  LOTE_PURGA,
+  MAX_LOTES_PURGA,
+  PAUSA_ENTRE_LOTES_MS,
+  describirOrigenRetencion,
+  leerRetencionDias,
+  normalizarDiasManuales,
+  type OrigenRetencion,
+} from './audit-retencion.js';
 
 @Injectable()
 export class AuditService {
@@ -127,25 +138,87 @@ export class AuditService {
   private readonly logger = new Logger(AuditService.name);
 
   /**
-   * Retención automática (07-11): `audit_logs` crecía sin límite (283 MB, 1.2 M filas al 07-11)
-   * y la purga solo existía a mano. El día 1 de cada mes, a las 04:15 de México, borra lo de más
-   * de un año, igual que el `POST audit/purge` por omisión.
+   * ÚNICA purga de la bitácora (antes había dos que se contradecían: `audit-cleanup` a 90 días y esta a 365; mandaba
+   * la corta). Los domingos a las 04:15 de México borra lo que pasó la retención configurada
+   * (`audit-retencion.ts`: 90 días mientras Adam no fije otro número, piso 30), por lotes.
+   *
+   * Es semanal, no mensual: es la cadencia que de hecho tenía el borrado que sí actuaba. Con un tope de 40 lotes por
+   * corrida (200,000 filas) lo que sobre se borra el domingo siguiente.
    */
-  @Cron('15 4 1 * *', { name: 'purga-bitacora', timeZone: WORKDAY_TIMEZONE })
-  async purgaMensual() {
-    await runScheduledJob('purga-bitacora', this.logger, async () => {
-      const r = await this.purgeOlderThan(365);
-      this.logger.log(`Bitácora: ${r.deleted} registros anteriores a ${r.cutoff} borrados`);
-    });
+  @Cron('15 4 * * 0', { name: 'purga-bitacora', timeZone: WORKDAY_TIMEZONE })
+  async purgaProgramada() {
+    await runScheduledJob('purga-bitacora', this.logger, () => this.purgeOlderThan());
   }
 
-  /** Retención: borra logs más viejos que N días (default 365). */
-  async purgeOlderThan(days = 365) {
-    const cutoff = new Date(Date.now() - Math.max(30, days) * 86_400_000);
-    const result = await this.prisma.auditLog.deleteMany({
-      where: { createdAt: { lt: cutoff } },
-    });
-    return { deleted: result.count, cutoff: cutoff.toISOString() };
+  /**
+   * Borra de la bitácora lo anterior a N días, en lotes de 5,000 (un solo `deleteMany` sobre millones de filas
+   * bloquea la tabla y llena el WAL en un disco que va justo).
+   *   - Sin `days` rige la retención configurada.
+   *   - Con `days` explícito (llamada manual) manda ese número, nunca menor de 30 ni mayor de 3650.
+   *   - Un `days` que no es un número entero responde 400: no se adivina qué borrar.
+   *   - Si la retención configurada no se puede leer (fila ilegible) se usa el último número válido y, si no hay
+   *     ninguno, NO se borra nada y la llamada falla con un mensaje claro (la tarea programada queda como fallida en
+   *     su latido, a la vista): lo borrado no se recupera, así que no se adivina 90 sobre algo que Adam quiso distinto.
+   * `AuditLog` está en AUDIT_EXCLUDED, así que borrar no genera más bitácora.
+   */
+  async purgeOlderThan(days?: number | string | null) {
+    const pedidos = normalizarDiasManuales(days);
+    if (pedidos === 'invalido') {
+      throw new BadRequestException('«days» debe ser un número entero de días.');
+    }
+
+    let dias: number;
+    let origen: OrigenRetencion | 'manual';
+    if (pedidos !== null) {
+      dias = pedidos;
+      origen = 'manual';
+    } else {
+      const lectura = await leerRetencionDias(this.prisma);
+      if (lectura.dias === null) {
+        throw new BadRequestException(
+          `No se borró nada de la bitácora: la retención configurada («${CLAVE_RETENCION_BITACORA}») no es un número ` +
+            `entero de días y no hay un número válido anterior. ${COMO_CORREGIR_RETENCION} ` +
+            `Para una purga puntual se puede mandar «days» en la llamada.`,
+        );
+      }
+      dias = lectura.dias;
+      origen = lectura.origen;
+    }
+    const cutoff = new Date(Date.now() - dias * 86_400_000);
+
+    let deleted = 0;
+    let quedanMas = false;
+    for (let lote = 1; lote <= MAX_LOTES_PURGA; lote += 1) {
+      // Se ordena por `createdAt` (índice existente) para que cada vuelta tome lo más viejo sin recorrer la tabla.
+      const filas = await this.prisma.auditLog.findMany({
+        where: { createdAt: { lt: cutoff } },
+        select: { id: true },
+        orderBy: { createdAt: 'asc' },
+        take: LOTE_PURGA,
+      });
+      if (filas.length === 0) break;
+      const r = await this.prisma.auditLog.deleteMany({ where: { id: { in: filas.map((f) => f.id) } } });
+      deleted += r.count;
+      if (filas.length < LOTE_PURGA) break;
+      // Llegó al tope con el lote lleno: puede quedar más (se sabrá en la siguiente corrida).
+      if (lote === MAX_LOTES_PURGA) {
+        quedanMas = true;
+        break;
+      }
+      await this.pausar(PAUSA_ENTRE_LOTES_MS);
+    }
+
+    const cutoffIso = cutoff.toISOString();
+    this.logger.log(
+      `Bitácora: ${deleted} registros anteriores a ${cutoffIso} borrados (retención ${dias} días, ${describirOrigenRetencion(origen)})` +
+        (quedanMas ? `; puede que queden más, seguirán en la próxima corrida (tope ${MAX_LOTES_PURGA} lotes)` : ''),
+    );
+    return { deleted, cutoff: cutoffIso, dias, origen, quedanMas };
+  }
+
+  /** Pausa entre lotes. Es un método para poder sustituirlo en pruebas sin relojes falsos. */
+  protected pausar(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
