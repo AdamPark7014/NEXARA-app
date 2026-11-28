@@ -30,6 +30,18 @@ export type SugerenciaComplejidad = {
   destino?: string | null;
 };
 
+/**
+ * Lo que contesta `ai/complejidad/sugerir`. `sugerencia` es lo de siempre; `disponible`, `motivo` y `mensaje` los
+ * manda la API nueva cuando no hay sugerencia (la IA no está o no dio un nivel) y son opcionales: con una API vieja
+ * solo llega `sugerencia` y la pantalla se ve como antes. `mensaje` es una frase lista para mostrar tal cual.
+ */
+export type RespuestaSugerenciaComplejidad = {
+  sugerencia: SugerenciaComplejidad | null;
+  disponible?: boolean;
+  motivo?: string;
+  mensaje?: string;
+};
+
 export function fetchTiemposTipicos(token: string, q: { coreKind: string; tipo?: string | null }): Promise<TiemposTipicos> {
   const p = new URLSearchParams({ coreKind: q.coreKind });
   if (q.tipo) p.set("tipo", q.tipo);
@@ -39,7 +51,7 @@ export function fetchTiemposTipicos(token: string, q: { coreKind: string; tipo?:
 export function sugerirComplejidad(
   token: string,
   body: { coreKind: string; tipo?: string | null; titulo: string; indicaciones?: string | null },
-): Promise<{ sugerencia: SugerenciaComplejidad | null }> {
+): Promise<RespuestaSugerenciaComplejidad> {
   return erpFetch(`ai/complejidad/sugerir`, token, {
     method: "POST",
     body: JSON.stringify({

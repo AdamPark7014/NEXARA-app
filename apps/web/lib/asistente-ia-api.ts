@@ -158,8 +158,12 @@ async function pedir<T>(token: string, path: string, init?: RequestInit): Promis
   return (await res.json()) as T;
 }
 
+/**
+ * `modelo` y `mensaje` son opcionales: quien no puede usar el asistente recibe solo `{ disponible: false }`, y a quien sí
+ * puede la API le manda `mensaje` (una frase en español para mostrar tal cual) cuando la IA no está.
+ */
 export function estadoAsistente(token: string) {
-  return pedir<{ disponible: boolean; modelo: string }>(token, "ai/asistente/estado");
+  return pedir<{ disponible: boolean; modelo?: string; mensaje?: string }>(token, "ai/asistente/estado");
 }
 
 /**

@@ -94,6 +94,89 @@ describe("ComplejidadCampo", () => {
     expect(onChange).toHaveBeenLastCalledWith({ sugerida: "CRITICA" });
   });
 
+  describe("cuando no hay sugerencia, lo dice", () => {
+    const AVISO = "Sugerencia no disponible por ahora: elige tú el nivel.";
+
+    async function pasarEspera() {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(950);
+      });
+    }
+
+    it("con la frase de la API: se ve, no inventa ningún nivel y los cuatro botones siguen decidiendo", async () => {
+      sugerir.mockResolvedValue({ sugerencia: null, disponible: false, motivo: "ia_no_disponible", mensaje: AVISO });
+      const onSugerencia = vi.fn();
+      const { onChange } = montar({ onSugerencia });
+      await pasarEspera();
+
+      expect(sugerir).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("status")).toHaveTextContent(AVISO);
+      // Ni un nivel puesto por la sugerencia, ni una sugerencia inventada para quien lo guarda.
+      expect(onChange).not.toHaveBeenCalled();
+      expect(onSugerencia).toHaveBeenCalledTimes(1);
+      expect(onSugerencia).toHaveBeenCalledWith(null);
+      // Sigue siendo quien asigna quien elige.
+      for (const nombre of [/Básica/, /Estándar/, /Compleja/, /Crítica/]) {
+        expect(screen.getByRole("button", { name: nombre })).toBeEnabled();
+      }
+      fireEvent.click(screen.getByRole("button", { name: /Crítica/ }));
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange).toHaveBeenCalledWith({ complejidad: "CRITICA" });
+    });
+
+    it("si la IA contestó pero sin un nivel, dice la frase que mande la API", async () => {
+      sugerir.mockResolvedValue({
+        sugerencia: null,
+        disponible: true,
+        motivo: "sin_respuesta",
+        mensaje: "No pude sugerir esta vez: elige tú el nivel.",
+      });
+      montar();
+      await pasarEspera();
+      expect(screen.getByRole("status")).toHaveTextContent("No pude sugerir esta vez: elige tú el nivel.");
+    });
+
+    it("si la consulta falla, dice el texto por omisión", async () => {
+      sugerir.mockRejectedValue(new Error("HTTP 503"));
+      const { onChange } = montar();
+      await pasarEspera();
+      expect(screen.getByRole("status")).toHaveTextContent(AVISO);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("sin frase (API vieja, título corto) no hay nada que decir: la caja no sale", async () => {
+      sugerir.mockResolvedValue({ sugerencia: null });
+      montar();
+      await pasarEspera();
+      expect(sugerir).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole("status")).toBeNull();
+    });
+
+    it("al cambiar el título, el aviso se limpia y vuelve a preguntar", async () => {
+      sugerir.mockResolvedValueOnce({ sugerencia: null, disponible: false, motivo: "ia_no_disponible", mensaje: AVISO });
+      let responder!: (v: unknown) => void;
+      sugerir.mockImplementationOnce(() => new Promise((r) => (responder = r)));
+      const { rerender, props, onChange } = montar();
+      await pasarEspera();
+      expect(screen.getByRole("status")).toHaveTextContent(AVISO);
+
+      rerender(<ComplejidadCampo {...props} titulo="Instalar 12 cámaras en la bodega" />);
+      await pasarEspera();
+      // Preguntó de nuevo y, mientras espera, ya no sigue el aviso viejo.
+      expect(sugerir).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText(AVISO)).toBeNull();
+      expect(screen.getByRole("status")).toHaveTextContent("Revisando el título para sugerir la complejidad…");
+
+      await act(async () => {
+        responder({ sugerencia: { complejidad: "COMPLEJA", motivo: "Doce cámaras." }, disponible: true });
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.queryByText(AVISO)).toBeNull();
+      expect(screen.getByText("Sugerencia: Compleja.")).toBeTruthy();
+      expect(onChange).toHaveBeenCalledWith({ complejidad: "COMPLEJA", sugerida: "COMPLEJA" });
+    });
+  });
+
   it("enseña el tiempo de cada nivel y deja usarlo", async () => {
     sugerir.mockResolvedValue({ sugerencia: null });
     const { onUsarTiempo } = montar({ value: "BASICA", pedirSugerencia: false });

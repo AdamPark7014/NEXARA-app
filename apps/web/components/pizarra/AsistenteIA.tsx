@@ -183,11 +183,15 @@ function Renglon({
  * API contra el catálogo y lo dice («Corregido de "talks"»). Cada campo se corrige a mano en
  * la tarjeta, sin volver a escribir la instrucción, y se confirma una por una o todas. Solo se
  * muestra si la API dice que está disponible: a todo mando con gente a cargo y a dirección, con la
- * IA activa. La regla vive allá (`quien-asigna.ts`) y aquí no se repite.
+ * IA activa. La regla vive allá (`quien-asigna.ts`) y aquí no se repite. Si quien sí puede usarlo se
+ * encuentra con que no hay IA, la API manda una frase (`mensaje`) y se muestra en lugar del panel; a quien
+ * no le toca no le llega nada y no ve nada.
  */
 export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
   const { user, token } = useUser();
   const [disponible, setDisponible] = useState(false);
+  /** Solo lo manda la API a quien sí puede asignar con IA y hoy no hay IA: se dice en vez de esconder el panel. */
+  const [sinIa, setSinIa] = useState<string | null>(null);
   const [personas, setPersonas] = useState<PersonaAsignable[]>([]);
   const v2 = useMemo(() => resolveV2RoleKey(user), [user]);
 
@@ -196,7 +200,14 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
     let vivo = true;
     estadoAsistente(token)
       .then((r) => {
-        if (!vivo || !r.disponible) return;
+        if (!vivo) return;
+        if (!r.disponible) {
+          // Sin mensaje (quien no puede usarlo, o una API vieja) no se muestra nada, como siempre.
+          const frase = typeof r.mensaje === "string" ? r.mensaje.trim() : "";
+          if (frase) setSinIa(frase);
+          return;
+        }
+        setSinIa(null);
         setDisponible(true);
         personasAsignables(token)
           .then((lista) => vivo && setPersonas(Array.isArray(lista) ? lista : []))
@@ -208,7 +219,14 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
     };
   }, [token]);
 
-  if (!disponible || !token) return null;
+  if (!token) return null;
+  if (!disponible) {
+    return sinIa ? (
+      <p className={c.tenue} role="status">
+        {sinIa}
+      </p>
+    ) : null;
+  }
   return (
     <Contenido
       token={token}

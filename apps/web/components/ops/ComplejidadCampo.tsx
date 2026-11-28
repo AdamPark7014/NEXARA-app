@@ -28,6 +28,9 @@ const COMPLEJIDAD_NIVEL_TITULO: Record<Complejidad, string> = {
 /** Espera tras la última tecla antes de pedir la sugerencia (una llamada por título, no por letra). */
 const ESPERA_SUGERENCIA_MS = 900;
 
+/** Si la consulta falla sin que la API diga nada (red, sesión): igual se dice, no se calla. */
+const AVISO_SIN_SUGERENCIA = "Sugerencia no disponible por ahora: elige tú el nivel.";
+
 /**
  * «Complejidad» al asignar (canvas de Asignar, 28-10): cuatro niveles con el tiempo típico de
  * cada uno, la sugerencia de la IA y, debajo, lo típico de ese tipo de trabajo para usarlo como
@@ -71,6 +74,8 @@ export default function ComplejidadCampo({
   const [tiempos, setTiempos] = useState<TiemposTipicos | null>(null);
   const [sugerencia, setSugerencia] = useState<SugerenciaComplejidad | null>(null);
   const [pensando, setPensando] = useState(false);
+  /** Por qué no hay sugerencia (la IA no está, falló la consulta): se dice en la misma caja, nunca se calla. */
+  const [aviso, setAviso] = useState<string | null>(null);
   /** Quien asigna ya eligió a mano: la sugerencia ya no cambia su elección. */
   const elegidaAMano = useRef(esComplejidad(value) && !pedirSugerencia);
   const ultimaPregunta = useRef("");
@@ -100,10 +105,14 @@ export default function ComplejidadCampo({
     const espera = window.setTimeout(() => {
       ultimaPregunta.current = pregunta;
       setPensando(true);
+      setAviso(null);
       sugerirComplejidad(token, { coreKind, tipo, titulo: t, indicaciones })
-        .then(({ sugerencia: sug }) => {
+        .then(({ sugerencia: sug, mensaje }) => {
           if (!vivo) return;
           setSugerencia(sug);
+          // Sin sugerencia, la frase es la de la API; sin frase (título corto, API vieja) no hay nada que decir.
+          const frase = typeof mensaje === "string" ? mensaje.trim() : "";
+          setAviso(sug || !frase ? null : frase);
           onSugerenciaRef.current?.(sug);
           if (sug) {
             onChangeRef.current(
@@ -111,7 +120,11 @@ export default function ComplejidadCampo({
             );
           }
         })
-        .catch(() => vivo && setSugerencia(null))
+        .catch(() => {
+          if (!vivo) return;
+          setSugerencia(null);
+          setAviso(AVISO_SIN_SUGERENCIA);
+        })
         .finally(() => vivo && setPensando(false));
     }, ESPERA_SUGERENCIA_MS);
     return () => {
@@ -155,7 +168,7 @@ export default function ComplejidadCampo({
         })}
       </div>
 
-      {sugerencia || pensando ? (
+      {sugerencia || pensando || aviso ? (
         <div className={s.sugerencia} role="status" aria-live="polite">
           <AutoAwesomeOutlinedIcon className={s.sugerenciaI} aria-hidden="true" />
           {pensando && !sugerencia ? (
@@ -168,6 +181,8 @@ export default function ComplejidadCampo({
                 ? "Elegiste otra: quedan las dos registradas."
                 : "Tú decides; si la cambias, queda registrado."}
             </span>
+          ) : aviso ? (
+            <span>{aviso}</span>
           ) : null}
         </div>
       ) : null}

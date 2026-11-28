@@ -120,6 +120,31 @@ describe("AsistenteIA", () => {
     expect(api.personasAsignables).not.toHaveBeenCalled();
   });
 
+  it("si la IA no está pero la API manda su frase, la dice en lugar de esconder el panel", async () => {
+    const frase = "«Asignar con IA» no está disponible por ahora: usa «＋ Asignar» en Mi equipo.";
+    api.estadoAsistente.mockResolvedValue({ disponible: false, modelo: "claude-haiku-5-5", mensaje: frase });
+    render(<AsistenteIA />);
+    expect(await screen.findByRole("status")).toHaveTextContent(frase);
+    // Solo el aviso: ni la caja de «Asignar con IA» ni su formulario, y no se piden las personas.
+    expect(screen.queryByLabelText("Instrucción para la IA")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Preparar actividades/ })).toBeNull();
+    expect(api.personasAsignables).not.toHaveBeenCalled();
+  });
+
+  it("una frase vacía o en blanco cuenta como sin frase: no se pinta nada", async () => {
+    api.estadoAsistente.mockResolvedValue({ disponible: false, mensaje: "   " });
+    const { container } = render(<AsistenteIA />);
+    await waitFor(() => expect(api.estadoAsistente).toHaveBeenCalled());
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("con IA disponible no sale ningún aviso, aunque la API mande una frase de más", async () => {
+    api.estadoAsistente.mockResolvedValue({ disponible: true, modelo: "claude-haiku-5-5", mensaje: "no debería verse" });
+    render(<AsistenteIA />);
+    expect(await screen.findByLabelText("Instrucción para la IA")).toBeInTheDocument();
+    expect(screen.queryByText("no debería verse")).toBeNull();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     buscarClientesParecidos.mockResolvedValue([]);
