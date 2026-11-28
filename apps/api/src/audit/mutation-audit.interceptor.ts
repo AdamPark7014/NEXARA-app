@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { AuditService } from './audit.service.js';
 import { clasificarError } from '../common/errors/all-exception.filter.js';
+import { esLlaveSecreta } from '../common/errors/mascara-log.js';
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -211,22 +212,65 @@ export class MutationAuditInterceptor implements NestInterceptor {
   }
 
   private sanitizeBody(body: unknown): Record<string, unknown> | null {
-    if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
-    const src = body as Record<string, unknown>;
-    const out: Record<string, unknown> = {};
-    const redact = new Set([
-      'password', 'passwordHash', 'newPassword', 'confirm', 'token',
-      'access_token', 'refreshToken', 'secret', 'otp', 'mfaCode',
-    ]);
-    for (const [k, v] of Object.entries(src)) {
-      if (redact.has(k)) {
-        out[k] = '[redacted]';
-        continue;
-      }
-      if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null) {
+    return sanitizarCuerpoParaBitacora(body);
+  }
+}
+
+/**
+ * Nombres exactos cuyo valor no se guarda en la bitácora (en minúsculas: se compara con `llave.toLowerCase()`).
+ * Son los que por sí solos no dicen «secreto» (`code`, `pin`, `otp`, `confirm`...). Lo demás se reconoce por
+ * el nombre con `esLlaveSecreta` (contiene `password`, `token`, `secret`...; empieza o termina en `rfc`,
+ * `curp`, `nss`, `clabe`...), de modo que `portalPassword` o `counterpartyClabe` no dependen de estar aquí.
+ */
+const LLAVES_TACHADAS = new Set([
+  'password', 'passwordhash', 'password_hash', 'newpassword', 'currentpassword', 'confirmpassword',
+  'confirm', 'contrasena', 'token', 'access_token', 'refresh_token', 'refreshtoken', 'authorization',
+  'cookie', 'secret', 'otp', 'mfacode', 'code', 'pickupcode', 'pin', 'apikey', 'api_key',
+  // Datos personales y bancarios de altas de personal y clientes.
+  'curp', 'rfc', 'nss', 'clabe',
+]);
+
+/** Coordenadas: la tabla de ubicaciones ya es el registro de dónde estuvo cada quien (21,702 filas las repetían). */
+const LLAVES_UBICACION = new Set([
+  'latitude', 'longitude', 'latitud', 'longitud', 'lat', 'lng', 'lon', 'accuracy',
+]);
+
+/** Fotos y archivos en línea: guardaban el inicio del base64 (200 caracteres de basura por fila). */
+const LLAVES_ARCHIVO = new Set(['photourl', 'photobase64', 'fotobase64', 'foto']);
+
+/**
+ * Lo que de la petición queda en `changes.request` de la bitácora: solo valores sueltos (texto,
+ * número, booleano, nulo); un objeto o arreglo anidado no se guarda. No se guardan contraseñas,
+ * códigos, claves, tokens, CURP/RFC/NSS/CLABE, números de tarjeta o de cuenta (`[redacted]`; se
+ * reconocen por el nombre de la llave: `portalPassword`, `counterpartyClabe`, `receptorRfc`...),
+ * coordenadas (`[ubicación]`) ni fotos o cualquier texto que empiece con `data:` (`[archivo]`).
+ * Un texto de más de 200 caracteres se corta.
+ */
+export function sanitizarCuerpoParaBitacora(body: unknown): Record<string, unknown> | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  const src = body as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(src)) {
+    const llave = k.toLowerCase();
+    if (LLAVES_TACHADAS.has(llave) || esLlaveSecreta(k)) {
+      out[k] = '[redacted]';
+      continue;
+    }
+    if (LLAVES_UBICACION.has(llave)) {
+      out[k] = '[ubicación]';
+      continue;
+    }
+    if (LLAVES_ARCHIVO.has(llave) && typeof v === 'string' && v.length > 0) {
+      out[k] = '[archivo]';
+      continue;
+    }
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null) {
+      if (typeof v === 'string' && /^\s*data:/i.test(v.slice(0, 40))) {
+        out[k] = '[archivo]';
+      } else {
         out[k] = typeof v === 'string' && v.length > 200 ? `${v.slice(0, 200)}…` : v;
       }
     }
-    return Object.keys(out).length ? out : null;
   }
+  return Object.keys(out).length ? out : null;
 }

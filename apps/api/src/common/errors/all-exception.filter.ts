@@ -6,8 +6,116 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { resumenInterno } from './normalizar.js';
+import { resumenInterno, rutaPatron } from './normalizar.js';
+import {
+  esLlaveSecreta,
+  formaDe,
+  mensajeSeguroParaLog,
+  paramsParaLog,
+  pathParaLog,
+  usuarioParaLog,
+} from './mascara-log.js';
 
+/**
+ * Nombres exactos cuyo valor nunca se escribe en el log. Se comparan en minúsculas contra `key.toLowerCase()`:
+ * antes la lista traía `passwordHash` en camelCase y por eso nunca coincidía. Además de esta lista, una llave
+ * se tacha si su nombre dice que es un secreto o un dato personal (`esLlaveSecreta`: `portalPassword`,
+ * `counterpartyClabe`, `receptorRfc`...). Aquí no entra `code`: en un error HTTP es el código propio del error.
+ */
+export const LLAVES_SENSIBLES_LOG = new Set([
+  'password',
+  'passwordhash',
+  'password_hash',
+  'newpassword',
+  'currentpassword',
+  'confirmpassword',
+  'contrasena',
+  'contraseña',
+  'token',
+  'access_token',
+  'refresh_token',
+  'refreshtoken',
+  'authorization',
+  'mfacode',
+  'otp',
+  'pin',
+  'apikey',
+  'api_key',
+  'secret',
+  'cookie',
+]);
+
+/** Hasta dónde baja `sanitizeValue`: un objeto con ciclos no debe reventar el filtro de errores. */
+const PROFUNDIDAD_SANITIZAR = 8;
+/** Largo máximo del JSON de `details` de un error HTTP en el log. */
+const MAX_DETALLE_LOG = 500;
+/** Cuántas líneas de la pila se escriben en el log. */
+const MAX_LINEAS_PILA_LOG = 12;
+const MAX_LARGO_LINEA_PILA = 300;
+
+/** Cuántos mensajes de un arreglo de validación se escriben en el log. */
+const MAX_MENSAJES_LOG = 20;
+
+/**
+ * El `message` del log con la misma forma que el de la respuesta (un arreglo de validación sigue siendo un
+ * arreglo) pero sin data URLs, correos ni JWT, y con tope de largo.
+ */
+function mensajeParaLog(mensaje: unknown): string | string[] {
+  if (Array.isArray(mensaje)) {
+    return mensaje.slice(0, MAX_MENSAJES_LOG).map((m) => mensajeSeguroParaLog(m));
+  }
+  return mensajeSeguroParaLog(mensaje);
+}
+
+/**
+ * Un marco real de la pila de Node: termina en `archivo:línea:columna` (con o sin paréntesis), en `(<anonymous>)` o en
+ * `(index N)`. Un mensaje de varias líneas que imite «    at …» no pasa si no tiene esa forma.
+ */
+const RE_MARCO_PILA = /^\s+at\s.*(?::\d+:\d+\)?|\(<anonymous>\)|\(index \d+\))\s*$/;
+/** Un marco de pila real mide muy por debajo de esto; una línea más larga no es un marco. */
+const MAX_LARGO_MARCO_PILA = 1000;
+
+/**
+ * Las líneas «at …» de la pila, sin el mensaje del error: el mensaje de Prisma va antes de las líneas
+ * `at` y trae el cuerpo de la consulta con los valores que mandó la persona.
+ */
+function pilaParaLog(stack: unknown): string {
+  if (typeof stack !== 'string') return '';
+  const marcos: string[] = [];
+  for (const linea of stack.split('\n', 400)) {
+    if (linea.length > MAX_LARGO_MARCO_PILA || !RE_MARCO_PILA.test(linea)) continue;
+    marcos.push(linea.trim().slice(0, MAX_LARGO_LINEA_PILA));
+    if (marcos.length >= MAX_LINEAS_PILA_LOG) break;
+  }
+  return marcos.join('\n');
+}
+
+/**
+ * Lo que el log guarda en `details`: de una `HttpException`, su respuesta sin llaves sensibles y recortada a
+ * 500 caracteres de JSON; de cualquier otro error, el resumen interno (modelo, acción, código de Prisma) y
+ * las primeras 12 líneas «at» de la pila (no la primera línea, que es el mensaje). Nunca el mensaje original,
+ * que en Prisma trae los valores enviados.
+ */
+function detallesParaLog(
+  exception: unknown,
+  clasificado: { details: unknown; interno?: string },
+  sanitizar: (valor: unknown) => unknown,
+): unknown {
+  if (exception instanceof HttpException) {
+    let json = '';
+    try {
+      json = JSON.stringify(sanitizar(clasificado.details)) ?? '';
+    } catch {
+      json = '';
+    }
+    return mensajeSeguroParaLog(json, MAX_DETALLE_LOG);
+  }
+  const stack = (exception as { stack?: unknown } | null | undefined)?.stack;
+  return {
+    interno: clasificado.interno ?? resumenInterno(exception),
+    stack: pilaParaLog(stack),
+  };
+}
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -26,28 +134,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
     );
   }
 
-  private sanitizeValue(value: unknown): unknown {
-    const sensitiveKeys = new Set([
-      'password',
-      'passwordHash',
-      'token',
-      'access_token',
-      'refresh_token',
-      'authorization',
-    ]);
+  private sanitizeValue(value: unknown, prof = 0): unknown {
+    if (prof >= PROFUNDIDAD_SANITIZAR) {
+      return '[...]';
+    }
 
     if (Array.isArray(value)) {
-      return value.map((item) => this.sanitizeValue(item));
+      return value.map((item) => this.sanitizeValue(item, prof + 1));
     }
 
     if (value && typeof value === 'object') {
       const source = value as Record<string, unknown>;
       const sanitized: Record<string, unknown> = {};
       for (const [key, current] of Object.entries(source)) {
-        if (sensitiveKeys.has(key.toLowerCase())) {
+        if (LLAVES_SENSIBLES_LOG.has(key.toLowerCase()) || esLlaveSecreta(key)) {
           sanitized[key] = '[REDACTED]';
         } else {
-          sanitized[key] = this.sanitizeValue(current);
+          sanitized[key] = this.sanitizeValue(current, prof + 1);
         }
       }
       return sanitized;
@@ -66,30 +169,37 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // Se asigna como `string` porque así se tipaba antes; el consejo de abajo lo usa tal cual.
     const message = clasificado.mensajeRespuesta as string;
 
-    const payload = {
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      method: request.method,
-      status,
-      message,
-      errorCode,
-      details: this.sanitizeValue(details),
-      user: (request as any).user || null,
-      body: this.sanitizeValue(request.body),
-      query: this.sanitizeValue(request.query),
-      params: this.sanitizeValue(request.params),
-    };
-
     // Keep expected public internet probes out of error-level noise.
     // Desde el 07-11 solo un 5xx es `error`: un 4xx (sección SEO sin publicar, escáneres que piden
     // /phpinfo.php, sesión vencida) es culpa de quien llama y antes eran ~800 «errores» al día que
     // tapaban los de verdad.
-    if (status === 404 && this.isExpectedNoise404(request.url, request.method)) {
-      this.logger.warn('API Not Found (noise)', payload);
-    } else if (status < 500) {
-      this.logger.warn('API Client Error', payload);
+    const esRuido404 = status === 404 && this.isExpectedNoise404(request.url, request.method);
+    const evento = esRuido404 ? 'API Not Found (noise)' : status < 500 ? 'API Client Error' : 'API Exception';
+
+    // Lo que se escribe en el log NO es lo que se responde: aquí el usuario es solo {id, roleKey, isClient},
+    // el cuerpo y el query van reducidos a su forma (qué campos llegaron, no sus valores), la ruta y los
+    // parámetros sin tokens y los detalles sin el mensaje interno de Prisma. Ver `mascara-log.ts`.
+    const payload = {
+      timestamp: new Date().toISOString(),
+      // `message` pisa la etiqueta del primer argumento en el JSON de winston: `evento` la conserva.
+      evento,
+      ruta: rutaPatron(request),
+      path: pathParaLog(request.originalUrl ?? request.url),
+      method: request.method,
+      status,
+      message: mensajeParaLog(message),
+      errorCode,
+      details: detallesParaLog(exception, clasificado, (valor) => this.sanitizeValue(valor)),
+      user: usuarioParaLog((request as any).user),
+      body: formaDe(request.body),
+      query: formaDe(request.query),
+      params: paramsParaLog(request.params),
+    };
+
+    if (status < 500) {
+      this.logger.warn(evento, payload);
     } else {
-      this.logger.error('API Exception', payload);
+      this.logger.error(evento, payload);
     }
 
     // Suggest possible solutions for common errors
