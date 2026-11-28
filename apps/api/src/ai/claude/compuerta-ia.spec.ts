@@ -480,4 +480,70 @@ describe('CompuertaIa', () => {
     foto.hoy.filas.length = 0;
     expect(compuerta.contadoresDelDia().filas).toHaveLength(1);
   });
+
+  describe('último fallo y resultado de la última sonda (los lee GET /ai/salud)', () => {
+    it('sin nada visto, ambos son null', () => {
+      expect(nueva().compuerta.instantanea()).toMatchObject({ ultimoFallo: null, ultimaSondaResultado: null });
+    });
+
+    it('el último fallo guarda cuándo, qué clase, de qué proceso y el detalle, cuente o no para el corte', () => {
+      const { compuerta, reloj, avanzar } = nueva();
+      compuerta.registrarFallo(clasificarFallo(error500()), 'actas', false, 1);
+      expect(compuerta.instantanea().ultimoFallo).toEqual({ at: T0, motivo: 'error_servicio', proceso: 'actas', detalle: '500 api_error' });
+      expect(compuerta.instantanea().estado).toBe('ok');
+      avanzar(MIN);
+      compuerta.registrarFallo(llave(), 'triage', false, 1);
+      expect(compuerta.instantanea().ultimoFallo).toEqual({
+        at: reloj.t,
+        motivo: 'llave_puerta_invalida',
+        proceso: 'triage',
+        detalle: '401 authentication_error',
+      });
+    });
+
+    it('un éxito no borra el último fallo (sirve para ver cuándo fue)', () => {
+      const { compuerta, avanzar } = nueva();
+      compuerta.registrarFallo(llave(), 'actas', false, 1);
+      avanzar(MIN);
+      compuerta.registrarBuena('actas', 'claude-haiku-5-5', 1);
+      expect(compuerta.instantanea().ultimoFallo).toMatchObject({ at: T0, motivo: 'llave_puerta_invalida' });
+    });
+
+    it('la sonda que falla y la que sale bien dejan su resultado; una llamada común no lo toca', () => {
+      const { compuerta, reloj, avanzar } = nueva();
+      compuerta.registrarFallo(llave(), 'nexara-sonda', true);
+      expect(compuerta.instantanea().ultimaSondaResultado).toEqual({ at: T0, ok: false, motivo: 'llave_puerta_invalida' });
+      avanzar(MIN);
+      compuerta.registrarBuena('actas', 'claude-haiku-5-5', 1);
+      expect(compuerta.instantanea().ultimaSondaResultado).toMatchObject({ at: T0, ok: false });
+      avanzar(MIN);
+      compuerta.registrarBuena('nexara-sonda', 'claude-haiku-5-5', undefined, true);
+      expect(compuerta.instantanea().ultimaSondaResultado).toEqual({ at: reloj.t, ok: true, motivo: null });
+    });
+
+    it('una sonda que falla por algo que no abre el corte también queda anotada, con su motivo', () => {
+      const { compuerta } = nueva();
+      compuerta.registrarFallo(clasificarFallo(error500()), 'nexara-sonda', true);
+      expect(compuerta.instantanea().ultimaSondaResultado).toEqual({ at: T0, ok: false, motivo: 'error_servicio' });
+    });
+
+    it('con la compuerta apagada no anota nada', () => {
+      const { compuerta } = nueva('apagado');
+      compuerta.registrarFallo(llave(), 'nexara-sonda', true);
+      compuerta.registrarBuena('nexara-sonda', 'claude-haiku-5-5', undefined, true);
+      expect(compuerta.instantanea()).toMatchObject({ ultimoFallo: null, ultimaSondaResultado: null, ultimaBuena: null });
+    });
+
+    it('la foto no deja alterar lo anotado', () => {
+      const { compuerta } = nueva();
+      compuerta.registrarFallo(llave(), 'actas', true, 1);
+      const foto = compuerta.instantanea();
+      foto.ultimoFallo!.proceso = 'otro';
+      foto.ultimaSondaResultado!.ok = true;
+      expect(compuerta.instantanea()).toMatchObject({
+        ultimoFallo: { proceso: 'actas' },
+        ultimaSondaResultado: { ok: false },
+      });
+    });
+  });
 });

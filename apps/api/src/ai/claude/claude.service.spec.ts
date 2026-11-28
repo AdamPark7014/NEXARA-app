@@ -745,4 +745,60 @@ describe('ClaudeService: compuerta de la IA', () => {
       expect(create).toHaveBeenCalledTimes(3);
     });
   });
+
+  describe('lo que lee GET /ai/salud', () => {
+    it('cupoDelDia dice cuánto lleva gastado la empresa hoy, sin contar ni liberar nada', async () => {
+      irA(Date.UTC(2026, 10, 28, 15, 0, 0));
+      const { svc } = conCompuerta(jest.fn().mockResolvedValue(respuesta('ok')), 'observar');
+      expect(svc.cupoDelDia(1)).toEqual({ dia: '2026-11-28', tope: 300, usadas: 0 });
+      await svc.texto(PETICION);
+      await svc.texto(PETICION);
+      await svc.texto({ ...PETICION, companyId: 2 });
+      expect(svc.cupoDelDia(1)).toMatchObject({ usadas: 2 });
+      expect(svc.cupoDelDia(2)).toMatchObject({ usadas: 1 });
+      expect(svc.cupoDelDia(3)).toMatchObject({ usadas: 0 });
+      // Leerlo no lo mueve.
+      svc.cupoDelDia(1);
+      expect(llamadasContadas(svc)).toBe(3);
+    });
+
+    it('el tope sale de CLAUDE_TOPE_DIARIO y el día cambia a la medianoche de México', async () => {
+      process.env.CLAUDE_TOPE_DIARIO = '5';
+      irA(Date.UTC(2026, 10, 28, 5, 59, 0)); // 23:59 del 27-11 en México
+      const { svc } = conCompuerta(jest.fn().mockResolvedValue(respuesta('ok')), 'observar');
+      await svc.texto(PETICION);
+      expect(svc.cupoDelDia(1)).toEqual({ dia: '2026-11-27', tope: 5, usadas: 1 });
+      irA(Date.UTC(2026, 10, 28, 6, 1, 0)); // ya es 28-11 en México
+      expect(svc.cupoDelDia(1)).toEqual({ dia: '2026-11-28', tope: 5, usadas: 0 });
+    });
+
+    it('la sonda deja su resultado en la compuerta, buena o mala', async () => {
+      const t0 = Date.UTC(2026, 10, 28, 15, 0, 0);
+      irA(t0);
+      const create = jest.fn().mockRejectedValue(e401());
+      const { svc } = conCompuerta(create, 'observar');
+      await svc.sondearSiToca();
+      expect(svc.compuerta.instantanea()).toMatchObject({
+        ultimaSondaResultado: { at: t0, ok: false, motivo: 'llave_puerta_invalida' },
+        ultimoFallo: { at: t0, motivo: 'llave_puerta_invalida', proceso: 'nexara-sonda' },
+      });
+      irA(t0 + 5 * MIN);
+      create.mockResolvedValue(respuesta('ok'));
+      await svc.sondearSiToca();
+      expect(svc.compuerta.instantanea().ultimaSondaResultado).toEqual({ at: t0 + 5 * MIN, ok: true, motivo: null });
+    });
+
+    it('la llamada real que lleva el permiso de sonda también deja el resultado; una común no', async () => {
+      const t0 = Date.UTC(2026, 10, 28, 15, 0, 0);
+      irA(t0);
+      const create = jest.fn().mockRejectedValue(e401());
+      const { svc } = conCompuerta(create, 'observar');
+      for (let i = 0; i < 3; i++) await svc.texto(PETICION).catch(() => undefined);
+      expect(svc.compuerta.instantanea().ultimaSondaResultado).toBeNull();
+      irA(t0 + 5 * MIN);
+      create.mockResolvedValue(respuesta('ok'));
+      await svc.texto(PETICION); // pasado proximoIntento: esta llamada lleva el permiso de sonda
+      expect(svc.compuerta.instantanea().ultimaSondaResultado).toEqual({ at: t0 + 5 * MIN, ok: true, motivo: null });
+    });
+  });
 });

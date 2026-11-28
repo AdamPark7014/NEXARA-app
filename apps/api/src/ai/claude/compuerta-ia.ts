@@ -106,6 +106,12 @@ export type FilaConteoDia = {
   otros: number;
 };
 
+/** El último fallo que vio este proceso (de cualquier clase, cuente o no para el corte). Solo estado y tipo, nunca el mensaje. */
+export type UltimoFalloCompuerta = { at: number; motivo: MotivoFallo; proceso: string; detalle: string };
+
+/** Cómo salió la última sonda (la del reloj o la llamada real que llevaba el permiso). `motivo` solo si falló. */
+export type ResultadoSonda = { at: number; ok: boolean; motivo: MotivoFallo | null };
+
 export type InstantaneaCompuerta = {
   estado: 'ok' | 'caida';
   motivo: MotivoCorte | null;
@@ -118,6 +124,10 @@ export type InstantaneaCompuerta = {
   sondaEnVuelo: boolean;
   /** Cuándo arrancó la última sonda. */
   ultimaSonda: number | null;
+  /** Cómo terminó la última sonda (`null` mientras ninguna haya terminado desde que arrancó el proceso). */
+  ultimaSondaResultado: ResultadoSonda | null;
+  /** El último fallo visto, aunque no haya abierto el corte (`null` si este proceso no ha visto ninguno). */
+  ultimoFallo: UltimoFalloCompuerta | null;
   ultimaBuena: { at: number; proceso: string; modelo: string } | null;
   /** Cuánto esperará la próxima vez que la sonda falle, en minutos. */
   esperaActualMin: number;
@@ -266,6 +276,8 @@ export class CompuertaIa {
   /** Desde cuándo hay una sonda en vuelo (`null` = ninguna). */
   private sondaDesde: number | null = null;
   private ultimaSondaAt: number | null = null;
+  private ultimaSondaResultado: ResultadoSonda | null = null;
+  private ultimoFallo: UltimoFalloCompuerta | null = null;
   private ultimaBuena: { at: number; proceso: string; modelo: string } | null = null;
   private readonly oyentes = new Set<(evento: EventoCompuerta) => void>();
 
@@ -372,13 +384,16 @@ export class CompuertaIa {
 
   /**
    * Una llamada salió bien (la sonda o una real). Reinicia la cuenta de fallos; si había caída, la cierra, devuelve la
-   * escalera a 5 min y emite `VOLVIO`. `companyId` es para la cuenta del día (la sonda no lleva).
+   * escalera a 5 min y emite `VOLVIO`. `companyId` es para la cuenta del día (la sonda no lleva). `esSonda` es `true`
+   * para la sonda del reloj y para la llamada real que llevaba el permiso de sonda: solo sirve para que `GET /ai/salud`
+   * diga cómo salió la última prueba.
    */
-  registrarBuena(proceso: string, modelo: string, companyId?: number): void {
+  registrarBuena(proceso: string, modelo: string, companyId?: number, esSonda = false): void {
     if (this.modo === 'apagado') return;
     const ahora = this.reloj();
     this.contar(companyId, proceso, 'buenas');
     this.ultimaBuena = { at: ahora, proceso, modelo };
+    if (esSonda) this.ultimaSondaResultado = { at: ahora, ok: true, motivo: null };
     this.fallosSeguidos = 0;
     this.sondaDesde = null;
     if (this.estado === 'caida') {
@@ -405,7 +420,11 @@ export class CompuertaIa {
     if (this.modo === 'apagado') return;
     const ahora = this.reloj();
     this.contar(companyId, proceso, clase.sinCosto ? 'sinCosto' : 'otros');
-    if (esSonda) this.sondaDesde = null;
+    this.ultimoFallo = { at: ahora, motivo: clase.motivo, proceso, detalle: clase.detalle };
+    if (esSonda) {
+      this.sondaDesde = null;
+      this.ultimaSondaResultado = { at: ahora, ok: false, motivo: clase.motivo };
+    }
 
     if (!clase.cuentaParaCorte) {
       // La sonda de una caída que falla por otra cosa: no se sabe si volvió; espera lo mismo otra vez, sin subir.
@@ -484,6 +503,8 @@ export class CompuertaIa {
       proximoIntento: this.proximoIntento,
       sondaEnVuelo: this.sondaViva(ahora),
       ultimaSonda: this.ultimaSondaAt,
+      ultimaSondaResultado: this.ultimaSondaResultado ? { ...this.ultimaSondaResultado } : null,
+      ultimoFallo: this.ultimoFallo ? { ...this.ultimoFallo } : null,
       ultimaBuena: this.ultimaBuena ? { ...this.ultimaBuena } : null,
       esperaActualMin: this.esperaMs(this.nivel) / 60_000,
       hoy: this.contadoresDelDia(),

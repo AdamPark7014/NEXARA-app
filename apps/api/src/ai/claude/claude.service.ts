@@ -171,6 +171,11 @@ const SONDA_MINUTOS_POR_OMISION = 30;
 /** De un mismo motivo se escribe a lo sumo un aviso por minuto en el log. */
 const AVISO_CADA_MS = 60_000;
 
+/** Tope de llamadas por empresa y día (`CLAUDE_TOPE_DIARIO`, 300). Lo usan el cupo y `GET /ai/salud`. */
+function topeDiario(): number {
+  return Math.max(1, Number(process.env.CLAUDE_TOPE_DIARIO) || 300);
+}
+
 /** Modo de la compuerta sin base de datos (evals con tsx y pruebas): `IA_COMPUERTA_MODO`, y si falta, apagado. */
 function modoDeEntorno(): ModoIa {
   return interpretarModoPiloto(process.env.IA_COMPUERTA_MODO) ?? 'apagado';
@@ -294,7 +299,7 @@ export class ClaudeService {
    * puerta no llegó a cobrarla (`liberarLlamada`). Lanza si el cupo del día ya se acabó.
    */
   private registrarLlamada(companyId: number): BoletoCupo {
-    const tope = Math.max(1, Number(process.env.CLAUDE_TOPE_DIARIO) || 300);
+    const tope = topeDiario();
     // `Date.now()` y no `new Date()` solos: es el mismo reloj que usa la compuerta (y el que las pruebas mueven).
     const dia = workDateKey(new Date(Date.now()));
     const clave = `${companyId}:${dia}`;
@@ -311,6 +316,15 @@ export class ClaudeService {
       if (!k.endsWith(`:${dia}`)) this.llamadasPorDia.delete(k);
     this.llamadasPorDia.set(clave, usadas + 1);
     return { clave, dia };
+  }
+
+  /**
+   * Cuánto cupo de IA lleva gastado hoy (día de México) la empresa y cuál es su tope. Solo lee: no cuenta ni libera
+   * nada. Es lo que muestra `GET /ai/salud`.
+   */
+  cupoDelDia(companyId: number): { dia: string; tope: number; usadas: number } {
+    const dia = workDateKey(new Date(Date.now()));
+    return { dia, tope: topeDiario(), usadas: this.llamadasPorDia.get(`${companyId}:${dia}`) ?? 0 };
   }
 
   /**
@@ -382,7 +396,7 @@ export class ClaudeService {
       if (clase.sinCosto) this.liberarLlamada(boleto);
       throw this.traducirFallo(error, clase, peticion.proceso, modelo);
     }
-    this.compuerta.registrarBuena(peticion.proceso, modelo, peticion.companyId);
+    this.compuerta.registrarBuena(peticion.proceso, modelo, peticion.companyId, paso.esSonda);
 
     const uso = usoDeRespuesta(modelo, respuesta.usage);
     this.logger.log(
@@ -489,7 +503,7 @@ export class ClaudeService {
         },
         { timeout: 15_000, maxRetries: 0, headers: { 'x-proceso': PROCESO_SONDA } },
       );
-      this.compuerta.registrarBuena(PROCESO_SONDA, modelo);
+      this.compuerta.registrarBuena(PROCESO_SONDA, modelo, undefined, true);
       return true;
     } catch (error) {
       const clase = clasificarFallo(error);

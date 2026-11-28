@@ -28,6 +28,8 @@ import { EstandarService } from './estandar/estandar.service.js';
 import { RutaEstandarDto } from './estandar/ruta.dto.js';
 import { RevisionActividadService } from './revision/revision-actividad.service.js';
 import { requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { isChainTopAuthority } from '../activities/activity-superiors.js';
+import { SaludIaService } from './salud/salud-ia.service.js';
 
 /** Un dictado son segundos o un par de minutos: 10 MB sobran en opus. */
 const MAX_DICTADO_BYTES = 10 * 1024 * 1024;
@@ -42,6 +44,7 @@ export class AiController {
     private readonly complejidad: ComplejidadService,
     private readonly estandar: EstandarService,
     private readonly revision: RevisionActividadService,
+    private readonly saludIa: SaludIaService,
   ) {}
 
   /**
@@ -78,6 +81,19 @@ export class AiController {
   async estadoAsistente(@CurrentUser() user: any) {
     if (!(await this.asistente.puedeUsar(user))) return { disponible: false };
     return this.asistente.estado();
+  }
+
+  /**
+   * El estado real de la IA: si responde, desde cuándo no, última llamada buena y último fallo, lo que se gastó hoy por
+   * función y las señales de la base que muestran una caída (sugerencias de complejidad por día). Solo lee, y solo de la
+   * empresa del token. Es de dirección y desarrollo: `console.admin` lo tienen otros roles y no basta. No va en
+   * `GET /health` (Gatus y Traefik lo usan y no deben parpadear por la IA).
+   */
+  @Get('salud')
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  salud(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    if (!isChainTopAuthority(user)) throw new ForbiddenException('Solo dirección y desarrollo ven el estado de la IA.');
+    return this.saludIa.estado(requireCompanyId(companyId));
   }
 
   /**

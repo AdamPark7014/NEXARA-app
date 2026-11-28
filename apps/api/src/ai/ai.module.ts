@@ -12,12 +12,13 @@ import { TranscriptorService } from './voz/transcriptor.service.js';
 import { ComplejidadService } from './complejidad/complejidad.service.js';
 import { EstandarService } from './estandar/estandar.service.js';
 import { GuardiaIaService } from './claude/guardia-ia.service.js';
+import { SaludIaService } from './salud/salud-ia.service.js';
 
 @Module({
   // NotificationsModule: la tarjeta de «la IA cayó / volvió» de GuardiaIaService. UsersModule ya lo importa, así que no
   // crea ciclo (NotificationsModule solo depende de PrismaModule, AuthModule y DevicesModule).
   imports: [PrismaModule, AuthModule, UsersModule, NotificationsModule],
-  providers: [AiTriageService, ClaudeService, AsistenteActividadesService, TranscriptorService, ComplejidadService, EstandarService, RevisionActividadService, GuardiaIaService],
+  providers: [AiTriageService, ClaudeService, AsistenteActividadesService, TranscriptorService, ComplejidadService, EstandarService, RevisionActividadService, GuardiaIaService, SaludIaService],
   controllers: [AiController],
   exports: [AiTriageService, ClaudeService, TranscriptorService, ComplejidadService, EstandarService],
 })
