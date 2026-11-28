@@ -99,7 +99,10 @@ describe('Mis actividades: lo asignado se ve', () => {
     expect(where.userId).toBe(LUIS.id);
     expect(where.companyId).toBe(1);
     expect(where.retiradoAt).toBeNull();
-    expect(where.activity).toEqual({ deletedAt: null });
+    // Solo se pide lo que la pantalla enseña (lo-que-se-muestra.ts): sin borradas y con las tres ramas del filtro.
+    expect(where.activity.deletedAt).toBeNull();
+    expect(where.activity.OR).toHaveLength(3);
+    expect(Object.keys(where.activity).sort()).toEqual(['OR', 'deletedAt']);
     expect(JSON.stringify(where)).not.toContain('coreKind');
   });
 

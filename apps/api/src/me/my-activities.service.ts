@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
@@ -16,6 +17,7 @@ import type { CreateActivityDto } from '../activities/dto/create-activity.dto.js
 import { PrismaService } from '../prisma/prisma.service.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 import { workDayStart } from '../common/time/workday.js';
+import { esCerradaParaLaCola, loQueSeMuestra } from './lo-que-se-muestra.js';
 import {
   cambiosAlIniciar,
   horasPlanValidas,
@@ -281,8 +283,7 @@ export type ReorderMyActivitiesDto = {
 
 const norm = (email?: string | null) => (email || '').trim().toLowerCase();
 
-const isClosed = (estatus: string) =>
-  /finalizada|completada|cancelada|aprobada|no cumplida|incumplida/.test((estatus || '').toLowerCase());
+const isClosed = esCerradaParaLaCola;
 
 /** null/undefined al final. */
 const nullsLast = (a: number | null | undefined, b: number | null | undefined) => {
@@ -294,6 +295,8 @@ const nullsLast = (a: number | null | undefined, b: number | null | undefined) =
 
 @Injectable()
 export class MyActivitiesService {
+  private readonly logger = new Logger(MyActivitiesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly activities: ActivitiesService,
@@ -1164,12 +1167,19 @@ export class MyActivitiesService {
     // suya) ni por el departamento de quien se la dejó. Sí se recorta por persona,
     // empresa y por haber salido del equipo.
     const tenant = companyId != null ? { companyId } : {};
+    const t0 = performance.now();
+    const ahora = new Date();
+    // El día de la empresa: con el reloj del servidor (UTC), «hoy» empezaba a las 18:00 de México.
+    const dayStart = workDayStart(ahora);
+    const hace7Dias = ahora.getTime() - 7 * 24 * 60 * 60 * 1000;
+    // Solo lo que la pantalla enseña (abierto, cerrado hoy, «No cumplida» de 7 días). Ver lo-que-se-muestra.ts.
+    const visible = loQueSeMuestra(dayStart, new Date(hace7Dias));
     const rows = await this.prisma.activityAssignee.findMany({
       where: {
         userId: viewer.id,
         retiradoAt: null,
         ...tenant,
-        activity: { deletedAt: null },
+        activity: { deletedAt: null, ...visible },
       },
       select: {
         rol: true,
@@ -1239,6 +1249,8 @@ export class MyActivitiesService {
           },
         },
       },
+      // Con el filtro de arriba casi nadie se acerca a 300; si alguien lo rebasa, se corta lo más viejo y no al azar.
+      orderBy: { asignadoAt: 'desc' },
       take: 300,
     });
 
@@ -1251,6 +1263,7 @@ export class MyActivitiesService {
         responsableId: viewer.id,
         deletedAt: null,
         ...tenant,
+        ...visible,
         ...(cubiertas.size > 0 ? { id: { notIn: [...cubiertas] } } : {}),
         assignees: { none: { userId: viewer.id } },
       },
@@ -1325,9 +1338,7 @@ export class MyActivitiesService {
       } as (typeof rows)[number]);
     }
 
-    const ahora = new Date();
-    // El día de la empresa: con el reloj del servidor (UTC), «hoy» empezaba a las 18:00 de México.
-    const dayStart = workDayStart(ahora);
+    const tConsulta = performance.now();
     // Sesiones de trabajo: lo que quedó corriendo de ayer (o lleva 12 h) se cierra al leerlo.
     await cerrarSesionesVencidas(this.prisma, { userIds: [viewer.id], companyId }, ahora);
     const sesiones = await leerSesiones(this.prisma, {
@@ -1335,6 +1346,7 @@ export class MyActivitiesService {
       activityIds: rows.map((row) => row.activity.id),
       companyId,
     });
+    const tSesiones = performance.now();
     const items: MyActivityItem[] = rows.map((row) => {
       const a = row.activity;
       const tiempos = tiemposDto(row, a, ahora, sesionesDe(sesiones, viewer.id, a.id));
@@ -1446,7 +1458,6 @@ export class MyActivitiesService {
       )
       .sort((a, b) => (b.fechaFinalizacion?.getTime() ?? 0) - (a.fechaFinalizacion?.getTime() ?? 0));
 
-    const hace7Dias = ahora.getTime() - 7 * 24 * 60 * 60 * 1000;
     const noCumplidas = items
       .filter(
         (item) =>
@@ -1459,6 +1470,14 @@ export class MyActivitiesService {
       );
 
     const manager = this.isAreaManager(viewer.email);
+    // Una línea solo cuando es lenta: dice si el tiempo se fue en la base, en las sesiones o en armar la respuesta.
+    const total = performance.now() - t0;
+    if (total > 700) {
+      this.logger.warn(
+        `me/activities lento: filas=${rows.length} huerfanas=${huerfanas.length} consulta=${Math.round(tConsulta - t0)} ms ` +
+          `sesiones=${Math.round(tSesiones - tConsulta)} ms armado=${Math.round(performance.now() - tSesiones)} ms`,
+      );
+    }
     return { canReorder: manager, canSelfAssign: true, open, seguimiento, doneToday, noCumplidas };
   }
 
