@@ -5,6 +5,27 @@ export const MENSAJE_UN_SOLO_DIA =
 
 export const MINUTOS_JORNADA_NETOS = 420; // 10:00–18:00 menos 60 de comida
 
+// Los mismos tres textos que da la API (apps/api/src/activities/actividad-un-solo-dia.ts): la pantalla avisa
+// antes de enviar con las mismas palabras que el servidor usaría al rechazar. Hay una prueba que los compara.
+export const MENSAJE_VARIOS_DIAS =
+  "Esta actividad abarca varios días y cada actividad es de un solo día. Crea una actividad por cada día.";
+
+export const MENSAJE_DIAS_DISTINTOS =
+  "El inicio y la hora de entrega caen en días distintos. Pon los dos en el mismo día.";
+
+export function horasYMinutos(minutos: number): string {
+  const total = Math.max(0, Math.round(Number(minutos) || 0));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h && m) return `${h} h ${m} min`;
+  if (h) return `${h} h`;
+  return `${m} min`;
+}
+
+export function mensajeTiempoExcedeDia(tiempoEstimadoMin: number): string {
+  return `El tiempo estimado (${horasYMinutos(tiempoEstimadoMin)}) es más de lo que cabe en un día de trabajo (${horasYMinutos(MINUTOS_JORNADA_NETOS)}). Baja el tiempo o crea otra actividad para el resto.`;
+}
+
 function claveDia(valor: unknown): string | null {
   if (valor == null || valor === "") return null;
   if (typeof valor === "string") {
@@ -64,7 +85,7 @@ export function validarUnSoloDia(input: {
     const a = diaClave(input.periodoInicio);
     const b = diaClave(input.periodoFin);
     if (!a || !b) return { ok: false, error: "Las fechas del periodo no son válidas (usa AAAA-MM-DD)" };
-    if (a !== b) return { ok: false, error: MENSAJE_UN_SOLO_DIA };
+    if (a !== b) return { ok: false, error: MENSAJE_VARIOS_DIAS };
   }
   const inicio = diaInstante(input.fechaInicio);
   const max = diaInstante(input.fechaMaxima);
@@ -72,7 +93,7 @@ export function validarUnSoloDia(input: {
   const ancla = inicio ?? max ?? entrega;
   if (ancla) {
     for (const d of [inicio, max, entrega]) {
-      if (d && d !== ancla) return { ok: false, error: MENSAJE_UN_SOLO_DIA };
+      if (d && d !== ancla) return { ok: false, error: MENSAJE_DIAS_DISTINTOS };
     }
   }
   if (
@@ -80,7 +101,7 @@ export function validarUnSoloDia(input: {
     Number.isFinite(input.tiempoEstimadoMin) &&
     input.tiempoEstimadoMin > MINUTOS_JORNADA_NETOS
   ) {
-    return { ok: false, error: MENSAJE_UN_SOLO_DIA };
+    return { ok: false, error: mensajeTiempoExcedeDia(input.tiempoEstimadoMin) };
   }
   return { ok: true };
 }
