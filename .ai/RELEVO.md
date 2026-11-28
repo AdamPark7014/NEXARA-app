@@ -1,5 +1,13 @@
 # RELEVO
 
+- **28-11 ~10:30 México (claude-code) — Nexara Piloto, ola 1, tanda 11 (parte 1): «Mis actividades» pide a la base solo lo que se muestra. Solo API; sin migraciones; SIN DESPLEGAR.**
+  - 92f2bfb35: `me/lo-que-se-muestra.ts` (`loQueSeMuestra`, `esCerradaParaLaCola`) filtra en la consulta lo abierto, lo cerrado hoy (día de México) y lo «No cumplida» de 7 días. Es un superconjunto de lo que `list()` filtra después; el filtrado en memoria no se tocó y la respuesta es la misma. Se agregó `orderBy asignadoAt desc` al `take 300`.
+  - Comprobado en producción, solo lectura: de 816 asignaciones vigentes la pantalla enseña 19; el filtro trae 19, con 0 perdidas y 0 de más.
+  - Mide por dentro: si la lista tarda más de 700 ms deja una línea `me/activities lento: filas=… consulta=… sesiones=… armado=…`. Tras desplegar, comparar contra la línea base del log de Traefik (mediana 861 ms, p90 1,670, 38 % de 1 s o más); meta: mediana menor a 300 ms en hora pico. Si no baja, el cuello es el proceso único de Node o el abanico de recargas por `entity:updated`, no la base.
+  - Falta de la tanda 11: [arreglos-chicos#5] (quién revisa al revisor), que necesita la decisión de Adam sobre quién revisa al director de operaciones.
+  - Verificado: `typecheck:api` en cero; jest de `src/me`: 36 suites, 381 en verde.
+  - Paridad: API hecho · Web, Android e iOS no aplican (mismo contrato).
+
 - **28-11 ~10:05 México (claude-code) — Nexara Piloto, ola 1, tanda 8 (parte 1 y 6). API y web; sin migraciones; SIN DESPLEGAR.**
   - 99c25f268 rechazos que dicen qué hacer: `activities/evidence/evidencia-mensajes.ts` (evidencia en revisión o aprobada, actividad aprobada, cancelada o «No cumplida», foto de entrada ya guardada, paso equivocado con «primero…» o «este paso ya se envió, sigue con…»), `activities/actividad-un-solo-dia.ts` (tres textos por causa: varios días, días distintos, tiempo que no cabe, dicho en horas) y `attendance/mensajes-checada.ts` (entrada, salida y comida repetidas). Mismos códigos HTTP; cada rechazo lleva `code` estable (`{ message, code }`).
   - Cuidado al tocar textos de checada: las apps publicadas eligen pantalla leyendo palabras del mensaje. Los dos textos de checada conservan el de antes como prefijo, ninguno contiene `FRASES_QUE_LAS_APPS_LEEN` (hay prueba) y el de fin de semana (`guardias/guardias-reglas.ts`) no se tocó.
