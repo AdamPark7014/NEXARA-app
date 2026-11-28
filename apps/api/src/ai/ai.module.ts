@@ -10,10 +10,11 @@ import { AsistenteActividadesService } from './asistente/asistente-actividades.s
 import { TranscriptorService } from './voz/transcriptor.service.js';
 import { ComplejidadService } from './complejidad/complejidad.service.js';
 import { EstandarService } from './estandar/estandar.service.js';
+import { GuardiaIaService } from './claude/guardia-ia.service.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, UsersModule],
-  providers: [AiTriageService, ClaudeService, AsistenteActividadesService, TranscriptorService, ComplejidadService, EstandarService, RevisionActividadService],
+  providers: [AiTriageService, ClaudeService, AsistenteActividadesService, TranscriptorService, ComplejidadService, EstandarService, RevisionActividadService, GuardiaIaService],
   controllers: [AiController],
   exports: [AiTriageService, ClaudeService, TranscriptorService, ComplejidadService, EstandarService],
 })
