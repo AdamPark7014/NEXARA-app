@@ -1,5 +1,5 @@
 import { skipsMutationAudit } from './mutation-audit.interceptor';
-import { AUDIT_EXCLUDED } from '../prisma/prisma.service';
+import { AUDIT_EXCLUDED, SYNC_SIN_AUTOR } from '../prisma/prisma.service';
 
 describe('auditoría · lo que entra a audit_logs', () => {
   it('el webhook de los terminales Hikvision no se audita (cada evento ya está en integra_push_events)', () => {
@@ -15,5 +15,10 @@ describe('auditoría · lo que entra a audit_logs', () => {
   it('los eventos que empujan los terminales no se copian a la auditoría de Prisma', () => {
     expect(AUDIT_EXCLUDED.has('IntegraPushEvent')).toBe(true);
     expect(AUDIT_EXCLUDED.has('Activity')).toBe(false);
+  });
+
+  it('los modelos que escribe solo la sincronización de CT e INTEGRA están en SYNC_SIN_AUTOR; los de las personas no', () => {
+    expect(SYNC_SIN_AUTOR.has('ProductCT')).toBe(true);
+    expect(SYNC_SIN_AUTOR.has('Activity')).toBe(false);
   });
 });

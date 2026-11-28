@@ -1,11 +1,13 @@
 import { Prisma } from '@prisma/client';
 import {
   buildAuditChanges,
+  decidirEscritura,
   isAuditNoise,
   planTenantQuery,
   readCompoundUniqueSelector,
   redactAuditPayload,
   runWithTenantScope,
+  SYNC_SIN_AUTOR,
   whereAlreadyHasCompanyScope,
 } from './prisma.service.js';
 
@@ -173,6 +175,125 @@ describe('isAuditNoise', () => {
   it('los demás modelos se auditan como siempre', () => {
     expect(isAuditNoise('Activity', 'update', { data: { lastSeenAt: new Date() } }, { id: 1 })).toBe(false);
     expect(isAuditNoise('Activity', 'update', { data: { status: 'DONE' } }, { id: 1 })).toBe(false);
+  });
+});
+
+describe('isAuditNoise · sincronización sin autor', () => {
+  const modelos = [...SYNC_SIN_AUTOR];
+  const acciones = ['create', 'update', 'upsert', 'createMany'];
+
+  it('son los 12 modelos que escribe la sincronización de CT e INTEGRA', () => {
+    expect(modelos).toHaveLength(12);
+    expect(SYNC_SIN_AUTOR.has('ProductCT')).toBe(true);
+    expect(SYNC_SIN_AUTOR.has('IntegraPerson')).toBe(true);
+    // Los modelos que tocan las personas no están.
+    for (const m of ['Activity', 'Cotizacion', 'User', 'ChatChannelMember']) {
+      expect(SYNC_SIN_AUTOR.has(m)).toBe(false);
+    }
+  });
+
+  it('create, update, upsert y createMany sin autor son ruido en cada uno de esos modelos', () => {
+    for (const modelo of modelos) {
+      for (const accion of acciones) {
+        expect(isAuditNoise(modelo, accion, { data: { a: 1 } }, { id: 1, count: 4 })).toBe(true);
+        expect(isAuditNoise(modelo, accion, undefined, undefined, null)).toBe(true);
+        expect(isAuditNoise(modelo, accion, undefined, undefined, 0)).toBe(true);
+      }
+    }
+  });
+
+  it('con una persona detrás (sync a mano) se audita como siempre', () => {
+    for (const modelo of modelos) {
+      for (const accion of acciones) {
+        expect(isAuditNoise(modelo, accion, { data: { a: 1 } }, { id: 1, count: 4 }, 7)).toBe(false);
+      }
+    }
+  });
+
+  it('los borrados y las masivas que tocaron filas siguen auditándose; las de 0 filas no', () => {
+    for (const modelo of modelos) {
+      expect(isAuditNoise(modelo, 'deleteMany', {}, { count: 3 })).toBe(false);
+      expect(isAuditNoise(modelo, 'updateMany', {}, { count: 5 })).toBe(false);
+      expect(isAuditNoise(modelo, 'delete', {}, { id: 1 })).toBe(false);
+      expect(isAuditNoise(modelo, 'updateMany', {}, { count: 0 })).toBe(true);
+    }
+  });
+
+  it('los modelos de las personas se auditan aunque no haya autor', () => {
+    for (const modelo of ['Activity', 'Cotizacion', 'User', 'ChatChannelMember']) {
+      for (const accion of ['create', 'upsert']) {
+        expect(isAuditNoise(modelo, accion, { data: {} }, { id: 1 })).toBe(false);
+      }
+    }
+  });
+
+  it('AUDIT_SYNC_SIN_AUTOR=1 devuelve el comportamiento de antes (salida de emergencia)', () => {
+    const previo = process.env['AUDIT_SYNC_SIN_AUTOR'];
+    try {
+      process.env['AUDIT_SYNC_SIN_AUTOR'] = '1';
+      expect(isAuditNoise('ProductCT', 'upsert', {}, { id: 1 })).toBe(false);
+      expect(decidirEscritura('ProductCT', 'upsert', {}, { id: 1 }, undefined)).toEqual({
+        avisar: true,
+        auditar: true,
+      });
+      // Con otro valor no se enciende.
+      process.env['AUDIT_SYNC_SIN_AUTOR'] = '0';
+      expect(isAuditNoise('ProductCT', 'upsert', {}, { id: 1 })).toBe(true);
+    } finally {
+      if (previo === undefined) delete process.env['AUDIT_SYNC_SIN_AUTOR'];
+      else process.env['AUDIT_SYNC_SIN_AUTOR'] = previo;
+    }
+  });
+
+  it('cada nombre de SYNC_SIN_AUTOR existe en el esquema de Prisma (atrapa un renombre o una errata)', () => {
+    const existentes = new Set(Prisma.dmmf.datamodel.models.map((m) => m.name));
+    for (const modelo of modelos) {
+      expect(existentes.has(modelo)).toBe(true);
+    }
+  });
+});
+
+describe('decidirEscritura', () => {
+  it('la escritura de la propia auditoría no avisa ni se audita', () => {
+    expect(decidirEscritura('AuditLog', 'create', {}, { id: 1 })).toEqual({ avisar: false, auditar: false });
+    expect(decidirEscritura('AuditLog', 'createMany', {}, { count: 50 }, 7)).toEqual({
+      avisar: false,
+      auditar: false,
+    });
+  });
+
+  it('el sync sin autor ni avisa ni se audita; con autor, las dos cosas', () => {
+    expect(decidirEscritura('ProductCT', 'upsert', {}, { id: 1 }, undefined)).toEqual({
+      avisar: false,
+      auditar: false,
+    });
+    expect(decidirEscritura('ProductCT', 'upsert', {}, { id: 1 }, 7)).toEqual({ avisar: true, auditar: true });
+  });
+
+  it('los modelos de AUDIT_EXCLUDED no se auditan pero siguen avisando por tiempo real', () => {
+    expect(decidirEscritura('Notification', 'create', {}, { id: 1 })).toEqual({ avisar: true, auditar: false });
+    expect(decidirEscritura('IntegraPushEvent', 'create', {}, { id: 1 })).toEqual({ avisar: true, auditar: false });
+    expect(decidirEscritura('LocationTracking', 'create', {}, { id: 1 }, 7)).toEqual({
+      avisar: true,
+      auditar: false,
+    });
+  });
+
+  it('una masiva que no tocó filas no avisa ni se audita', () => {
+    expect(decidirEscritura('ChatChannelMember', 'updateMany', {}, { count: 0 })).toEqual({
+      avisar: false,
+      auditar: false,
+    });
+  });
+
+  it('lo que hacen las personas sigue avisando y auditándose', () => {
+    expect(decidirEscritura('Activity', 'update', {}, { id: 1 }, 7)).toEqual({ avisar: true, auditar: true });
+    // Aun sin autor (cron, seed) un modelo que no es de sincronización se sigue auditando.
+    expect(decidirEscritura('Activity', 'update', {}, { id: 1 })).toEqual({ avisar: true, auditar: true });
+    expect(decidirEscritura('ProductCT', 'deleteMany', {}, { count: 22 })).toEqual({
+      avisar: true,
+      auditar: true,
+    });
   });
 });
 

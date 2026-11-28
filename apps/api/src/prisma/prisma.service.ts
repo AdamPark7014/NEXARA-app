@@ -37,6 +37,25 @@ export const AUDIT_EXCLUDED = new Set<string>([
 ]);
 
 /**
+ * Modelos que escribe solo la sincronización del catálogo de CT y de INTEGRA. Sin una persona detrás, su registro es
+ * la tabla misma: el 28-11-2026 eran 4.1 M de las 4.25 M de filas de audit_logs (96.5 %), todas con `userId` nulo y
+ * los UPSERT sin siquiera guardar qué cambió. Cada escritura sin autor ni se audita ni se avisa por tiempo real
+ * (el `emit` global hacía recargar a todos los clientes conectados). Si una persona dispara el sync a mano y este
+ * corre dentro de su petición (sin `async`), el almacén trae `userId` y esa escritura sigue entrando a la bitácora y
+ * a los sockets. Si el trabajo se manda a la cola (`async`, `supplier.ct.sync`, los de `integra-acs-fanout`), corre
+ * fuera de la petición y queda sin autor: la fila de `SupplierCatalogSyncRun` deja constancia de la corrida.
+ * Los borrados y las masivas que sí tocaron filas se siguen auditando (ver `isAuditNoise`).
+ */
+export const SYNC_SIN_AUTOR = new Set<string>([
+  'ProductCT', 'SupplierProduct', 'SupplierCatalogSyncRun',
+  'IntegraSyncRun', 'IntegraSite', 'IntegraPerson', 'IntegraPersonCard',
+  'IntegraDevice', 'IntegraCamera', 'IntegraDoor', 'IntegraVehicle', 'IntegraRegion',
+]);
+
+/** Las escrituras de esos modelos que el sync repite sin parar. Borrar y las `updateMany` con filas siguen auditadas. */
+const ACCIONES_DE_SYNC = new Set(['create', 'update', 'upsert', 'createMany']);
+
+/**
  * Claves que nunca deben quedar registradas en AuditLog.changes. Sin esto, un
  * `user.update({ data: { password } })` deja el hash en una tabla que consultan
  * los visores de auditoría.
@@ -99,11 +118,16 @@ export function buildAuditChanges(
 }
 
 /**
- * Escrituras de modelos auditados que aun así no van a audit_logs, porque no dicen nada:
+ * Escrituras de modelos auditados que aun así no van a audit_logs (ni se difunden por tiempo real, ver
+ * `decidirEscritura`), porque no dicen nada:
  * - las masivas que no tocaron ninguna fila: `ChatService.ensureDefaults` corre un `updateMany`, un `createMany` con
  *   `skipDuplicates` y un `deleteMany` en cada consulta del chat y casi siempre afectan 0 filas (≈10 mil por 6 h);
  * - el latido de sesión que solo mueve `lastSeenAt` (≈4 mil por hora en horario laboral). Crear, renovar o revocar
  *   la sesión sí se audita.
+ * - lo que la sincronización de CT e INTEGRA escribe sin una persona detrás (`SYNC_SIN_AUTOR`): create, update, upsert y
+ *   createMany sin `autorId`. Con autor (alguien dispara el sync a mano) sí cuenta. Salida de emergencia, sin
+ *   desplegar: `AUDIT_SYNC_SIN_AUTOR=1` en el entorno del API y recrear el contenedor (con Docker Compose un
+ *   cambio de variable de entorno no se toma con un simple reinicio).
  * Sin esto audit_logs crecía ≈250 MB al día con el disco del servidor al 88 % (28-10-2026).
  */
 export function isAuditNoise(
@@ -111,7 +135,16 @@ export function isAuditNoise(
   action: string,
   args: { data?: unknown } | undefined,
   result: unknown,
+  autorId?: number | null,
 ): boolean {
+  if (
+    SYNC_SIN_AUTOR.has(model) &&
+    ACCIONES_DE_SYNC.has(action) &&
+    !(autorId != null && autorId > 0) &&
+    process.env['AUDIT_SYNC_SIN_AUTOR'] !== '1'
+  ) {
+    return true;
+  }
   if (BULK_ACTIONS.has(action)) {
     return (result as { count?: unknown } | null | undefined)?.count === 0;
   }
@@ -123,6 +156,24 @@ export function isAuditNoise(
     }
   }
   return false;
+}
+
+/**
+ * Qué hace el middleware con una escritura ya hecha: difundirla por tiempo real (`entity:updated`) y/o anotarla en
+ * audit_logs. Lo que es ruido (`isAuditNoise`) no hace ninguna de las dos: no dice nada y solo haría recargar a los
+ * clientes. Los modelos de `AUDIT_EXCLUDED` (Notification, LocationTracking, IntegraPushEvent…) no se auditan pero
+ * SIGUEN avisando, porque las apps se refrescan con ellos. La escritura de la propia auditoría no hace ninguna.
+ */
+export function decidirEscritura(
+  model: string,
+  action: string,
+  args: { data?: unknown } | undefined,
+  result: unknown,
+  autorId?: number | null,
+): { avisar: boolean; auditar: boolean } {
+  if (model === 'AuditLog') return { avisar: false, auditar: false };
+  const ruido = isAuditNoise(model, action, args, result, autorId);
+  return { avisar: !ruido, auditar: !ruido && !AUDIT_EXCLUDED.has(model) };
 }
 
 const READ_ACTIONS = new Set([
@@ -662,6 +713,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         const store = getTenantStore();
         const broadcastCompanyId =
           store?.companyId && store.companyId > 0 ? store.companyId : null;
+        // Quién la hizo: sin persona detrás (cron de sincronización, seed) no hay autor.
+        const autorId = store?.userId != null && store.userId > 0 ? store.userId : undefined;
 
         // Realtime broadcast. Acotado a la empresa cuando hay contexto de
         // tenant: un `emit` global filtraría a cada cliente conectado la
@@ -678,19 +731,26 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         if (params.model === 'AuditLog') {
           return result;
         }
-        if (broadcastCompanyId) {
-          this.realtimeGateway.emitToCompany(broadcastCompanyId, 'entity:updated', payload);
-        } else {
-          // Sin contexto de tenant (cron, seed, arranque) no hay sala a la que
-          // acotar; se mantiene la difusión global de solo metadatos.
-          this.realtimeGateway.emit('entity:updated', payload);
+        // La sincronización de CT e INTEGRA sin autor ni se avisa ni se audita (ver SYNC_SIN_AUTOR).
+        const { avisar, auditar } = decidirEscritura(
+          params.model,
+          params.action,
+          params.args,
+          result,
+          autorId,
+        );
+        if (avisar) {
+          if (broadcastCompanyId) {
+            this.realtimeGateway.emitToCompany(broadcastCompanyId, 'entity:updated', payload);
+          } else {
+            // Sin contexto de tenant (cron, seed, arranque) no hay sala a la que
+            // acotar; se mantiene la difusión global de solo metadatos.
+            this.realtimeGateway.emit('entity:updated', payload);
+          }
         }
 
         // Audit log (best-effort, async, non-blocking)
-        if (
-          !AUDIT_EXCLUDED.has(params.model) &&
-          !isAuditNoise(params.model, params.action, params.args, result)
-        ) {
+        if (auditar) {
           const entityId = result?.id ?? 0;
           const actionMap: Record<string, string> = {
             create: 'CREATE', update: 'UPDATE', delete: 'DELETE',
@@ -707,7 +767,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             changes,
             companyId: broadcastCompanyId ?? undefined,
             // Sin autor, el registro de auditoría dice qué cambió pero no quién.
-            userId: store?.userId != null && store.userId > 0 ? store.userId : undefined,
+            userId: autorId,
             ipAddress: store?.ipAddress ?? undefined,
             userAgent: store?.userAgent ?? undefined,
           });
