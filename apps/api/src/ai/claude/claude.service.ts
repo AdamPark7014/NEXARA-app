@@ -2,6 +2,7 @@ import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nest
 import Anthropic from '@anthropic-ai/sdk';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { interpretarModoPiloto, leerModoPiloto } from '../../common/piloto/interruptor-piloto.js';
+import { workDateKey } from '../../common/time/workday.js';
 import {
   CLAVES_IA,
   CompuertaIa,
@@ -31,8 +32,11 @@ export { tipoDeError };
  *   proceso. Cada proceso puede pedir otro con su propia variable de entorno.
  * - Salida estructurada (JSON Schema): la respuesta siempre trae los campos esperados.
  * - Tope diario de llamadas por empresa (`CLAUDE_TOPE_DIARIO`, 300 por omisión) para que
- *   un error o un abuso no dispare la factura. Vive en memoria: se reinicia con el proceso. La
- *   puerta además corta al llegar al presupuesto mensual del proyecto.
+ *   un error o un abuso no dispare la factura. Vive en memoria: se reinicia con el proceso. El día
+ *   es el de México (cambia a las 00:00 locales, no a las 18:00). Una llamada que la puerta no
+ *   cobra (401, 403, presupuesto agotado, saturación, modelo no permitido, solicitud demasiado
+ *   grande) devuelve su cupo; las que pudieron cobrarse (5xx, tiempo agotado, respuesta cortada o
+ *   inválida) lo conservan. La puerta además corta al llegar al presupuesto mensual del proyecto.
  * - Compuerta (`compuerta-ia.ts`): un corte de circuito en memoria. Tres fallos seguidos de llave, token, proyecto o
  *   presupuesto abren la «caída»; una sonda casi gratuita (`nexara-sonda`) la cierra cuando la puerta vuelve. Su
  *   interruptor es `ia.compuerta.modo` (sin fila = `observar`: cuenta y avisa, nunca bloquea).
@@ -156,6 +160,9 @@ export function procesoParaPuerta(proceso: string): string {
   return limpio || 'sin-proceso';
 }
 
+/** Lo que `registrarLlamada` entrega para poder devolver el cupo: la clave del mapa y el día (de México) en que se contó. */
+type BoletoCupo = { clave: string; dia: string };
+
 /** Proceso con el que la sonda de la compuerta aparece en el libro de la puerta (`x-proceso`). */
 export const PROCESO_SONDA = 'nexara-sonda';
 /** Cada cuántos minutos se sondea la puerta aunque nadie use la IA (`IA_SONDA_MINUTOS`). */
@@ -275,9 +282,14 @@ export class ClaudeService {
     return this.cliente;
   }
 
-  private registrarLlamada(companyId: number) {
+  /**
+   * Cuenta la llamada contra el cupo del día (día de México) y devuelve el boleto con el que se puede devolver si la
+   * puerta no llegó a cobrarla (`liberarLlamada`). Lanza si el cupo del día ya se acabó.
+   */
+  private registrarLlamada(companyId: number): BoletoCupo {
     const tope = Math.max(1, Number(process.env.CLAUDE_TOPE_DIARIO) || 300);
-    const dia = new Date().toISOString().slice(0, 10);
+    // `Date.now()` y no `new Date()` solos: es el mismo reloj que usa la compuerta (y el que las pruebas mueven).
+    const dia = workDateKey(new Date(Date.now()));
     const clave = `${companyId}:${dia}`;
     const usadas = this.llamadasPorDia.get(clave) ?? 0;
     if (usadas >= tope) {
@@ -289,6 +301,18 @@ export class ClaudeService {
     for (const k of this.llamadasPorDia.keys())
       if (!k.endsWith(`:${dia}`)) this.llamadasPorDia.delete(k);
     this.llamadasPorDia.set(clave, usadas + 1);
+    return { clave, dia };
+  }
+
+  /**
+   * Devuelve el cupo de una llamada que la puerta no cobró (sin pasar de cero). Solo si el boleto es del día de hoy:
+   * si la llamada cruzó la medianoche de México, su cupo era de un día que ya se limpió y no se le resta al nuevo.
+   */
+  private liberarLlamada(boleto: BoletoCupo): void {
+    if (boleto.dia !== workDateKey(new Date(Date.now()))) return;
+    const usadas = this.llamadasPorDia.get(boleto.clave);
+    if (usadas === undefined) return;
+    this.llamadasPorDia.set(boleto.clave, Math.max(0, usadas - 1));
   }
 
   /** Llamada común: sistema estable con caché, mensaje variable, errores en español. */
@@ -300,8 +324,9 @@ export class ClaudeService {
     await this.refrescarModo();
     // El corte va ANTES de contar el cupo: una llamada que la compuerta niega no gasta nada.
     const paso = this.compuerta.pedirPaso();
+    let boleto: BoletoCupo;
     try {
-      this.registrarLlamada(peticion.companyId);
+      boleto = this.registrarLlamada(peticion.companyId);
     } catch (error) {
       // El cupo la frenó: la sonda que traía no se hizo, que no quede ocupada.
       if (paso.esSonda) this.compuerta.soltarSonda();
@@ -343,6 +368,9 @@ export class ClaudeService {
     } catch (error) {
       const clase = clasificarFallo(error);
       this.compuerta.registrarFallo(clase, peticion.proceso, paso.esSonda, peticion.companyId);
+      // Lo que la puerta no cobra (401, 403, presupuesto, saturación, modelo no permitido, 413) no gasta cupo: el 25-11
+      // se fueron ~200 de 300 en puras 401. Un tiempo agotado o un 5xx SÍ lo gastan: pudieron cobrarse.
+      if (clase.sinCosto) this.liberarLlamada(boleto);
       throw this.traducirFallo(error, clase, peticion.proceso, modelo);
     }
     this.compuerta.registrarBuena(peticion.proceso, modelo, peticion.companyId);

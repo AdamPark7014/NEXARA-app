@@ -293,8 +293,8 @@ describe('ClaudeService: compuerta de la IA', () => {
       expect(error.getResponse()).toMatchObject({ statusCode: 503, code: 'IA_NO_DISPONIBLE' });
     }
     expect(create).toHaveBeenCalledTimes(3);
-    // Cada llamada contó contra el cupo del día (la devolución de lo que la puerta no cobra llega en compuerta-ia#2).
-    expect(llamadasContadas(svc)).toBe(3);
+    // Los 401 no los cobra la puerta: cada uno devolvió su cupo (antes se quedaban contados).
+    expect(llamadasContadas(svc)).toBe(0);
     expect(svc.disponible()).toBe(false);
 
     const cuarta = await svc.texto(PETICION).catch((e) => e);
@@ -303,8 +303,8 @@ describe('ClaudeService: compuerta de la IA', () => {
     expect(cuarta.getResponse()).toMatchObject({ statusCode: 503, error: 'Service Unavailable', code: 'IA_NO_DISPONIBLE' });
     expect(cuarta).toMatchObject({ motivo: 'llave_puerta_invalida', sinCosto: true });
     expect(cuarta.reintentoEn).toBeGreaterThan(0);
-    // El corte negó antes de contar el cupo: sigue en 3, no pasa a 4.
-    expect(llamadasContadas(svc)).toBe(3);
+    // El corte negó antes de contar el cupo.
+    expect(llamadasContadas(svc)).toBe(0);
     expect(svc.estadoIa()).toMatchObject({ estado: 'caida', modo: 'activo', configurada: true, motivo: 'llave_puerta_invalida' });
   });
 
@@ -466,7 +466,7 @@ describe('ClaudeService: compuerta de la IA', () => {
     process.env.CLAUDE_TOPE_DIARIO = '3';
     const create = jest.fn().mockResolvedValue(respuesta('ok'));
     const { svc } = conCompuerta(create, 'activo');
-    // Tres llamadas buenas llenan el cupo.
+    // Tres llamadas buenas llenan el cupo (los 401 ya no lo llenan: devuelven el suyo).
     for (let i = 0; i < 3; i++) await svc.texto(PETICION);
     expect(llamadasContadas(svc)).toBe(3);
     // La sonda del cron encuentra la llave muerta: la caída se abre al instante.
@@ -478,6 +478,137 @@ describe('ClaudeService: compuerta de la IA', () => {
     expect(create).toHaveBeenCalledTimes(3);
     expect(svc.compuerta.instantanea().sondaEnVuelo).toBe(false);
     expect(svc.compuerta.permite()).toBe(true);
+  });
+
+  describe('cupo diario', () => {
+    const fallo = (e: unknown) => jest.fn().mockRejectedValue(e);
+
+    it('cinco 401 seguidos (modo observar) no gastan cupo: caben las 300 llamadas buenas y la 301 sí topa', async () => {
+      const create = jest.fn();
+      for (let i = 0; i < 5; i++) create.mockRejectedValueOnce(e401());
+      create.mockResolvedValue(respuesta('ok'));
+      const { svc } = conCompuerta(create, 'observar');
+      for (let i = 0; i < 5; i++) {
+        const error = await svc.texto(PETICION).catch((e) => e);
+        expect(error).toBeInstanceOf(IaNoDisponibleException);
+      }
+      expect(llamadasContadas(svc)).toBe(0);
+      for (let i = 0; i < 300; i++) await svc.texto(PETICION);
+      expect(llamadasContadas(svc)).toBe(300);
+      const tope = await svc.texto(PETICION).catch((e) => e);
+      expect(tope.message).toBe('Se alcanzó el tope diario de 300 consultas a la IA para esta empresa: vuelve a intentarlo mañana.');
+      expect(create).toHaveBeenCalledTimes(305);
+      expect(llamadasContadas(svc)).toBe(300);
+    });
+
+    it('un tiempo agotado sí cuenta: pudo cobrarse', async () => {
+      const { svc } = conCompuerta(fallo(new Anthropic.APIConnectionTimeoutError()), 'observar');
+      await svc.texto(PETICION).catch(() => undefined);
+      expect(llamadasContadas(svc)).toBe(1);
+    });
+
+    it.each([
+      ['401', 0, e401],
+      ['403', 0, e403],
+      ['presupuesto agotado', 0, e429Presupuesto],
+      ['429 por ritmo (saturada)', 0, e429Ritmo],
+      ['modelo no permitido', 0, eModelo],
+      ['solicitud demasiado grande (413)', 0, () => errorApi(Anthropic.APIError as any, 413, 'request_too_large')],
+      ['500', 1, e500],
+      ['tiempo agotado', 1, () => new Anthropic.APIConnectionTimeoutError()],
+      ['error que no es de la API', 1, () => new TypeError('algo propio')],
+    ])('tabla de cupo: %s deja %i en el contador', async (_nombre, quedan, fabricar) => {
+      const { svc } = conCompuerta(fallo(fabricar()), 'apagado');
+      await svc.texto(PETICION).catch(() => undefined);
+      expect(llamadasContadas(svc)).toBe(quedan);
+    });
+
+    it('la respuesta cortada (refusal, max_tokens) o que no es JSON SÍ gasta cupo: la puerta la cobró', async () => {
+      const casos = [
+        respuesta('', { stop_reason: 'refusal' }),
+        respuesta('{"a":', { stop_reason: 'max_tokens' }),
+        respuesta('no es json'),
+      ];
+      for (const r of casos) {
+        reiniciarCachePiloto();
+        const { svc } = conCompuerta(jest.fn().mockResolvedValue(r), 'apagado');
+        await svc.json({ ...PETICION, esquema: {} }).catch(() => undefined);
+        expect(llamadasContadas(svc)).toBe(1);
+      }
+    });
+
+    it('el rechazo del corte (modo activo) no consume cupo ni lo devuelve de más', async () => {
+      const create = jest.fn().mockResolvedValue(respuesta('ok'));
+      const { svc } = conCompuerta(create, 'activo');
+      await svc.texto(PETICION);
+      expect(llamadasContadas(svc)).toBe(1);
+      svc.compuerta.registrarFallo(clasificarFallo(e401()), 'nexara-sonda', true);
+      for (let i = 0; i < 4; i++) {
+        const error = await svc.texto(PETICION).catch((e) => e);
+        expect(error).toBeInstanceOf(IaNoDisponibleException);
+        expect(error.sinCosto).toBe(true);
+      }
+      expect(create).toHaveBeenCalledTimes(1);
+      // Ni gastó ni restó: el único cupo es el de la llamada buena de antes.
+      expect(llamadasContadas(svc)).toBe(1);
+    });
+
+    it('devolver el cupo nunca lo deja por debajo de cero y es por empresa', async () => {
+      const create = jest.fn().mockResolvedValueOnce(respuesta('ok')).mockRejectedValue(e401());
+      const { svc } = conCompuerta(create, 'apagado');
+      await svc.texto({ ...PETICION, companyId: 2 });
+      for (let i = 0; i < 5; i++) await svc.texto({ ...PETICION, companyId: 1 }).catch(() => undefined);
+      const porClave = Object.fromEntries((svc as any).llamadasPorDia as Map<string, number>);
+      expect(Object.values(porClave).sort()).toEqual([0, 1]);
+      expect(Object.entries(porClave).find(([k]) => k.startsWith('2:'))?.[1]).toBe(1);
+    });
+
+    describe('el día cuenta en hora de México', () => {
+      afterEach(() => {
+        jest.useRealTimers();
+      });
+
+      it('el cupo se renueva a las 00:00 de México, no a las 18:00', async () => {
+        process.env.CLAUDE_TOPE_DIARIO = '2';
+        jest.useFakeTimers().setSystemTime(new Date('2026-11-28T23:30:00Z')); // 17:30 del 28 en México
+        const create = jest.fn().mockResolvedValue(respuesta('ok'));
+        const { svc } = conCompuerta(create, 'apagado');
+        await svc.texto(PETICION);
+        await svc.texto(PETICION);
+        expect(llamadasContadas(svc)).toBe(2);
+
+        // 00:30 UTC del 29 = 18:30 del 28 en México. Con el día en UTC (el error de antes) ya sería otro día.
+        jest.setSystemTime(new Date('2026-11-29T00:30:00Z'));
+        const igualDia = await svc.texto(PETICION).catch((e) => e);
+        expect(igualDia.message).toMatch(/tope diario de 2 consultas/);
+        expect(create).toHaveBeenCalledTimes(2);
+
+        // 06:30 UTC del 29 = 00:30 del 29 en México: ahora sí es otro día.
+        jest.setSystemTime(new Date('2026-11-29T06:30:00Z'));
+        await svc.texto(PETICION);
+        expect(create).toHaveBeenCalledTimes(3);
+        expect([...((svc as any).llamadasPorDia as Map<string, number>).entries()]).toEqual([['1:2026-11-29', 1]]);
+      });
+
+      it('lo que sobra de un día ya cerrado no se le resta al día nuevo', async () => {
+        // `setImmediate` se queda real: la prueba lo usa para dejar que la llamada llegue a `create`.
+        jest.useFakeTimers({ doNotFake: ['setImmediate'] }).setSystemTime(new Date('2026-11-29T05:59:00Z')); // 23:59 del 28 en México
+        let rechazar!: (e: unknown) => void;
+        const create = jest.fn(() => new Promise((_ok, no) => (rechazar = no)));
+        const { svc } = conCompuerta(create as unknown as jest.Mock, 'apagado');
+        const enVuelo = svc.texto(PETICION).catch((e) => e);
+        await new Promise((r) => setImmediate(r));
+        expect(llamadasContadas(svc)).toBe(1);
+
+        // Mientras la llamada seguía en vuelo llegó la medianoche, y otra persona ya gastó una del día nuevo.
+        jest.setSystemTime(new Date('2026-11-29T06:01:00Z'));
+        (svc as any).llamadasPorDia.clear();
+        (svc as any).llamadasPorDia.set('1:2026-11-29', 1);
+        rechazar(e401());
+        await enVuelo;
+        expect([...((svc as any).llamadasPorDia as Map<string, number>).entries()]).toEqual([['1:2026-11-29', 1]]);
+      });
+    });
   });
 
   describe('disponible()', () => {

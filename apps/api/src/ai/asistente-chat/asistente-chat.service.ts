@@ -9,6 +9,7 @@ import { ChatService } from '../../chat/chat.service.js';
 import { LigasService, type ActorLiga } from '../../chat/ligas/ligas.service.js';
 import { rutaDeLiga } from '../../chat/ligas/ligas.js';
 import { ClaudeService } from '../claude/claude.service.js';
+import { IaNoDisponibleException } from '../claude/compuerta-ia.js';
 import { AsistenteActividadesService } from '../asistente/asistente-actividades.service.js';
 import { TEMAS_AYUDA } from './ayuda-core.js';
 import { detectarIntencion, type CuandoPendientes, type Intencion } from './intenciones.js';
@@ -342,8 +343,8 @@ export class AsistenteChatService {
 
   // ─────────────────────────── IA (lo que el código no resolvió) ───────────────────────────
 
-  private registrarUsoIA(user: Actor, tenantId: number): boolean {
-    const dia = workDateKey(new Date());
+  /** Cuenta una pregunta abierta contra el cupo de la persona y el de la empresa (día de México). `false` = ya no hay. */
+  private registrarUsoIA(user: Actor, tenantId: number, dia: string = workDateKey(new Date())): boolean {
     const persona = `${tenantId}:${user.id}:${dia}`;
     const empresa = `${tenantId}:*:${dia}`;
     const topeEmpresa = Math.max(1, Number(process.env.CHAT_ASISTENTE_TOPE_DIARIO) || 150);
@@ -356,12 +357,26 @@ export class AsistenteChatService {
     return true;
   }
 
+  /**
+   * Devuelve el cupo de una pregunta que la IA no llegó a cobrar (clave caída, corte de la compuerta, presupuesto…): la
+   * de la persona y la de la empresa, sin pasar de cero. `dia` es el mismo con el que se contó; si ese día ya se limpió
+   * no hay nada que restar y no se crea nada.
+   */
+  private liberarUsoIA(user: Actor, tenantId: number, dia: string = workDateKey(new Date())): void {
+    for (const clave of [`${tenantId}:${user.id}:${dia}`, `${tenantId}:*:${dia}`]) {
+      const usadas = this.usoIA.get(clave);
+      if (usadas !== undefined) this.usoIA.set(clave, Math.max(0, usadas - 1));
+    }
+  }
+
   private async conIA(pregunta: string, user: Actor, tenantId: number): Promise<RespuestaAsistenteChat> {
     const base = { intencion: 'ia' as const, sugerencias: SUGERENCIAS_BASE, accion: null };
     if (!this.claude.disponible()) {
       return { ...base, fuente: 'codigo', texto: 'Esa no la sé contestar sin la IA, y ahora no está disponible. Prueba con «¿qué puedes hacer?».' };
     }
-    if (!this.registrarUsoIA(user, tenantId)) {
+    // El mismo día para contar y para devolver, aunque la llamada cruce la medianoche de México.
+    const dia = workDateKey(new Date());
+    if (!this.registrarUsoIA(user, tenantId, dia)) {
       return {
         ...base,
         fuente: 'codigo',
@@ -380,6 +395,9 @@ export class AsistenteChatService {
       });
       salida = limpiarSalida(datos);
     } catch (e) {
+      // Si la IA no llegó a cobrar (llave caída, corte de la compuerta…), la pregunta no gasta el cupo de la persona.
+      // Solo se usa la clase de la excepción: el servicio de Claude no necesita métodos nuevos para esto.
+      if (e instanceof IaNoDisponibleException && e.sinCosto) this.liberarUsoIA(user, tenantId, dia);
       const motivo = e instanceof ServiceUnavailableException ? e.message : 'La IA no respondió: intenta de nuevo.';
       this.logger.warn(`[chat-asistente] sin respuesta de la IA: ${motivo}`);
       return { ...base, fuente: 'codigo', texto: motivo };

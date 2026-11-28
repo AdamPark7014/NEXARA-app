@@ -1,5 +1,6 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { AsistenteChatService } from './asistente-chat.service.js';
+import { IaNoDisponibleException } from '../claude/compuerta-ia.js';
 
 const GENERAL = { id: 333, members: [{ userId: 5 }] };
 
@@ -87,5 +88,65 @@ describe('AsistenteChatService', () => {
     expect(tope.fuente).toBe('codigo');
     expect(tope.texto).toMatch(/se acabaron las preguntas abiertas/);
     expect(claude.json).toHaveBeenCalledTimes(20);
+  });
+  describe('cupo de la IA cuando la IA falla', () => {
+    const pregunta = { texto: '@asistente ¿puedo cambiar de jefe directo si me cambio de área?', channelId: 333 };
+    const usoDe = (svc: unknown) => Object.fromEntries((svc as { usoIA: Map<string, number> }).usoIA);
+    const claveDe = (uso: Record<string, number>, resto: string) => Object.entries(uso).find(([k]) => k.includes(resto))?.[1];
+
+    it('un fallo sin costo (la puerta no cobra) deja el uso de la persona y de la empresa en 0 y responde en español, sin IA', async () => {
+      const { svc, claude } = armar();
+      claude.json.mockRejectedValue(
+        new IaNoDisponibleException('La IA no está disponible por ahora: ya se avisó al administrador.', 'llave_puerta_invalida', true),
+      );
+      const r = await svc.responder(yo, 1, pregunta);
+      expect(r).toMatchObject({ fuente: 'codigo', intencion: 'ia' });
+      expect(r.texto).toBe('La IA no está disponible por ahora: ya se avisó al administrador.');
+      const uso = usoDe(svc);
+      expect(claveDe(uso, ':5:')).toBe(0);
+      expect(claveDe(uso, ':*:')).toBe(0);
+    });
+
+    it('con un error cualquiera (pudo cobrarse) el uso queda en 1', async () => {
+      for (const error of [
+        new IaNoDisponibleException('La IA no respondió: intenta de nuevo.', 'error_servicio', false),
+        new ServiceUnavailableException('La IA respondió en un formato inesperado: intenta de nuevo.'),
+        new Error('boom'),
+      ]) {
+        const { svc, claude } = armar();
+        claude.json.mockRejectedValue(error);
+        const r = await svc.responder(yo, 1, pregunta);
+        expect(r.fuente).toBe('codigo');
+        expect(r.texto).toMatch(/^La IA /);
+        const uso = usoDe(svc);
+        expect(claveDe(uso, ':5:')).toBe(1);
+        expect(claveDe(uso, ':*:')).toBe(1);
+      }
+    });
+
+    it('veinticinco preguntas con la IA caída no gastan el tope de 20: cuando vuelve, la persona sigue pudiendo preguntar', async () => {
+      const { svc, claude } = armar();
+      claude.json.mockRejectedValue(new IaNoDisponibleException('Se acabó el presupuesto de IA de este mes: avísale al administrador.', 'presupuesto_agotado', true));
+      for (let i = 0; i < 25; i++) {
+        const r = await svc.responder(yo, 1, pregunta);
+        expect(r.texto).toMatch(/presupuesto de IA/);
+      }
+      claude.json.mockResolvedValue({ datos: { fueraDeTema: false, tema: null, respuesta: 'Ya volví.' } });
+      const r = await svc.responder(yo, 1, pregunta);
+      expect(r).toMatchObject({ fuente: 'ia' });
+      expect(r.texto).toContain('Ya volví.');
+      expect(claveDe(usoDe(svc), ':5:')).toBe(1);
+    });
+
+    it('lo devuelto es solo de esa persona: el uso de otra persona de la empresa no se toca', async () => {
+      const { svc, claude } = armar();
+      await svc.responder({ ...yo, id: 7 }, 1, pregunta);
+      claude.json.mockRejectedValue(new IaNoDisponibleException('x', 'llave_puerta_invalida', true));
+      await svc.responder(yo, 1, pregunta);
+      const uso = usoDe(svc);
+      expect(claveDe(uso, ':7:')).toBe(1);
+      expect(claveDe(uso, ':5:')).toBe(0);
+      expect(claveDe(uso, ':*:')).toBe(1);
+    });
   });
 });
